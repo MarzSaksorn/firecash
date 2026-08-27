@@ -1,0 +1,6 @@
+{
+  "name": "FireCash",
+  "description": "Receipt logging, instant OCR extraction, spending analytics, and seamless data export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

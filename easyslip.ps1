@@ -1,0 +1,1 @@
+curl -X POST https://api.easyslip.com/v2/verify/bank -H "Authorization: Bearer d88bd65d-ea06-4835-9f37-37b2b59156d5"  -H "Content-Type: application/json" -d '{"payload": "00410006000001010300402200462305o93d9k4endhPo5102TH910462AB", "checkDuplicate": true}'

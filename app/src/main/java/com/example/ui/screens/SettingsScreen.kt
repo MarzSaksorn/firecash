@@ -1,0 +1,652 @@
+package com.example.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowRightAlt
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.data.model.KeywordRule
+import com.example.ui.components.FireCashTopBar
+import com.example.ui.theme.FireCashBackground
+import com.example.ui.theme.FireCashOnBackground
+import com.example.ui.theme.FireCashOnPrimary
+import com.example.ui.theme.FireCashOnSurface
+import com.example.ui.theme.FireCashOnSurfaceVariant
+import com.example.ui.theme.FireCashOutline
+import com.example.ui.theme.FireCashOutlineVariant
+import com.example.ui.theme.FireCashPrimary
+import com.example.ui.theme.FireCashPrimaryContainer
+import com.example.ui.theme.FireCashSecondary
+import com.example.ui.theme.FireCashSurfaceContainer
+import com.example.ui.theme.FireCashSurfaceContainerHigh
+import com.example.ui.theme.FireCashSurfaceContainerHighest
+import com.example.ui.theme.FireCashSurfaceContainerLow
+import com.example.ui.theme.FireCashSurfaceDim
+import com.example.ui.theme.FireCashSurfaceVariant
+
+@Composable
+fun SettingsScreen(
+    currentCurrency: String,
+    rules: List<KeywordRule>,
+    googleDriveSync: Boolean,
+    easySlipEnabled: Boolean,
+    apiKey: String,
+    checkDuplicates: Boolean,
+    onCurrencyChange: (String) -> Unit,
+    onToggleDriveSync: (Boolean) -> Unit,
+    onToggleEasySlip: (Boolean) -> Unit,
+    onUpdateApiKey: (String) -> Unit,
+    onToggleCheckDuplicates: (Boolean) -> Unit,
+    onAddRule: (keyword: String, category: String) -> Unit,
+    onRemoveRule: (KeywordRule) -> Unit,
+    onNavigateToBackup: () -> Unit,
+    onBack: () -> Unit, onNavigateToCapture: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var currencyMenuExpanded by remember { mutableStateOf(false) }
+    var showAddRuleDialog by remember { mutableStateOf(false) }
+    var newKeyword by remember { mutableStateOf("") }
+    var newCategory by remember { mutableStateOf("Travel") }
+
+    var apiKeyText by remember { mutableStateOf(apiKey) }
+
+    val currencies = listOf("USD", "THB", "EUR", "GBP", "JPY")
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .background(FireCashBackground)
+    ) {
+        FireCashTopBar(
+            title = "FireCash",
+            showBackButton = true,
+            onBackClick = onBack,
+            onProfileClick = {}
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "General Settings",
+                color = FireCashOnSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+
+            // Card 1: Base Currency
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FireCashSurfaceContainerLow)
+                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(FireCashSurfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Payments,
+                                contentDescription = null,
+                                tint = FireCashPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = "Base Currency",
+                                color = FireCashOnSurface,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Set default currency for analytics",
+                                color = FireCashOnSurfaceVariant,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+
+                    // Currency Dropdown
+                    Box {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(FireCashSurfaceContainerHigh)
+                                .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                .clickable { currencyMenuExpanded = true }
+                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                                .testTag("currency_selector_dropdown"),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = when (currentCurrency) {
+                                    "THB" -> "THB (฿)"
+                                    "EUR" -> "EUR (€)"
+                                    "GBP" -> "GBP (£)"
+                                    "JPY" -> "JPY (¥)"
+                                    else -> "USD ($)"
+                                },
+                                color = FireCashOnSurface,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                tint = FireCashOnSurfaceVariant
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = currencyMenuExpanded,
+                            onDismissRequest = { currencyMenuExpanded = false },
+                            modifier = Modifier.background(FireCashSurfaceContainerHighest)
+                        ) {
+                            currencies.forEach { curr ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = when (curr) {
+                                                "THB" -> "THB (฿)"
+                                                "EUR" -> "EUR (€)"
+                                                "GBP" -> "GBP (£)"
+                                                "JPY" -> "JPY (¥)"
+                                                else -> "USD ($)"
+                                            },
+                                            color = FireCashOnSurface
+                                        )
+                                    },
+                                    onClick = {
+                                        onCurrencyChange(curr)
+                                        currencyMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // EasySlip Verification Configuration
+            Text(
+                text = "Bank Slip Verification (EasySlip Proxy)",
+                color = FireCashOnSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 4.dp, top = 6.dp)
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FireCashSurfaceContainerLow)
+                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(FireCashSurfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Shield,
+                                    contentDescription = null,
+                                    tint = FireCashSecondary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+
+                            Column {
+                                Text(
+                                    text = "EasySlip Verification",
+                                    color = FireCashOnSurface,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Verify PromptPay / EMVCo Tag 91 CRC",
+                                    color = FireCashOnSurfaceVariant,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+
+                        Switch(
+                            checked = easySlipEnabled,
+                            onCheckedChange = onToggleEasySlip,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = FireCashOnPrimary,
+                                checkedTrackColor = FireCashSecondary,
+                                uncheckedThumbColor = FireCashOutline,
+                                uncheckedTrackColor = FireCashSurfaceVariant
+                            )
+                        )
+                    }
+
+                    if (easySlipEnabled) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            // API Key Field
+                            OutlinedTextField(
+                                value = apiKeyText,
+                                onValueChange = {
+                                    apiKeyText = it
+                                    onUpdateApiKey(it)
+                                },
+                                label = { Text("EasySlip API Key") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Key,
+                                        contentDescription = null,
+                                        tint = FireCashOnSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                textStyle = TextStyle(
+                                    color = FireCashOnSurface,
+                                    fontSize = 13.sp,
+                                    fontFamily = FontFamily.Monospace
+                                ),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = FireCashSurfaceContainerHigh,
+                                    unfocusedContainerColor = FireCashSurfaceContainerHigh,
+                                    focusedBorderColor = FireCashPrimary,
+                                    unfocusedBorderColor = FireCashOutlineVariant
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // Duplicate Check Toggle
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Prevent Duplicate Slips",
+                                    color = FireCashOnSurface,
+                                    fontSize = 14.sp
+                                )
+                                Switch(
+                                    checked = checkDuplicates,
+                                    onCheckedChange = onToggleCheckDuplicates,
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = FireCashOnPrimary,
+                                        checkedTrackColor = FireCashPrimary
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Card 2: Keyword Mapping Pro
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FireCashSurfaceContainerLow)
+                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(FireCashSurfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Label,
+                                contentDescription = null,
+                                tint = FireCashPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "Keyword Mapping",
+                                    color = FireCashOnSurface,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(FireCashPrimary.copy(alpha = 0.2f))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "Smart",
+                                        color = FireCashPrimary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Auto-assign categories based on extracted keywords.",
+                                color = FireCashOnSurfaceVariant,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+
+                    // Rules List
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rules.forEach { rule ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(FireCashSurfaceContainerHighest)
+                                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(FireCashSurfaceDim)
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = rule.keyword,
+                                            color = FireCashOnSurface,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowRightAlt,
+                                        contentDescription = null,
+                                        tint = FireCashOutline,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+
+                                    Text(
+                                        text = rule.category,
+                                        color = FireCashSecondary,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = { onRemoveRule(rule) },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Remove rule",
+                                        tint = FireCashOutline,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Add Rule Button
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(
+                                    width = 1.dp,
+                                    color = FireCashOutline.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .clickable { showAddRuleDialog = true }
+                                .padding(vertical = 10.dp)
+                                .testTag("add_rule_button"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = FireCashPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = "Add Rule",
+                                    color = FireCashPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Text(
+                text = "Data & Storage",
+                color = FireCashOnSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+            )
+
+            // Card 3: Google Drive Sync & Backup
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FireCashSurfaceContainerLow)
+                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .clickable { onNavigateToBackup() }
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(FireCashSurfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudSync,
+                                contentDescription = null,
+                                tint = FireCashPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = "Google Drive & Local Backup",
+                                color = FireCashOnSurface,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Manage snapshots and encrypted exports",
+                                color = FireCashOnSurfaceVariant,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowRightAlt,
+                        contentDescription = null,
+                        tint = FireCashPrimary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(30.dp))
+        }
+
+        // Add Rule Dialog
+        if (showAddRuleDialog) {
+            AlertDialog(
+                onDismissRequest = { showAddRuleDialog = false },
+                title = {
+                    Text(
+                        text = "Add Keyword Mapping",
+                        color = FireCashOnSurface,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = newKeyword,
+                            onValueChange = { newKeyword = it },
+                            label = { Text("Merchant / Keyword") },
+                            placeholder = { Text("e.g. Uber, Netflix, Starbucks, PromptPay") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = newCategory,
+                            onValueChange = { newCategory = it },
+                            label = { Text("Map To Category") },
+                            placeholder = { Text("e.g. Travel, Software, Food & Dining") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (newKeyword.isNotBlank()) {
+                                onAddRule(newKeyword, newCategory)
+                                newKeyword = ""
+                            }
+                            showAddRuleDialog = false
+                        }
+                    ) {
+                        Text("Add Rule")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAddRuleDialog = false }) {
+                        Text("Cancel")
+                    }
+                },
+                containerColor = FireCashSurfaceContainerHighest
+            )
+        }
+    }
+}

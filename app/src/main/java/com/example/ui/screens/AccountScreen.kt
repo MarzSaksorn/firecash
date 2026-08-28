@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,6 +40,12 @@ import com.example.ui.theme.FireCashSecondaryContainer
 import com.example.ui.theme.FireCashSurfaceContainerLow
 import java.util.Locale
 
+private fun isSelfTransfer(slip: SavedSlip): Boolean {
+    val s = slip.senderName?.trim()?.lowercase(Locale.ROOT)
+    val r = slip.receiverName?.trim()?.lowercase(Locale.ROOT)
+    return !s.isNullOrEmpty() && s == r
+}
+
 @Composable
 fun AccountScreen(
     slips: List<SavedSlip>,
@@ -55,8 +62,8 @@ fun AccountScreen(
     LaunchedEffect(Unit) {
         onAutoSync()
     }
-    val moneyIn = slips.filter { it.isMoneyIn && it.amount != null }.sumOf { it.amount!! }
-    val moneyOut = slips.filter { !it.isMoneyIn && it.amount != null }.sumOf { it.amount!! }
+    val moneyIn = slips.filter { !isSelfTransfer(it) && it.isMoneyIn && it.amount != null }.sumOf { it.amount!! }
+    val moneyOut = slips.filter { !isSelfTransfer(it) && !it.isMoneyIn && it.amount != null }.sumOf { it.amount!! }
     val balance = moneyIn - moneyOut
 
     Box(
@@ -283,9 +290,18 @@ fun AccountScreen(
 
 @Composable
 private fun TransactionRow(slip: SavedSlip, onClick: () -> Unit) {
+    val isSelf = isSelfTransfer(slip)
     val isIn = slip.isMoneyIn
-    val arrow = if (isIn) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward
-    val color = if (isIn) Color(0xFF66BB6A) else Color(0xFFEF5350)
+    val arrow = when {
+        isSelf -> Icons.Default.SwapHoriz
+        isIn -> Icons.Default.ArrowDownward
+        else -> Icons.Default.ArrowUpward
+    }
+    val color = when {
+        isSelf -> Color(0xFF9E9E9E)
+        isIn -> Color(0xFF66BB6A)
+        else -> Color(0xFFEF5350)
+    }
 
     Row(
         modifier = Modifier
@@ -314,7 +330,11 @@ private fun TransactionRow(slip: SavedSlip, onClick: () -> Unit) {
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = if (isIn) (slip.senderName ?: "Transfer") else (slip.receiverName ?: "Transfer"),
+                text = when {
+                    isSelf -> "Transfer"
+                    isIn -> slip.senderName ?: "Transfer"
+                    else -> slip.receiverName ?: "Transfer"
+                },
                 color = Color.White,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium
@@ -328,7 +348,8 @@ private fun TransactionRow(slip: SavedSlip, onClick: () -> Unit) {
 
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = "${if (isIn) "+" else "-"}THB %.2f".format(Locale.US, slip.amount ?: 0.0),
+                text = if (isSelf) "THB %.2f".format(Locale.US, slip.amount ?: 0.0)
+                else "${if (isIn) "+" else "-"}THB %.2f".format(Locale.US, slip.amount ?: 0.0),
                 color = color,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold

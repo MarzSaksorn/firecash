@@ -44,6 +44,12 @@ private data class TimeEntry(val label: String, val total: Double)
 
 private enum class TimeBucket { DAY, WEEK, MONTH }
 
+private fun isSelfTransfer(slip: SavedSlip): Boolean {
+    val s = slip.senderName?.trim()?.lowercase(Locale.ROOT)
+    val r = slip.receiverName?.trim()?.lowercase(Locale.ROOT)
+    return !s.isNullOrEmpty() && s == r
+}
+
 @Composable
 fun AnalyticsScreen(
     slips: List<SavedSlip>,
@@ -51,7 +57,7 @@ fun AnalyticsScreen(
     onRefresh: () -> Unit
 ) {
     val expenses = remember(slips) {
-        slips.mapNotNull { slip ->
+        slips.filterNot { isSelfTransfer(it) }.mapNotNull { slip ->
             val amt = slip.amount ?: return@mapNotNull null
             Expense(
                 merchant = slip.senderName ?: slip.receiverName ?: "Unknown",

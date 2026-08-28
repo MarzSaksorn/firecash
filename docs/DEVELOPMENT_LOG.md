@@ -5,13 +5,13 @@
 **Project:** FireCash — Receipt Logging & PromptPay/EMVCo Slip Verification (Jetpack Compose + Room + EasySlip + ML Kit + NotificationListener)  
 **Repo:** `C:\Users\admin\Project\FireCash` • `namespace = com.example` • `applicationId = com.aistudio.firecash.qxrtv`  
 **Period:** 2026-08-25 (night) → 2026-08-28 (intensive) • Today is `Fri Aug 28 2026` (UTC)  
-**Model:** `opencode/muse-spark-1.2-contributor-free` via opencode harness after Day 2 night (project kicked off **2026-08-25 night**)
+**Model:** `opencode/muse-spark-1.2-contributor-free` via opencode harness from **Day 3 (2026-08-27)** (project kicked off **2026-08-25 night**)
 
 ---
 
 ## Overview
 
-FireCash started as research-driven. **Days 1-2 were pure research via a separate `opencode` convo** — that convo produced the Stitch UI plan (`docs/firecash_ui_stitch_plan.md` with MD3 dark tokens `#121316`/`#FF6B00`/`#10B981`/`#6366F1`). That plan was fed to **Google Stitch** on **2026-08-26 night**, then an **unplanned Google AI Studio** spike was tried the same night and was **not satisfying (not in the original plan)** and abandoned; **after that we came to this `opencode + Muse Spark` convo with the Google Stitch design as input** and rebuilt/iterated the entire app in one long `2026-08-28` night session — from `Account Settings` scaffolding through to notification whitelists, reverse chat-style list, search, copy-to-clipboard, logo, navigation and homepage changes. All commits below are from `git log --reverse --date=short` (local time).
+FireCash started as research-driven. **Days 1-2 were pure research via a separate `opencode` convo** — that convo produced the Stitch UI plan (`docs/firecash_ui_stitch_plan.md` with MD3 dark tokens `#121316`/`#FF6B00`/`#10B981`/`#6366F1`). That plan was fed to **Google Stitch** on **2026-08-26 night**, then an **unplanned Google AI Studio** spike was tried the same night and was **not satisfying (not in the original plan)** and abandoned; **after that we came to this `opencode + Muse Spark` convo with the Google Stitch design as input** on **Day 3 (2026-08-27)** and rebuilt/iterated the entire app in one long intensive session — from `Account Settings` scaffolding through to notification whitelists, reverse chat-style list, search, copy-to-clipboard, logo, navigation and homepage changes. All commits below are from `git log --reverse --date=short` (local time).
 
 ---
 
@@ -43,11 +43,11 @@ FireCash started as research-driven. **Days 1-2 were pure research via a separat
 
 ---
 
-## Day 3 — 2026-08-28 — This Opencode Convo Intensive (Stitch Design as Input)
+## Day 3 — 2026-08-27 — This Opencode Convo Intensive (Stitch Design as Input)
 
-This is **Day 3** (2026-08-28) — the entire intensive `opencode + Muse Spark` session rebuilding from the Google Stitch design. Presented in chronological order as they happened (git timestamps match this day).
+This is **Day 3** (2026-08-27) — the entire intensive `opencode + Muse Spark` session rebuilding from the Google Stitch design. Presented in chronological order as they happened (git timestamps: `2026-08-27` + `2026-08-28`).
 
-> Note: `Stitch + AI Studio` moved to **2026-08-26 night** per user; the `opencode` intensive below is **Day 3 = 2026-08-28**.
+> Note: `Stitch + AI Studio` moved to **2026-08-26 night** per user; the `opencode` intensive below is **Day 3 = 2026-08-27**.
 
 ### 00:00–02:00 — Core Scan & Persistence
 

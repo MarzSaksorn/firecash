@@ -1,6 +1,8 @@
 package com.example.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -241,7 +243,8 @@ fun MainApp(modifier: Modifier = Modifier) {
                 )
             }
         }
-    ) {
+    ) { paddingValues ->
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
         if (showPayload) {
             QrPayloadScreen(
                 payload = qrPayload,
@@ -347,6 +350,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                         showSavedSlips = false
                     }
                 )
+            }
         }
     }
 }

@@ -1,8 +1,7 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,27 +9,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.analytics.AnalyticsEngine
-import com.example.data.analytics.CategorySpend
 import com.example.data.analytics.InsightType
 import com.example.data.analytics.SpendingInsight
 import com.example.data.model.Expense
@@ -39,7 +34,15 @@ import com.example.ui.theme.FireCashBackground
 import com.example.ui.theme.FireCashOnSurfaceVariant
 import com.example.ui.theme.FireCashPrimary
 import com.example.ui.theme.FireCashSurfaceContainerLow
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.time.temporal.WeekFields
 import java.util.Locale
+
+private data class TimeEntry(val label: String, val total: Double)
+
+private enum class TimeBucket { DAY, WEEK, MONTH }
 
 @Composable
 fun AnalyticsScreen(
@@ -63,8 +66,12 @@ fun AnalyticsScreen(
     val totalSpent = analytics.totalSpent
     val changePct = analytics.changePercentage
     val avgPerDay = analytics.averagePerDay
-    val categorySpends = analytics.categorySpends
     val insights = analytics.insights
+
+    var selectedBucket by remember { mutableStateOf(TimeBucket.DAY) }
+    val timeEntries = remember(expenses, selectedBucket) {
+        computeEntries(expenses.filter { it.date.isNotBlank() }, selectedBucket)
+    }
 
     Column(
         modifier = Modifier
@@ -94,7 +101,6 @@ fun AnalyticsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Stats row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -119,25 +125,57 @@ fun AnalyticsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Category breakdown
-        if (categorySpends.isNotEmpty()) {
-            Text(
-                text = "Spending by Category",
-                color = FireCashOnSurfaceVariant,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Spending Over Time",
+                    color = FireCashOnSurfaceVariant,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TimeFilterChip(label = "Day", selected = selectedBucket == TimeBucket.DAY) {
+                        selectedBucket = TimeBucket.DAY
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    TimeFilterChip(label = "Week", selected = selectedBucket == TimeBucket.WEEK) {
+                        selectedBucket = TimeBucket.WEEK
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    TimeFilterChip(label = "Month", selected = selectedBucket == TimeBucket.MONTH) {
+                        selectedBucket = TimeBucket.MONTH
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(12.dp))
-            StickChart(
-                data = categorySpends.take(6),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(220.dp)
-            )
+            if (timeEntries.isNotEmpty()) {
+                StickChart(
+                    data = timeEntries,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No dated transactions yet",
+                        color = FireCashOnSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(20.dp))
         }
 
-        // Insights
         if (insights.isNotEmpty()) {
             Text(
                 text = "AI Insights",
@@ -179,6 +217,20 @@ fun AnalyticsScreen(
 }
 
 @Composable
+private fun TimeFilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, fontSize = 12.sp) },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = FireCashPrimary,
+            containerColor = FireCashSurfaceContainerLow
+        ),
+        modifier = Modifier.height(32.dp)
+    )
+}
+
+@Composable
 private fun StatCard(
     title: String,
     value: String,
@@ -208,7 +260,7 @@ private fun StatCard(
 
 @Composable
 private fun StickChart(
-    data: List<CategorySpend>,
+    data: List<TimeEntry>,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -217,7 +269,7 @@ private fun StickChart(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            val maxAmount = data.maxOfOrNull { it.totalAmount } ?: 0.0
+            val maxAmount = data.maxOfOrNull { it.total } ?: 0.0
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val count = data.size
                 if (count == 0) return@Canvas
@@ -225,8 +277,8 @@ private fun StickChart(
                 val columnWidth = size.width / count
                 val chartBottom = size.height - 4.dp.toPx()
                 val chartHeight = chartBottom - 18.dp.toPx()
-                val baselineColor = androidx.compose.ui.graphics.Color(0xFF2C3036)
-                val stickColor = androidx.compose.ui.graphics.Color(0xFFFF6B00)
+                val baselineColor = Color(0xFF2C3036)
+                val stickColor = Color(0xFFFF6B00)
 
                 drawLine(
                     color = baselineColor,
@@ -235,9 +287,9 @@ private fun StickChart(
                     strokeWidth = 2.dp.toPx()
                 )
 
-                data.forEachIndexed { index, spend ->
+                data.forEachIndexed { index, entry ->
                     val stickHeight = if (maxAmount > 0) {
-                        (spend.totalAmount / maxAmount * chartHeight).toFloat()
+                        (entry.total / maxAmount * chartHeight).toFloat()
                     } else 0f
                     val centerX = columnWidth * index + columnWidth / 2f
                     val topY = chartBottom - stickHeight
@@ -260,10 +312,10 @@ private fun StickChart(
         }
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth()) {
-            data.forEachIndexed { index, spend ->
+            data.forEach { entry ->
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
                     Text(
-                        text = spend.category,
+                        text = entry.label,
                         color = FireCashOnSurfaceVariant,
                         fontSize = 10.sp,
                         maxLines = 1
@@ -315,4 +367,35 @@ private fun InsightRow(insight: SpendingInsight) {
             )
         }
     }
+}
+
+private fun computeEntries(
+    expenses: List<Expense>,
+    bucket: TimeBucket
+): List<TimeEntry> {
+    if (expenses.isEmpty()) return emptyList()
+    val df = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US)
+    val grouped = when (bucket) {
+        TimeBucket.DAY -> expenses.groupBy { it.date }
+        TimeBucket.WEEK -> expenses.groupBy {
+            val d = LocalDate.parse(it.date, df)
+            val week = d.get(WeekFields.of(Locale.US).weekOfYear())
+            "${d.year}-W${week.toString().padStart(2, '0')}"
+        }
+        TimeBucket.MONTH -> expenses.groupBy {
+            val d = LocalDate.parse(it.date, df)
+            "${d.year}-${d.monthValue.toString().padStart(2, '0')}"
+        }
+    }
+    return grouped.map { (key, list) ->
+        val label = when (bucket) {
+            TimeBucket.DAY -> key.takeLast(5)
+            TimeBucket.WEEK -> "W${key.takeLast(2)}"
+            TimeBucket.MONTH -> {
+                val d = LocalDate.parse("${key}-01", df)
+                d.month.getDisplayName(TextStyle.SHORT, Locale.US)
+            }
+        }
+        TimeEntry(label = label, total = list.sumOf { e -> e.amount })
+    }.sortedBy { it.label }
 }

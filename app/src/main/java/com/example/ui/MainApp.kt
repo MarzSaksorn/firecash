@@ -83,7 +83,7 @@ fun MainApp(modifier: Modifier = Modifier) {
         return easySlipClient.verifyPayload(payload, checkDuplicate = checkDuplicates)
     }
 
-    suspend fun addSlip(payload: String) {
+    suspend fun addSlip(payload: String, isMoneyIn: Boolean = false) {
         val result = verifyWithEasySlip(payload)
         slipData = result
         val slip = SavedSlip(
@@ -95,7 +95,8 @@ fun MainApp(modifier: Modifier = Modifier) {
             date = result?.transDate,
             time = result?.transTime,
             verificationStatus = result?.verificationStatus ?: VerificationStatus.UNVERIFIED,
-            slipData = result
+            slipData = result,
+            isMoneyIn = isMoneyIn
         )
 
         // Dedupe: re-scanning the same slip updates the existing entry instead of adding a log
@@ -122,10 +123,21 @@ fun MainApp(modifier: Modifier = Modifier) {
         qrPayload = payload
         isLoading = true
         scope.launch {
-            addSlip(payload)
+            slipData = verifyWithEasySlip(payload)
             isLoading = false
             showCapture = false
             showPayload = true
+        }
+    }
+
+    fun savePayload(isMoneyIn: Boolean) {
+        if (qrPayload.isBlank()) return
+        isLoading = true
+        scope.launch {
+            addSlip(qrPayload, isMoneyIn)
+            isLoading = false
+            showPayload = false
+            showCapture = true
         }
     }
 
@@ -238,6 +250,9 @@ fun MainApp(modifier: Modifier = Modifier) {
                 onBack = {
                     showPayload = false
                     showCapture = true
+                },
+                onSave = { isMoneyIn ->
+                    savePayload(isMoneyIn)
                 }
             )
         } else if (showCapture) {

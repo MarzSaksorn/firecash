@@ -11,18 +11,18 @@
 
 ## Overview
 
-FireCash started as a research-driven offline-first receipt/slip tracker. The original plan was pure research on Days 1-2. On Day 2 night an unplanned Google AI Studio spike was tried and failed, triggering a pivot to `opencode + Muse Spark` where the entire app was iterated in one long session on 2026-08-28 — from `Account Settings` scaffolding through to notification whitelists, reverse chat-style list, search, copy-to-clipboard, logo, navigation and homepage changes. All commits below are from `git log --reverse --date=short` (local time).
+FireCash started as research-driven. **Days 1-2 were pure research via a separate `opencode` convo** — that convo produced the Stitch UI plan (`docs/firecash_ui_stitch_plan.md` with MD3 dark tokens `#121316`/`#FF6B00`/`#10B981`/`#6366F1`). That plan was fed to **Google Stitch** to generate the initial UI. On **Day 2 night** an **unplanned Google AI Studio** spike was tried and was **not satisfying (not in the original plan)**, so we abandoned it and came to **this `opencode + Muse Spark` convo with the Google Stitch design as input** and rebuilt/iterated the entire app in one long `2026-08-28` session — from `Account Settings` scaffolding through to notification whitelists, reverse chat-style list, search, copy-to-clipboard, logo, navigation and homepage changes. All commits below are from `git log --reverse --date=short` (local time).
 
 ---
 
-## Day 1 — 2026-08-27 — Research
+## Day 1 — 2026-08-27 — Research (via first opencode convo)
 
-**Goal:** Understand the problem space, not code.
+**Goal:** Understand the problem space, not code — done **through a separate `opencode` convo**.
 
 - Read Thai banking slip specifics: PromptPay/EMVCo Tag 91 `9104[A-Fa-f0-9]{4}` CRC, Bangkok Bank `002`, KBank `004`, SCB `014`, KTB `006`, etc.
 - Surveyed EasySlip `POST /verify/bank`, duplicate detection, 180-day `SLIP_NOT_FOUND`, `RATE_LIMIT_EXCEEDED`.
 - Compared ML Kit Text Recognition vs Tag 91 QR parsing, Room `Expense`/`KeywordRule` persistence, CSV/PDF streaming, Drive snapshot vs full sync.
-- Produced `docs/firecash_full_plan.md` (11-feature table), `docs/firecash_ai_studio_systems_plan.md` (flow: Camera → OCR → EasySlip → Room → Analytics/Export), `docs/firecash_ui_stitch_plan.md` (MD3 dark tokens `#121316` / `#FF6B00` / `#10B981` / `#6366F1`), `docs/ai_studio_prompts.md`, `README.md` (8 key features).
+- That first opencode convo **produced the full research docs and the UI plan for Google Stitch**: `docs/firecash_full_plan.md` (11-feature table), `docs/firecash_ai_studio_systems_plan.md` (flow: Camera → OCR → EasySlip → Room → Analytics/Export), **`docs/firecash_ui_stitch_plan.md` (MD3 dark tokens `#121316` / `#FF6B00` / `#10B981` / `#6366F1` — specifically authored as input for Stitch)**, `docs/ai_studio_prompts.md`, `README.md` (8 key features).
 - No code beyond `Initial commit` + `Add all remaining project files` scaffolding.
 
 **Commits 2026-08-27:**
@@ -32,21 +32,23 @@ FireCash started as a research-driven offline-first receipt/slip tracker. The or
 
 ---
 
-## Day 2 — 2026-08-27 → 2026-08-28 — Research + Google AI Studio Detour (Off-Plan)
+## Day 2 — 2026-08-27 → 2026-08-28 — Stitch Build + Google AI Studio Detour (Off-Plan)
 
-**Morning/Afternoon:** Continued research, validated `docs/account-settings-summary.md` (hide bottom nav on settings, `showAccountSettings` flag, `loadTrackedFolders/saveTrackedFolders`, `scanFolder()`).
+**Morning/Afternoon — Google Stitch build (from Day 1 opencode UI plan):**
+- Fed the `firecash_ui_stitch_plan.md` from the first opencode convo into **Google Stitch** to generate the initial UI stitch. Stitch produced the dark-theme shell, card spacing, `14-20dp` radii, and test tags (`search_expenses_input` etc.) as a starting point.
+- Validated `docs/account-settings-summary.md` (hide bottom nav on settings, `showAccountSettings` flag, `loadTrackedFolders/saveTrackedFolders`, `scanFolder()`).
 
-**Night — Google AI Studio attempt (FAILED, not in plan):**
-- Spun up a green-field app in Google AI Studio to speed up UI stitching. Hit prompt limits, non-deterministic scaffolding, and no access to local `Room`/`CameraX`/`ML Kit` toolchain; generated code didn't compile against `FireCashDatabase`/`OcrProcessor` contracts.
-- Decision: abandon AI Studio, keep its `firecash_ui_stitch_plan.md` tokens but rebuild locally with a controllable harness.
+**Night — Google AI Studio attempt (FAILED, not in plan, not satisfying):**
+- Tried to continue the Stitch output in **Google AI Studio** for faster iteration. Hit prompt limits, non-deterministic scaffolding, and no access to local `Room`/`CameraX`/`ML Kit` toolchain; generated code didn't compile against `FireCashDatabase`/`OcrProcessor` contracts and styling drifted from the Stitch design.
+- Decision: **abandon AI Studio**, keep the `Google Stitch design` as spec, and rebuild properly locally.
 
-> **Pivot:** `opencode` harness (`C:\Users\admin\.config\opencode`) with `muse-spark-1.2-contributor-free` — allowed `scaffold → recon → hunt → validate → report` discipline and real `bash` builds (`./gradlew assembleDebug`).
+> **Pivot to this convo:** Came to **this `opencode + Muse Spark` convo (`muse-spark-1.2-contributor-free`) with the Google Stitch design as input** — allowed `scaffold → recon → hunt → validate → report` discipline and real `bash` builds (`./gradlew assembleDebug`). All `2026-08-28` commits below are from this convo.
 
 ---
 
-## Day 2 Night → Day 3 — 2026-08-28 — Opencode Intensive (All Features Below)
+## Day 2 Night → Day 3 — 2026-08-28 — This Opencode Convo Intensive (Stitch Design as Input)
 
-This is a single calendar day in git (`2026-08-28`) but ~60 commits of iterative UI/logic. Presented in chronological order as they happened.
+This is a single calendar day in git (`2026-08-28`) but ~60 commits of iterative UI/logic in **this** `opencode + Muse Spark` session, rebuilding from the Google Stitch design. Presented in chronological order as they happened.
 
 ### 00:00–02:00 — Core Scan & Persistence
 

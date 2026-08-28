@@ -293,9 +293,6 @@ fun MainApp(modifier: Modifier = Modifier) {
                 onBack = {
                     showPayload = false
                     showCapture = true
-                },
-                onSave = {
-                    savePayload()
                 }
             )
         } else if (showCapture) {

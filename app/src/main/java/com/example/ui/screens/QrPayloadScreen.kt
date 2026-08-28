@@ -12,8 +12,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowRightAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -22,15 +20,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.data.easyslip.VerifySlipResponse
 import com.example.data.model.VerificationStatus
 import com.example.ui.theme.FireCashBackground
 import com.example.ui.theme.FireCashOnSurface
 import com.example.ui.theme.FireCashOnSurfaceVariant
-import com.example.ui.theme.FireCashPrimary
 import com.example.ui.theme.FireCashSurfaceContainerLow
 import java.util.Locale
 
@@ -39,8 +34,7 @@ fun QrPayloadScreen(
     payload: String,
     slipData: VerifySlipResponse? = null,
     warning: String = "",
-    onBack: () -> Unit = {},
-    onSave: () -> Unit = {}
+    onBack: () -> Unit = {}
 ) {
 
     Box(
@@ -135,24 +129,6 @@ fun QrPayloadScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Save button - transaction type is auto-detected via My Names in Settings
-            Button(
-                onClick = { onSave() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = FireCashPrimary),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Text(
-                    text = "Save to Account",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
         }
     }
 }

@@ -21,6 +21,9 @@ class IncomeNotificationService : NotificationListenerService() {
         if (sbn.packageName == packageName) return
         val prefs = getSharedPreferences("firecash_settings", Context.MODE_PRIVATE)
         if (!prefs.getBoolean(PREFS_NOTIFICATION_INCOME, false)) return
+        // Whitelist: if non-empty, only listed packages are processed
+        val whitelist = loadWhitelist(prefs)
+        if (whitelist.isNotEmpty() && sbn.packageName !in whitelist) return
 
         val extras = sbn.notification.extras
         val title = extras.getCharSequence("android.title")?.toString() ?: ""
@@ -35,6 +38,7 @@ class IncomeNotificationService : NotificationListenerService() {
 
     companion object {
         const val PREFS_NOTIFICATION_INCOME = "notification_income_enabled"
+        const val PREFS_NOTIFICATION_WHITELIST = "notification_whitelist"
         private const val PREFS_SLIPS = "saved_slips"
         private const val PREFS_SEEN = "seen_payloads"
 
@@ -145,6 +149,18 @@ class IncomeNotificationService : NotificationListenerService() {
             obj.put("isMoneyIn", slip.isMoneyIn)
             obj.put("savedAt", slip.savedAt)
             return obj
+        }
+
+        fun loadWhitelist(prefs: SharedPreferences): List<String> {
+            val raw = prefs.getString(PREFS_NOTIFICATION_WHITELIST, null) ?: return emptyList()
+            return runCatching {
+                val arr = JSONArray(raw)
+                (0 until arr.length()).map { arr.getString(it) }
+            }.getOrDefault(emptyList())
+        }
+
+        fun saveWhitelist(prefs: SharedPreferences, list: List<String>) {
+            prefs.edit().putString(PREFS_NOTIFICATION_WHITELIST, JSONArray(list).toString()).apply()
         }
 
         private fun slipFromJson(obj: JSONObject): SavedSlip? {

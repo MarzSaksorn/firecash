@@ -76,6 +76,9 @@ fun MainApp(modifier: Modifier = Modifier) {
     var notificationIncomeEnabled by remember {
         mutableStateOf(prefs.getBoolean("notification_income_enabled", false))
     }
+    var notificationWhitelist by remember {
+        mutableStateOf(loadNotificationWhitelist(prefs))
+    }
     val seenPayloads = remember {
         mutableSetOf<String>().apply { addAll(loadSeenPayloads(prefs)) }
     }
@@ -485,9 +488,21 @@ fun MainApp(modifier: Modifier = Modifier) {
                     },
                     onSyncUnverified = { resyncUnverifiedSlips() },
                     notificationIncomeEnabled = notificationIncomeEnabled,
+                    notificationWhitelist = notificationWhitelist,
                     onToggleNotificationIncome = { enabled ->
                         notificationIncomeEnabled = enabled
                         prefs.edit().putBoolean("notification_income_enabled", enabled).apply()
+                    },
+                    onAddWhitelistedApp = { pkg ->
+                        val t = pkg.trim()
+                        if (t.isNotEmpty() && t !in notificationWhitelist) {
+                            notificationWhitelist = notificationWhitelist + t
+                            saveNotificationWhitelist(prefs, notificationWhitelist)
+                        }
+                    },
+                    onRemoveWhitelistedApp = { pkg ->
+                        notificationWhitelist = notificationWhitelist - pkg
+                        saveNotificationWhitelist(prefs, notificationWhitelist)
                     },
                     onRequestNotificationPermission = {
                         try {
@@ -546,6 +561,20 @@ private fun loadKnownNames(prefs: SharedPreferences): List<String> {
 private fun saveKnownNames(prefs: SharedPreferences, names: List<String>) {
     val arr = JSONArray(names)
     prefs.edit().putString(PREFS_KNOWN_NAMES, arr.toString()).apply()
+}
+
+private const val PREFS_NOTIFICATION_WHITELIST = "notification_whitelist"
+
+private fun loadNotificationWhitelist(prefs: SharedPreferences): List<String> {
+    val raw = prefs.getString(PREFS_NOTIFICATION_WHITELIST, null) ?: return emptyList()
+    return runCatching {
+        val arr = JSONArray(raw)
+        (0 until arr.length()).map { arr.getString(it) }
+    }.getOrDefault(emptyList())
+}
+
+private fun saveNotificationWhitelist(prefs: SharedPreferences, list: List<String>) {
+    prefs.edit().putString(PREFS_NOTIFICATION_WHITELIST, JSONArray(list).toString()).apply()
 }
 
 private fun loadSlips(prefs: SharedPreferences): List<SavedSlip> {

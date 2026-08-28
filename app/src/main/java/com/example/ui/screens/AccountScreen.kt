@@ -354,9 +354,6 @@ fun AccountScreen(
 
             LazyColumn(modifier = Modifier.fillMaxWidth(), reverseLayout = true, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 grouped.forEach { (date, dateSlips) ->
-                    item(key = "header_$date") {
-                        DateHeader(date = date, count = dateSlips.size)
-                    }
                     items(dateSlips, key = { it.savedAt }) { slip ->
                         val isSelected = slip.savedAt in selectedKeys
                         TransactionRow(
@@ -375,6 +372,9 @@ fun AccountScreen(
                                 selectedKeys = if (isSelected) selectedKeys - slip.savedAt else selectedKeys + slip.savedAt
                             }
                         )
+                    }
+                    item(key = "header_$date") {
+                        DateHeader(date = date, count = dateSlips.size)
                     }
                 }
             }

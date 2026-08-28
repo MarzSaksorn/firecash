@@ -285,7 +285,7 @@ class EasySlipClient(
             receivingBankName = null,
             receiverName = null,
             senderName = null,
-            amount = null,
+            amount = extractAmount(payload),
             transDate = null,
             transTime = null,
             errorMessage = if (isDuplicate) "Duplicate slip" else "EasySlip verification not configured — enable in Settings to verify",
@@ -308,12 +308,17 @@ class EasySlipClient(
             receivingBankName = null,
             receiverName = null,
             senderName = null,
-            amount = payload.matchAmount,
+            amount = payload.matchAmount ?: extractAmount(payload.crc),
             transDate = null,
             transTime = null,
             errorMessage = if (isDuplicate) "Duplicate slip" else "EasySlip verification not configured — enable in Settings to verify",
             verificationStatus = status
         )
+    }
+
+    private fun extractAmount(text: String): Double? {
+        val regex = Regex("""\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?""")
+        return regex.find(text)?.value?.replace(",", "")?.toDoubleOrNull()
     }
 
     fun getBankName(code: String): String {

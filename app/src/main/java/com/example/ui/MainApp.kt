@@ -124,16 +124,40 @@ fun MainApp(modifier: Modifier = Modifier) {
         return known.any { it.trim().lowercase(java.util.Locale.ROOT) == norm }
     }
 
+    fun extractAmount(text: String): Double? {
+        val regex = Regex("""\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?""")
+        return regex.find(text)?.value?.replace(",", "")?.toDoubleOrNull()
+    }
+
     suspend fun addSlip(payload: String, isMoneyIn: Boolean = false) {
-        val result = runCatching { verifyWithEasySlip(payload) }.getOrNull()
+        val verified = runCatching { verifyWithEasySlip(payload) }.getOrNull()
+        // Fallback when EasySlip disabled/offline: keep amount from raw payload so details page still shows data
+        val fallbackAmount = extractAmount(payload)
+        val result = verified ?: VerifySlipResponse(
+            success = false,
+            isDuplicate = false,
+            transRef = null,
+            amount = fallbackAmount,
+            transDate = null,
+            transTime = null,
+            senderName = null,
+            receiverName = null,
+            sendingBank = null,
+            sendingBankName = null,
+            receivingBank = null,
+            receivingBankName = null,
+            isAmountMatched = false,
+            verificationStatus = VerificationStatus.UNVERIFIED,
+            errorMessage = slipWarning
+        )
         slipData = result
         // Auto-resolve isMoneyIn based on known names:
         // - if both sender & receiver are known -> transfer (neutral, stored as false, UI shows Transfer)
         // - if receiver is known -> income
         // - if sender is known -> expense
         // - else fallback to requested isMoneyIn (manual toggle / default)
-        val senderKnown = isKnownName(result?.senderName, knownNames)
-        val receiverKnown = isKnownName(result?.receiverName, knownNames)
+        val senderKnown = isKnownName(result.senderName, knownNames)
+        val receiverKnown = isKnownName(result.receiverName, knownNames)
         val resolvedIsMoneyIn = when {
             senderKnown && receiverKnown -> false // transfer - will be excluded from balance
             receiverKnown -> true
@@ -142,13 +166,13 @@ fun MainApp(modifier: Modifier = Modifier) {
         }
         val slip = SavedSlip(
             payload = payload,
-            amount = result?.amount,
-            transRef = result?.transRef,
-            senderName = result?.senderName,
-            receiverName = result?.receiverName,
-            date = result?.transDate,
-            time = result?.transTime,
-            verificationStatus = result?.verificationStatus ?: VerificationStatus.UNVERIFIED,
+            amount = result.amount ?: fallbackAmount,
+            transRef = result.transRef,
+            senderName = result.senderName,
+            receiverName = result.receiverName,
+            date = result.transDate,
+            time = result.transTime,
+            verificationStatus = result.verificationStatus,
             slipData = result,
             isMoneyIn = resolvedIsMoneyIn
         )

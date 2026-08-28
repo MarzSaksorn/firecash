@@ -244,7 +244,7 @@ fun MainApp(modifier: Modifier = Modifier) {
             }
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        Box(modifier = Modifier.fillMaxSize().padding(bottom = paddingValues.calculateBottomPadding())) {
         if (showPayload) {
             QrPayloadScreen(
                 payload = qrPayload,

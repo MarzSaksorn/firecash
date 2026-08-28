@@ -4,8 +4,8 @@
 
 **Project:** FireCash — Receipt Logging & PromptPay/EMVCo Slip Verification (Jetpack Compose + Room + EasySlip + ML Kit + NotificationListener)  
 **Repo:** `C:\Users\admin\Project\FireCash` • `namespace = com.example` • `applicationId = com.aistudio.firecash.qxrtv`  
-**Period:** 2026-08-27 → 2026-08-28 (intensive) • Today is `Fri Aug 28 2026` (UTC)  
-**Model:** `opencode/muse-spark-1.2-contributor-free` via opencode harness after Day 2 night
+**Period:** 2026-08-25 (night) → 2026-08-28 (intensive) • Today is `Fri Aug 28 2026` (UTC)  
+**Model:** `opencode/muse-spark-1.2-contributor-free` via opencode harness after Day 2 night (project kicked off **2026-08-25 night**)
 
 ---
 
@@ -15,9 +15,9 @@ FireCash started as research-driven. **Days 1-2 were pure research via a separat
 
 ---
 
-## Day 1 — 2026-08-27 — Research (via first opencode convo)
+## Day 1 — 2026-08-25 Night → 2026-08-26 — Research (via first opencode convo)
 
-**Goal:** Understand the problem space, not code — done **through a separate `opencode` convo**.
+**Goal:** Understand the problem space, not code — done **through a separate `opencode` convo** (project kickoff **2026-08-25 night**, before any git commits).
 
 - Read Thai banking slip specifics: PromptPay/EMVCo Tag 91 `9104[A-Fa-f0-9]{4}` CRC, Bangkok Bank `002`, KBank `004`, SCB `014`, KTB `006`, etc.
 - Surveyed EasySlip `POST /verify/bank`, duplicate detection, 180-day `SLIP_NOT_FOUND`, `RATE_LIMIT_EXCEEDED`.
@@ -25,7 +25,7 @@ FireCash started as research-driven. **Days 1-2 were pure research via a separat
 - That first opencode convo **produced the full research docs and the UI plan for Google Stitch**: `docs/firecash_full_plan.md` (11-feature table), `docs/firecash_ai_studio_systems_plan.md` (flow: Camera → OCR → EasySlip → Room → Analytics/Export), **`docs/firecash_ui_stitch_plan.md` (MD3 dark tokens `#121316` / `#FF6B00` / `#10B981` / `#6366F1` — specifically authored as input for Stitch)**, `docs/ai_studio_prompts.md`, `README.md` (8 key features).
 - No code beyond `Initial commit` + `Add all remaining project files` scaffolding.
 
-**Commits 2026-08-27:**
+**Commits 2026-08-27 (first code push, research started 25th night):**
 - `2026-08-27 Initial commit`
 - `2026-08-27 feat: add Account Settings page with multiple tracked folders and sync options` — introduced `AccountSettingsScreen` (persisted `trackedFolderUris` via `JSONArray` in `SharedPreferences`), `DocumentFile` folder picker.
 - `2026-08-27 Add all remaining project files` — baseline `data/ocr`, `data/easyslip`, `data/local`, `ui/`, theme.
@@ -109,6 +109,62 @@ This is **Day 2 night** in real time but `2026-08-28` in git (`~60` commits) —
 **Not yet implemented (vs `firecash_full_plan.md`):** `Screen.Onboarding`, `Screen.Export`/`BackupRestore` routes (`MainViewModel` defines them, `MainApp` else is `Settings`), Drive sync execution (`MainApp` `googleDriveSync=false`), keyword `rules` persistence (`MainApp` `emptyList()`), `BottomNavBar` component now dead code after `7c364a9`.
 
 **Next steps you mentioned:** keep launcher untouched, potentially revisit `Onboarding`, `Export` unlimited, Drive restore, and verification rate-limit UX.
+
+---
+
+## Day 2 Night (Continued) — 2026-08-28 — CameraX, Permissions & OCR Wiring
+
+> This session continued the `opencode + Muse Spark` intensive. Focused on adding a working CameraX preview, runtime permission handling, and wiring the captured image to the OCR pipeline.
+
+### CameraX Integration & Runtime Permission
+
+- **feat: add CameraX preview to CaptureScreen** — `CaptureScreen.kt` now uses `PreviewView` + `ImageCapture` use cases bound to `ProcessCameraProvider`. Replaced the old placeholder with a real live camera feed.
+- **feat: runtime permission via Activity Result API** — Removed Accompanist `rememberPermissionState` dependency (version mismatch caused compile errors). Replaced with `rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission())` + `mutableStateOf` flag. Permission is auto-requested on first composition; camera only starts after grant.
+- **fix: add `android.permission.CAMERA` to AndroidManifest.xml** — Required for the permission prompt. Added between `RECEIVE_BOOT_COMPLETED` and `BIND_NOTIFICATION_LISTENER_SERVICE`.
+- **fix: update CaptureScreen call site in MainApp.kt** — Lambda signature changed from `(SourceType, SampleSlipPreset?) -> Unit` to `(SourceType, SampleSlipPreset?, String?) -> Unit` to carry the captured image path.
+
+### OCR Pipeline Wiring
+
+- **feat: pass captured image path through to OCR** — Shutter button now calls `onCapture(SourceType.CAMERA, null, photoFile.absolutePath)` instead of `onCapture(SourceType.CAMERA, null)`. Image saved to `cacheDir/capture_<timestamp>.jpg`.
+- **feat: update MainViewModel.startVerification signature** — Added optional `imageUri: String? = null` parameter. Passes it to `ocrProcessor.processReceipt(imageUri, samplePreset)`.
+- **fix: all CaptureScreen UI triggers updated** — Preset buttons, gallery picker, PDF upload all pass `null` as the third argument. Shutter button passes `photoFile.absolutePath`.
+- **Issue found: OcrProcessor ignores imageUri** — `OcrProcessor.processReceipt` still returns hard-coded Uber `$45.20` text when `samplePreset == null`. No real OCR (ML Kit) is integrated yet. This is the current blocker.
+
+### Gradle & Build Fixes
+
+- **fix: removed google-services plugin** — `google-services.json` was a placeholder; plugin removed from `app/build.gradle`.
+- **fix: added gradle wrapper** — Copied `gradle-wrapper.jar` from another project, created `gradlew.bat` and `gradlew` scripts, cached `gradle-9.3.1-bin.zip` in `~/.gradle/wrapper/dists/`.
+- **fix: local.properties set sdk.dir** — Points to `C:\Users\admin\AppData\Local\Android\Sdk`.
+- **fix: added file_paths.xml** — Created `res/xml/file_paths.xml` for `FileProvider` configuration.
+- **fix: updated AndroidManifest for FileProvider** — Added `tools:replace="android:authorities"` and `tools:node="replace"` to the provider declaration.
+- **fix: added gradle.properties** — `android.useAndroidX=true`, `org.gradle.jvmargs=-Xmx2048m`.
+
+### Project Status Documentation
+
+- **docs: created PROJECT_STATUS.md** — Comprehensive status file with current state table, root cause analysis of OCR issue, and next steps checklist. Written via PowerShell `Set-Content` as direct tool calls were unavailable.
+
+### Current Blocker
+
+The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProcessor) but `OcrProcessor.kt` never actually reads the image from disk. It returns placeholder Uber text regardless of what photo is captured. To fix:
+
+1. Add ML Kit `text-recognition` dependency.
+2. Update `OcrProcessor.processReceipt` to decode the bitmap from `imageUri` and run `TextRecognizer`.
+3. Feed OCR output to `SlipDataParser.parse()`.
+
+### Files Modified This Session
+
+| File | Change |
+|------|--------|
+| `app/src/main/java/com/example/ui/screens/CaptureScreen.kt` | CameraX preview, permission handling, image path passing |
+| `app/src/main/java/com/example/ui/MainApp.kt` | Updated `onCapture` lambda to pass `imagePath` |
+| `app/src/main/java/com/example/ui/viewmodel/MainViewModel.kt` | Added `imageUri` param to `startVerification` |
+| `app/src/main/AndroidManifest.xml` | Added `CAMERA` permission |
+| `app/src/main/res/xml/file_paths.xml` | Created for FileProvider |
+| `gradle.properties` | Created with AndroidX + JVM args |
+| `local.properties` | Set `sdk.dir` |
+| `gradle/libs.versions.toml` | CameraX + Accompanist versions (unchanged) |
+| `PROJECT_STATUS.md` | Created with status summary |
+| `docs/DEVELOPMENT_LOG.md` | This entry |
 
 ---
 

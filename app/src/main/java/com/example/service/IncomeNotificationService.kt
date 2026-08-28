@@ -21,9 +21,10 @@ class IncomeNotificationService : NotificationListenerService() {
         if (sbn.packageName == packageName) return
         val prefs = getSharedPreferences("firecash_settings", Context.MODE_PRIVATE)
         if (!prefs.getBoolean(PREFS_NOTIFICATION_INCOME, false)) return
-        // Whitelist: if non-empty, only listed packages are processed
+        // Whitelist: if non-empty, only listed packages are processed, with optional prefix template
         val whitelist = loadWhitelist(prefs)
-        if (whitelist.isNotEmpty() && sbn.packageName !in whitelist) return
+        val entry = whitelist.find { it.packageName == sbn.packageName }
+        if (whitelist.isNotEmpty() && entry == null) return
 
         val extras = sbn.notification.extras
         val title = extras.getCharSequence("android.title")?.toString() ?: ""
@@ -32,8 +33,18 @@ class IncomeNotificationService : NotificationListenerService() {
         val combined = listOf(title, text, bigText).filter { it.isNotBlank() }.joinToString(" ").trim()
         if (combined.isBlank()) return
 
-        val amount = extractFirstNumber(combined) ?: return
-        saveIncomeFromNotification(this, amount, title, combined, sbn.packageName)
+        var senderFromTemplate: String? = null
+        var amount: Double? = null
+        val template = entry?.prefix?.trim() ?: ""
+        if (template.isNotBlank()) {
+            val parsed = parseWithTemplate(combined, template)
+            if (parsed == null) return // prefix didn't match → ignore
+            senderFromTemplate = parsed.first
+            amount = parsed.second
+        }
+        if (amount == null) amount = extractFirstNumber(combined) ?: return
+        val effectiveSender = senderFromTemplate?.takeIf { it.isNotBlank() } ?: title
+        saveIncomeFromNotification(this, amount, effectiveSender, combined, sbn.packageName)
     }
 
     companion object {
@@ -49,6 +60,42 @@ class IncomeNotificationService : NotificationListenerService() {
             val match = AMOUNT_REGEX.find(text) ?: return null
             val raw = match.value.replace(",", "")
             return raw.toDoubleOrNull()
+        }
+
+        /**
+         * Parses text with a prefix template like "<Sender> โอนเงินให้คุณ ฿<Amount>".
+         * Returns Pair(sender, amount) if matched, null if template doesn't match.
+         */
+        fun parseWithTemplate(text: String, template: String): Pair<String?, Double?>? {
+            if (template.isBlank()) return null
+            val hasSender = template.contains("<Sender>")
+            val hasAmount = template.contains("<Amount>")
+            if (!hasSender && !hasAmount) {
+                // Simple contains check
+                return if (text.contains(template)) Pair(null, extractFirstNumber(text)) else null
+            }
+            // Build regex from template
+            var regexStr = Regex.escape(template)
+            regexStr = regexStr.replace(Regex.escape("<Sender>"), "(.+?)")
+            regexStr = regexStr.replace(Regex.escape("<Amount>"), """([\d,]+\.?\d*)""")
+            // Allow flexible whitespace
+            regexStr = regexStr.replace(Regex.escape(" "), """\s+""")
+            val regex = Regex(regexStr)
+            val match = regex.find(text) ?: return null
+            var sender: String? = null
+            var amount: Double? = null
+            var groupIdx = 1
+            if (hasSender) {
+                sender = match.groupValues.getOrNull(groupIdx)?.trim()
+                groupIdx++
+            }
+            if (hasAmount) {
+                val raw = match.groupValues.getOrNull(groupIdx)?.replace(",", "")?.trim()
+                amount = raw?.toDoubleOrNull() ?: extractFirstNumber(text)
+            } else {
+                amount = extractFirstNumber(text)
+            }
+            return Pair(sender?.takeIf { it.isNotBlank() }, amount)
         }
 
         fun isEnabled(context: Context): Boolean {
@@ -151,17 +198,36 @@ class IncomeNotificationService : NotificationListenerService() {
             return obj
         }
 
-        fun loadWhitelist(prefs: SharedPreferences): List<String> {
+        fun loadWhitelist(prefs: SharedPreferences): List<WhitelistedApp> {
             val raw = prefs.getString(PREFS_NOTIFICATION_WHITELIST, null) ?: return emptyList()
             return runCatching {
                 val arr = JSONArray(raw)
-                (0 until arr.length()).map { arr.getString(it) }
+                (0 until arr.length()).mapNotNull { i ->
+                    val el = arr.get(i)
+                    when (el) {
+                        is String -> WhitelistedApp(packageName = el, prefix = "")
+                        is JSONObject -> WhitelistedApp(
+                            packageName = el.optString("package"),
+                            prefix = el.optString("prefix", "")
+                        )
+                        else -> null
+                    }
+                }.filter { it.packageName.isNotBlank() }
             }.getOrDefault(emptyList())
         }
 
-        fun saveWhitelist(prefs: SharedPreferences, list: List<String>) {
-            prefs.edit().putString(PREFS_NOTIFICATION_WHITELIST, JSONArray(list).toString()).apply()
+        fun saveWhitelist(prefs: SharedPreferences, list: List<WhitelistedApp>) {
+            val arr = JSONArray()
+            list.forEach { entry ->
+                val obj = JSONObject()
+                obj.put("package", entry.packageName)
+                obj.put("prefix", entry.prefix)
+                arr.put(obj)
+            }
+            prefs.edit().putString(PREFS_NOTIFICATION_WHITELIST, arr.toString()).apply()
         }
+
+        // Legacy helpers for migration (String list) — kept for reference
 
         private fun slipFromJson(obj: JSONObject): SavedSlip? {
             return runCatching {

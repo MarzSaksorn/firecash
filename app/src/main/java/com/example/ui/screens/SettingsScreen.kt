@@ -89,7 +89,7 @@ fun SettingsScreen(
     knownNames: List<String> = emptyList(),
     unverifiedCount: Int = 0,
     notificationIncomeEnabled: Boolean = false,
-    notificationWhitelist: List<String> = emptyList(),
+    notificationWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
     onCurrencyChange: (String) -> Unit,
     onToggleDriveSync: (Boolean) -> Unit,
     onToggleEasySlip: (Boolean) -> Unit,
@@ -99,7 +99,7 @@ fun SettingsScreen(
     onRemoveKnownName: (String) -> Unit = {},
     onSyncUnverified: () -> Unit = {},
     onToggleNotificationIncome: (Boolean) -> Unit = {},
-    onAddWhitelistedApp: (String) -> Unit = {},
+    onAddWhitelistedApp: (String, String) -> Unit = { _, _ -> },
     onRemoveWhitelistedApp: (String) -> Unit = {},
     onRequestNotificationPermission: () -> Unit = {},
     onAddRule: (keyword: String, category: String) -> Unit,
@@ -116,6 +116,7 @@ fun SettingsScreen(
     var apiKeyText by remember { mutableStateOf(apiKey) }
     var newKnownName by remember { mutableStateOf("") }
     var newWhitelistApp by remember { mutableStateOf("") }
+    var newWhitelistPrefix by remember { mutableStateOf("<Sender> โอนเงินให้คุณ ฿<Amount>") }
 
     val currencies = listOf("USD", "THB", "EUR", "GBP", "JPY")
 
@@ -590,79 +591,112 @@ fun SettingsScreen(
                             color = FireCashOnSurfaceVariant,
                             fontSize = 11.sp
                         )
-                        // Whitelist
+                        // Whitelist with optional prefix template
                         Text(
-                            text = "Whitelist (only these apps will be read — empty = all apps)",
+                            text = "Whitelist (only these apps + prefix will be read)",
                             color = FireCashOnSurface,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(top = 8.dp)
                         )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = newWhitelistApp,
-                                onValueChange = { newWhitelistApp = it },
-                                placeholder = { Text("e.g. com.kasikornbank.kplus", fontSize = 12.sp) },
-                                singleLine = true,
-                                textStyle = TextStyle(color = FireCashOnSurface, fontSize = 12.sp, fontFamily = FontFamily.Monospace),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = FireCashSurfaceContainerHigh,
-                                    unfocusedContainerColor = FireCashSurfaceContainerHigh,
-                                    focusedBorderColor = FireCashPrimary,
-                                    unfocusedBorderColor = FireCashOutlineVariant
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f).testTag("whitelist_input")
-                            )
-                            Button(
-                                onClick = {
-                                    val t = newWhitelistApp.trim()
-                                    if (t.isNotEmpty()) {
-                                        onAddWhitelistedApp(t)
-                                        newWhitelistApp = ""
-                                    }
-                                },
-                                modifier = Modifier.testTag("add_whitelist_button")
-                            ) { Text("Add") }
-                        }
+                        Text(
+                            text = "Prefix template: use <Sender> and <Amount> placeholders. e.g. <Sender> โอนเงินให้คุณ ฿<Amount>",
+                            color = FireCashOnSurfaceVariant,
+                            fontSize = 11.sp
+                        )
+                        OutlinedTextField(
+                            value = newWhitelistApp,
+                            onValueChange = { newWhitelistApp = it },
+                            placeholder = { Text("App package e.g. com.kasikornbank.kplus", fontSize = 12.sp) },
+                            singleLine = true,
+                            textStyle = TextStyle(color = FireCashOnSurface, fontSize = 12.sp, fontFamily = FontFamily.Monospace),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = FireCashSurfaceContainerHigh,
+                                unfocusedContainerColor = FireCashSurfaceContainerHigh,
+                                focusedBorderColor = FireCashPrimary,
+                                unfocusedBorderColor = FireCashOutlineVariant
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth().testTag("whitelist_input")
+                        )
+                        OutlinedTextField(
+                            value = newWhitelistPrefix,
+                            onValueChange = { newWhitelistPrefix = it },
+                            placeholder = { Text("Prefix e.g. <Sender> โอนเงินให้คุณ ฿<Amount> (empty = any)", fontSize = 11.sp) },
+                            singleLine = true,
+                            textStyle = TextStyle(color = FireCashOnSurface, fontSize = 12.sp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = FireCashSurfaceContainerHigh,
+                                unfocusedContainerColor = FireCashSurfaceContainerHigh,
+                                focusedBorderColor = FireCashPrimary,
+                                unfocusedBorderColor = FireCashOutlineVariant
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth().testTag("whitelist_prefix_input")
+                        )
+                        Button(
+                            onClick = {
+                                val pkg = newWhitelistApp.trim()
+                                if (pkg.isNotEmpty()) {
+                                    onAddWhitelistedApp(pkg, newWhitelistPrefix.trim())
+                                    newWhitelistApp = ""
+                                    newWhitelistPrefix = ""
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("add_whitelist_button")
+                        ) { Text("Add to whitelist") }
                         if (notificationWhitelist.isEmpty()) {
                             Text(
-                                text = "No whitelist — all apps will be read. Add package names to restrict (e.g. bank apps).",
+                                text = "No whitelist — all apps will be read. Add package names to restrict.",
                                 color = FireCashOnSurfaceVariant,
                                 fontSize = 11.sp
                             )
                         } else {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                notificationWhitelist.forEach { pkg ->
-                                    Row(
+                                notificationWhitelist.forEach { entry ->
+                                    Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(10.dp))
                                             .background(FireCashSurfaceContainerHighest)
                                             .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
-                                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                            .padding(horizontal = 12.dp, vertical = 10.dp)
                                     ) {
-                                        Text(
-                                            text = pkg,
-                                            color = FireCashOnSurface,
-                                            fontSize = 12.sp,
-                                            fontFamily = FontFamily.Monospace,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        IconButton(
-                                            onClick = { onRemoveWhitelistedApp(pkg) },
-                                            modifier = Modifier.size(24.dp)
+                                        Row(
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Remove",
-                                                tint = FireCashOutline,
-                                                modifier = Modifier.size(18.dp)
+                                            Text(
+                                                text = entry.packageName,
+                                                color = FireCashOnSurface,
+                                                fontSize = 12.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            IconButton(
+                                                onClick = { onRemoveWhitelistedApp(entry.packageName) },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Remove",
+                                                    tint = FireCashOutline,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
+                                        if (entry.prefix.isNotBlank()) {
+                                            Text(
+                                                text = "Prefix: ${entry.prefix}",
+                                                color = FireCashOnSurfaceVariant,
+                                                fontSize = 11.sp
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "Prefix: (any)",
+                                                color = FireCashOnSurfaceVariant,
+                                                fontSize = 11.sp
                                             )
                                         }
                                     }

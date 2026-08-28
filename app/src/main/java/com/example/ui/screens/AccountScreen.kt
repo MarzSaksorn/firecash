@@ -1,8 +1,9 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
@@ -103,6 +105,11 @@ fun AccountScreen(
     val moneyOut = slips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null }.sumOf { it.amount!! }
     val balance = moneyIn - moneyOut
     var slipToDelete by remember { mutableStateOf<SavedSlip?>(null) }
+    var selectedKeys by remember { mutableStateOf(setOf<Long>()) }
+    var showDeleteMultiDialog by remember { mutableStateOf(false) }
+    val isSelectionMode = selectedKeys.isNotEmpty()
+    val selectedSlips = remember(slips, selectedKeys) { slips.filter { it.savedAt in selectedKeys } }
+    val deletableSelected = remember(selectedSlips) { selectedSlips.filter { isDeletable(it) } }
 
     Box(
         modifier = modifier
@@ -119,25 +126,53 @@ fun AccountScreen(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = FireCashPrimary
+            if (isSelectionMode) {
+                IconButton(onClick = { selectedKeys = emptySet() }) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Clear selection",
+                        tint = FireCashPrimary
+                    )
+                }
+                Text(
+                    text = "${selectedKeys.size} selected",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White,
+                    modifier = Modifier.weight(1f)
                 )
-            }
-            Text(
-                text = "My Account",
-                style = MaterialTheme.typography.headlineSmall,
-                color = Color.White,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = onOpenSettings) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Account settings",
-                    tint = FireCashPrimary
+                if (deletableSelected.isNotEmpty()) {
+                    IconButton(onClick = { showDeleteMultiDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete selected",
+                            tint = Color(0xFFEF5350)
+                        )
+                    }
+                }
+                TextButton(onClick = { selectedKeys = slips.map { it.savedAt }.toSet() }) {
+                    Text("All", color = FireCashPrimary, fontSize = 13.sp)
+                }
+            } else {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = FireCashPrimary
+                    )
+                }
+                Text(
+                    text = "My Account",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White,
+                    modifier = Modifier.weight(1f)
                 )
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Account settings",
+                        tint = FireCashPrimary
+                    )
+                }
             }
         }
 
@@ -295,11 +330,23 @@ fun AccountScreen(
                         DateHeader(date = date, count = dateSlips.size)
                     }
                     items(dateSlips, key = { it.savedAt }) { slip ->
+                        val isSelected = slip.savedAt in selectedKeys
                         TransactionRow(
                             slip = slip,
-                            onClick = { onSlipClick(slip) },
                             knownNames = knownNames,
-                            onDelete = if (isDeletable(slip)) ({ slipToDelete = slip }) else null
+                            isSelected = isSelected,
+                            isSelectionMode = isSelectionMode,
+                            onClick = {
+                                if (isSelectionMode) {
+                                    selectedKeys = if (isSelected) selectedKeys - slip.savedAt else selectedKeys + slip.savedAt
+                                } else {
+                                    onSlipClick(slip)
+                                }
+                            },
+                            onLongClick = {
+                                selectedKeys = if (isSelected) selectedKeys - slip.savedAt else selectedKeys + slip.savedAt
+                            },
+                            onDelete = if (!isSelectionMode && isDeletable(slip)) ({ slipToDelete = slip }) else null
                         )
                     }
                 }
@@ -329,7 +376,7 @@ fun AccountScreen(
             }
         }
 
-        // Delete confirmation - only for unknown/invalid slips
+        // Delete confirmation - single (only for unknown/invalid slips)
         slipToDelete?.let { target ->
             AlertDialog(
                 onDismissRequest = { slipToDelete = null },
@@ -355,14 +402,49 @@ fun AccountScreen(
                 containerColor = FireCashSurfaceContainerLow
             )
         }
+
+        // Multi-delete confirmation (only deletable among selected)
+        if (showDeleteMultiDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteMultiDialog = false },
+                title = { Text("Delete ${deletableSelected.size} slip(s)?", color = Color.White) },
+                text = {
+                    Text(
+                        if (deletableSelected.size < selectedKeys.size)
+                            "${deletableSelected.size} of ${selectedKeys.size} selected are unknown/invalid and will be deleted. Verified slips will be kept. Continue?"
+                        else
+                            "Delete ${deletableSelected.size} unknown/invalid slip(s)? This cannot be undone.",
+                        color = FireCashOnSurfaceVariant
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            deletableSelected.forEach { onDeleteSlip(it) }
+                            selectedKeys = emptySet()
+                            showDeleteMultiDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350))
+                    ) { Text("Delete", color = Color.White) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteMultiDialog = false }) { Text("Cancel") }
+                },
+                containerColor = FireCashSurfaceContainerLow
+            )
+        }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TransactionRow(
     slip: SavedSlip,
-    onClick: () -> Unit,
     knownNames: List<String> = emptyList(),
+    isSelected: Boolean = false,
+    isSelectionMode: Boolean = false,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
     onDelete: (() -> Unit)? = null
 ) {
     val effective = effectiveIsMoneyIn(slip, knownNames)
@@ -382,12 +464,41 @@ private fun TransactionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(FireCashSurfaceContainerLow, RoundedCornerShape(16.dp))
-            .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
+            .background(
+                if (isSelected) FireCashPrimary.copy(alpha = 0.12f) else FireCashSurfaceContainerLow,
+                RoundedCornerShape(16.dp)
+            )
+            .border(
+                if (isSelected) 1.5.dp else 1.dp,
+                if (isSelected) FireCashPrimary else Color.Gray.copy(alpha = 0.3f),
+                RoundedCornerShape(16.dp)
+            )
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (isSelectionMode) {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .background(
+                        if (isSelected) FireCashPrimary else Color.Transparent,
+                        CircleShape
+                    )
+                    .border(1.5.dp, if (isSelected) FireCashPrimary else Color.Gray.copy(alpha = 0.6f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+        }
         Box(
             modifier = Modifier
                 .size(40.dp)

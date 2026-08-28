@@ -137,8 +137,8 @@ fun AccountScreen(
                 val amountStr = slip.amount?.let { "%.2f".format(Locale.US, it) } ?: ""
                 val amountMatch = amountStr.contains(q) || slip.amount?.toString()?.contains(q) == true
                 val payloadExact = slip.payload == q
-                val transRefMatch = slip.transRef?.lowercase(Locale.ROOT)?.contains(qLower) == true
-                dateMatch || titleMatch || amountMatch || payloadExact || transRefMatch
+                val transRefExact = slip.transRef == q
+                dateMatch || titleMatch || amountMatch || payloadExact || transRefExact
             }
         }
     }

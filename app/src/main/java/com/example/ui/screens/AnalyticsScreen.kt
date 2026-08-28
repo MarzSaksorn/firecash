@@ -21,6 +21,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -124,10 +128,12 @@ fun AnalyticsScreen(
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(modifier = Modifier.height(12.dp))
-            categorySpends.take(6).forEach { spend ->
-                CategoryBarRow(spend = spend)
-                Spacer(modifier = Modifier.height(8.dp))
-            }
+            StickChart(
+                data = categorySpends.take(6),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+            )
             Spacer(modifier = Modifier.height(20.dp))
         }
 
@@ -201,38 +207,58 @@ private fun StatCard(
 }
 
 @Composable
-private fun CategoryBarRow(spend: CategorySpend) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = spend.category,
-                color = Color.White,
-                fontSize = 13.sp
-            )
-Text(
-                text = "THB %.2f (%d)".format(Locale.US, spend.totalAmount, spend.transactionCount),
-                color = FireCashOnSurfaceVariant,
-                fontSize = 12.sp
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
+private fun StickChart(
+    data: List<CategorySpend>,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
         Box(
             modifier = Modifier
+                .weight(1f)
                 .fillMaxWidth()
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(FireCashSurfaceContainerLow)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(spend.percentage.coerceIn(0f, 1f))
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(FireCashPrimary)
-            )
+            val maxAmount = data.maxOfOrNull { it.totalAmount } ?: 0.0
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val count = data.size
+                if (count == 0) return@Canvas
+                val spacing = 12.dp.toPx()
+                val totalSpacing = spacing * (count - 1)
+                val availableWidth = size.width - totalSpacing
+                val barWidth = availableWidth / count
+                val chartBottom = size.height - 24.dp.toPx()
+                val chartHeight = chartBottom - 8.dp.toPx()
+
+                data.forEachIndexed { index, spend ->
+                    val barHeight = if (maxAmount > 0) {
+                        (spend.totalAmount / maxAmount * chartHeight).toFloat()
+                    } else 0f
+                    val x = index * (barWidth + spacing)
+                    val y = chartBottom - barHeight
+
+                    drawRoundRect(
+                        color = androidx.compose.ui.graphics.Color(0xFFFF6B00),
+                        topLeft = Offset(x, y),
+                        size = androidx.compose.ui.geometry.Size(barWidth * 0.7f, barHeight),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(6.dp.toPx())
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            data.forEachIndexed { index, spend ->
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
+                    Text(
+                        text = spend.category,
+                        color = FireCashOnSurfaceVariant,
+                        fontSize = 10.sp,
+                        maxLines = 1
+                    )
+                }
+                if (index < data.size - 1) {
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
+            }
         }
     }
 }

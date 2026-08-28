@@ -84,7 +84,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     }
 
     suspend fun addSlip(payload: String, isMoneyIn: Boolean = false) {
-        val result = verifyWithEasySlip(payload)
+        val result = runCatching { verifyWithEasySlip(payload) }.getOrNull()
         slipData = result
         val slip = SavedSlip(
             payload = payload,
@@ -123,7 +123,7 @@ fun MainApp(modifier: Modifier = Modifier) {
         qrPayload = payload
         isLoading = true
         scope.launch {
-            slipData = verifyWithEasySlip(payload)
+            addSlip(payload)
             isLoading = false
             showCapture = false
             showPayload = true

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
@@ -28,6 +29,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.activity.compose.BackHandler
@@ -115,6 +118,30 @@ fun AccountScreen(
     val isSelectionMode = selectedKeys.isNotEmpty()
     val selectedSlips = remember(slips, selectedKeys) { slips.filter { it.savedAt in selectedKeys } }
     val deletableSelected = remember(selectedSlips) { selectedSlips.filter { isDeletable(it) } }
+
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchActive by remember { mutableStateOf(false) }
+    val filteredSlips = remember(slips, searchQuery, knownNames) {
+        if (searchQuery.isBlank()) slips
+        else {
+            val q = searchQuery.trim()
+            val qLower = q.lowercase(Locale.ROOT)
+            slips.filter { slip ->
+                val dateMatch = slip.date?.lowercase(Locale.ROOT)?.contains(qLower) == true
+                val title = when {
+                    isSelfTransfer(slip, knownNames) -> "transfer"
+                    effectiveIsMoneyIn(slip, knownNames) == true -> slip.senderName ?: ""
+                    else -> slip.receiverName ?: ""
+                }.lowercase(Locale.ROOT)
+                val titleMatch = title.contains(qLower)
+                val amountStr = slip.amount?.let { "%.2f".format(Locale.US, it) } ?: ""
+                val amountMatch = amountStr.contains(q) || slip.amount?.toString()?.contains(q) == true
+                val payloadExact = slip.payload == q
+                val transRefMatch = slip.transRef?.lowercase(Locale.ROOT)?.contains(qLower) == true
+                dateMatch || titleMatch || amountMatch || payloadExact || transRefMatch
+            }
+        }
+    }
 
     BackHandler(enabled = isSelectionMode) {
         selectedKeys = emptySet()
@@ -308,32 +335,75 @@ fun AccountScreen(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = "Transactions",
-                color = FireCashOnSurface,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            if (isBackgroundSyncing) {
-                Spacer(modifier = Modifier.width(8.dp))
-                CircularProgressIndicator(
-                    modifier = Modifier.size(14.dp),
-                    strokeWidth = 2.dp,
-                    color = FireCashOnSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Syncing…",
-                    color = FireCashOnSurfaceVariant,
-                    fontSize = 12.sp
+                    text = "Transactions",
+                    color = FireCashOnSurface,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (isBackgroundSyncing) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                        color = FireCashOnSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Syncing…",
+                        color = FireCashOnSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+            IconButton(
+                onClick = {
+                    isSearchActive = !isSearchActive
+                    if (!isSearchActive) searchQuery = ""
+                },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
+                    contentDescription = if (isSearchActive) "Close search" else "Search slips",
+                    tint = FireCashPrimary,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
+        if (isSearchActive) {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search date, title, amount, or exact QR payload", fontSize = 13.sp, color = FireCashOnSurfaceVariant) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = androidx.compose.ui.text.TextStyle(color = com.example.ui.theme.FireCashOnSurface, fontSize = 13.sp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = FireCashPrimary,
+                    unfocusedBorderColor = FireCashOnSurfaceVariant.copy(alpha = 0.4f),
+                    focusedContainerColor = FireCashSurfaceContainerLow,
+                    unfocusedContainerColor = FireCashSurfaceContainerLow,
+                    cursorColor = FireCashPrimary
+                ),
+                shape = RoundedCornerShape(10.dp),
+                trailingIcon = {
+                    if (searchQuery.isNotBlank()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = FireCashOnSurfaceVariant, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            )
+        }
         Spacer(modifier = Modifier.height(8.dp))
 
-        if (slips.isEmpty()) {
+        if (filteredSlips.isEmpty()) {
             Column(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -347,18 +417,18 @@ fun AccountScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "No transactions yet",
+                    text = if (slips.isEmpty()) "No transactions yet" else "No matching slips",
                     color = FireCashOnSurfaceVariant,
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Text(
-                    text = "Scan a slip to record money in/out",
+                    text = if (slips.isEmpty()) "Scan a slip to record money in/out" else "Try another date, title, amount or exact QR payload",
                     color = FireCashOnSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
         } else {
-            val grouped = slips
+            val grouped = filteredSlips
                 .groupBy { it.date ?: "Unknown" }
                 .map { (date, list) -> date to list.sortedByDescending { it.savedAt } }
                 .sortedByDescending { (date, _) -> date }

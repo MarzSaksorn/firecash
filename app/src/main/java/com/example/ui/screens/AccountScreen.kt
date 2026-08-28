@@ -354,6 +354,14 @@ fun AccountScreen(
 
             LazyColumn(modifier = Modifier.fillMaxWidth(), reverseLayout = true, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 grouped.forEach { (date, dateSlips) ->
+                    val dayTotal = dateSlips.sumOf { slip ->
+                        val amt = slip.amount ?: return@sumOf 0.0
+                        when (effectiveIsMoneyIn(slip, knownNames)) {
+                            true -> amt
+                            false -> -amt
+                            else -> 0.0
+                        }
+                    }
                     items(dateSlips, key = { it.savedAt }) { slip ->
                         val isSelected = slip.savedAt in selectedKeys
                         TransactionRow(
@@ -374,7 +382,7 @@ fun AccountScreen(
                         )
                     }
                     item(key = "header_$date") {
-                        DateHeader(date = date, count = dateSlips.size)
+                        DateHeader(date = date, count = dateSlips.size, total = dayTotal)
                     }
                 }
             }
@@ -545,7 +553,12 @@ private fun TransactionRow(
 }
 
 @Composable
-private fun DateHeader(date: String, count: Int) {
+private fun DateHeader(date: String, count: Int, total: Double) {
+    val totalColor = when {
+        total > 0.0 -> Color(0xFF66BB6A)
+        total < 0.0 -> Color(0xFFEF5350)
+        else -> FireCashOnSurfaceVariant
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -567,9 +580,10 @@ private fun DateHeader(date: String, count: Int) {
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "$count",
-            color = FireCashOnSurfaceVariant,
-            fontSize = 12.sp
+            text = "THB %.2f • %d".format(Locale.US, total, count),
+            color = totalColor,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold
         )
     }
 }

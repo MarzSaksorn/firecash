@@ -271,58 +271,47 @@ class EasySlipClient(
     }
 
     private fun simulateSlipVerification(payload: String): VerifySlipResponse {
-        val isDuplicate = payload.endsWith("9999") // Simulated duplicate trigger
-        val status = when {
-            isDuplicate -> VerificationStatus.DUPLICATE_DETECTED
-            payload.length < 10 -> VerificationStatus.UNVERIFIED
-            else -> VerificationStatus.VERIFIED
-        }
-
+        val isDuplicate = payload.endsWith("9999")
+        val status = if (isDuplicate) VerificationStatus.DUPLICATE_DETECTED else VerificationStatus.UNVERIFIED
         return VerifySlipResponse(
-            success = status == VerificationStatus.VERIFIED || status == VerificationStatus.DUPLICATE_DETECTED,
+            success = false,
             isDuplicate = isDuplicate,
-            matchedAccount = "xxx-x-x8901-x",
-            isAmountMatched = true,
-            transRef = "TXN-20231024-8841",
-            sendingBank = "004",
-            sendingBankName = "Kasikornbank (KBank)",
-            receivingBank = "014",
-            receivingBankName = "Siam Commercial Bank (SCB)",
-            receiverName = "Starbucks Thailand / Roasters",
-            senderName = "Verified Customer",
-            amount = 45.20,
-            transDate = "2023-10-24",
-            transTime = "08:42 AM",
+            matchedAccount = null,
+            isAmountMatched = false,
+            transRef = null,
+            sendingBank = null,
+            sendingBankName = null,
+            receivingBank = null,
+            receivingBankName = null,
+            receiverName = null,
+            senderName = null,
+            amount = null,
+            transDate = null,
+            transTime = null,
+            errorMessage = if (isDuplicate) "Duplicate slip" else "EasySlip verification not configured — enable in Settings to verify",
             verificationStatus = status
         )
     }
 
     private fun simulateSlipVerification(payload: BankPayload): VerifySlipResponse {
-        val bankCode = payload.sendingBank ?: "004"
-        val bankName = getBankName(bankCode)
-        val isDuplicate = payload.crc.endsWith("9999") // Simulated duplicate CRC trigger
-
-        val status = when {
-            isDuplicate -> VerificationStatus.DUPLICATE_DETECTED
-            payload.crc.length < 4 -> VerificationStatus.UNVERIFIED
-            else -> VerificationStatus.VERIFIED
-        }
-
+        val isDuplicate = payload.crc.endsWith("9999")
+        val status = if (isDuplicate) VerificationStatus.DUPLICATE_DETECTED else VerificationStatus.UNVERIFIED
         return VerifySlipResponse(
-            success = status == VerificationStatus.VERIFIED || status == VerificationStatus.DUPLICATE_DETECTED,
+            success = false,
             isDuplicate = isDuplicate,
-            matchedAccount = "xxx-x-x8901-x",
-            isAmountMatched = true,
-            transRef = payload.transRef ?: "TXN-20231024-8841",
-            sendingBank = bankCode,
-            sendingBankName = bankName,
-            receivingBank = "014",
-            receivingBankName = "Siam Commercial Bank (SCB)",
-            receiverName = "Starbucks Thailand / Roasters",
-            senderName = "Verified Customer",
-            amount = payload.matchAmount ?: 45.20,
-            transDate = "2023-10-24",
-            transTime = "08:42 AM",
+            matchedAccount = null,
+            isAmountMatched = false,
+            transRef = payload.transRef,
+            sendingBank = payload.sendingBank,
+            sendingBankName = payload.sendingBank?.let { getBankName(it) },
+            receivingBank = null,
+            receivingBankName = null,
+            receiverName = null,
+            senderName = null,
+            amount = payload.matchAmount,
+            transDate = null,
+            transTime = null,
+            errorMessage = if (isDuplicate) "Duplicate slip" else "EasySlip verification not configured — enable in Settings to verify",
             verificationStatus = status
         )
     }

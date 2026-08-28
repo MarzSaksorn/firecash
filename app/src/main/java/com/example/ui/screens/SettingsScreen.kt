@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -86,6 +87,7 @@ fun SettingsScreen(
     apiKey: String,
     checkDuplicates: Boolean,
     knownNames: List<String> = emptyList(),
+    unverifiedCount: Int = 0,
     onCurrencyChange: (String) -> Unit,
     onToggleDriveSync: (Boolean) -> Unit,
     onToggleEasySlip: (Boolean) -> Unit,
@@ -93,6 +95,7 @@ fun SettingsScreen(
     onToggleCheckDuplicates: (Boolean) -> Unit,
     onAddKnownName: (String) -> Unit = {},
     onRemoveKnownName: (String) -> Unit = {},
+    onSyncUnverified: () -> Unit = {},
     onAddRule: (keyword: String, category: String) -> Unit,
     onRemoveRule: (KeywordRule) -> Unit,
     onNavigateToBackup: () -> Unit,
@@ -368,6 +371,23 @@ fun SettingsScreen(
                                         checkedTrackColor = FireCashPrimary
                                     )
                                 )
+                            }
+                            if (unverifiedCount > 0) {
+                                Button(
+                                    onClick = onSyncUnverified,
+                                    enabled = apiKey.isNotBlank(),
+                                    modifier = Modifier.fillMaxWidth().testTag("sync_unverified_button"),
+                                    colors = ButtonDefaults.buttonColors(containerColor = FireCashPrimary)
+                                ) {
+                                    Text("Sync $unverifiedCount unverified slip(s) now", color = FireCashOnPrimary)
+                                }
+                                if (apiKey.isBlank()) {
+                                    Text(
+                                        text = "Add API key to enable sync",
+                                        color = FireCashOnSurfaceVariant,
+                                        fontSize = 11.sp
+                                    )
+                                }
                             }
                         }
                     }

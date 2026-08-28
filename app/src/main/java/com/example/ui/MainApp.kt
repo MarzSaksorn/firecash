@@ -240,6 +240,44 @@ fun MainApp(modifier: Modifier = Modifier) {
         }
     }
 
+    fun resyncUnverifiedSlips() {
+        if (!easySlipEnabled || apiKey.isBlank()) return
+        if (isLoading || isBackgroundSyncing) return
+        val unverified = savedSlips.filter { it.verificationStatus == VerificationStatus.UNVERIFIED }
+        if (unverified.isEmpty()) return
+        isLoading = true
+        scope.launch {
+            try {
+                for (old in unverified.toList()) {
+                    val result = runCatching { verifyWithEasySlip(old.payload) }.getOrNull() ?: continue
+                    // Preserve amount/date fallback and re-evaluate income via known names
+                    val resolvedIsMoneyIn = when {
+                        isKnownName(result.senderName, knownNames) && isKnownName(result.receiverName, knownNames) -> false
+                        isKnownName(result.receiverName, knownNames) -> true
+                        isKnownName(result.senderName, knownNames) -> false
+                        else -> old.isMoneyIn
+                    }
+                    val updated = old.copy(
+                        amount = result.amount ?: old.amount,
+                        transRef = result.transRef ?: old.transRef,
+                        senderName = result.senderName ?: old.senderName,
+                        receiverName = result.receiverName ?: old.receiverName,
+                        date = result.transDate ?: old.date,
+                        time = result.transTime ?: old.time,
+                        verificationStatus = result.verificationStatus,
+                        slipData = result,
+                        isMoneyIn = resolvedIsMoneyIn
+                    )
+                    val idx = savedSlips.indexOfFirst { it.payload == old.payload || (old.transRef != null && it.transRef == old.transRef) }
+                    if (idx >= 0) savedSlips[idx] = updated
+                }
+                saveSlips(prefs, savedSlips)
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
     fun onFolderSelected(uri: Uri) {
         runCatching {
             context.contentResolver.takePersistableUriPermission(
@@ -378,15 +416,18 @@ fun MainApp(modifier: Modifier = Modifier) {
     apiKey = apiKey,
     checkDuplicates = checkDuplicates,
     knownNames = knownNames,
+    unverifiedCount = savedSlips.count { it.verificationStatus == VerificationStatus.UNVERIFIED },
     onCurrencyChange = {},
     onToggleDriveSync = {},
     onToggleEasySlip = { enabled ->
         easySlipEnabled = enabled
         prefs.edit().putBoolean("easy_slip_enabled", enabled).apply()
+        if (enabled && apiKey.isNotBlank()) resyncUnverifiedSlips()
     },
     onUpdateApiKey = { key ->
         apiKey = key
         prefs.edit().putString("api_key", key).apply()
+        if (easySlipEnabled && key.isNotBlank()) resyncUnverifiedSlips()
     },
     onToggleCheckDuplicates = { enabled ->
         checkDuplicates = enabled
@@ -403,6 +444,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                         knownNames = knownNames - name
                         saveKnownNames(prefs, knownNames)
                     },
+                    onSyncUnverified = { resyncUnverifiedSlips() },
                     onAddRule = { _, _ -> },
                     onRemoveRule = {},
                     onNavigateToBackup = {},

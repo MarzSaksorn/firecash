@@ -116,7 +116,7 @@ fun SettingsScreen(
     var apiKeyText by remember { mutableStateOf(apiKey) }
     var newKnownName by remember { mutableStateOf("") }
     var newWhitelistApp by remember { mutableStateOf("") }
-    var newWhitelistPrefix by remember { mutableStateOf("<Sender> โอนเงินให้คุณ ฿<Amount>") }
+    var newWhitelistPrefix by remember { mutableStateOf("โอนเงินให้คุณ ฿") }
 
     val currencies = listOf("USD", "THB", "EUR", "GBP", "JPY")
 
@@ -591,16 +591,16 @@ fun SettingsScreen(
                             color = FireCashOnSurfaceVariant,
                             fontSize = 11.sp
                         )
-                        // Whitelist with optional prefix template
+                        // Whitelist with prefix detection
                         Text(
-                            text = "Whitelist (only these apps + prefix will be read)",
+                            text = "Whitelist (only these apps will be read)",
                             color = FireCashOnSurface,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(top = 8.dp)
                         )
                         Text(
-                            text = "Prefix template: use <Sender> and <Amount> placeholders. e.g. <Sender> โอนเงินให้คุณ ฿<Amount>",
+                            text = "Prefix: only notifications containing this text will be read, amount is first number after it. e.g. โอนเงินให้คุณ ฿",
                             color = FireCashOnSurfaceVariant,
                             fontSize = 11.sp
                         )
@@ -622,7 +622,7 @@ fun SettingsScreen(
                         OutlinedTextField(
                             value = newWhitelistPrefix,
                             onValueChange = { newWhitelistPrefix = it },
-                            placeholder = { Text("Prefix e.g. <Sender> โอนเงินให้คุณ ฿<Amount> (empty = any)", fontSize = 11.sp) },
+                            placeholder = { Text("Prefix e.g. โอนเงินให้คุณ ฿ (empty = any)", fontSize = 11.sp) },
                             singleLine = true,
                             textStyle = TextStyle(color = FireCashOnSurface, fontSize = 12.sp),
                             colors = OutlinedTextFieldDefaults.colors(

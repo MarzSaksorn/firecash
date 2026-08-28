@@ -33,18 +33,13 @@ class IncomeNotificationService : NotificationListenerService() {
         val combined = listOf(title, text, bigText).filter { it.isNotBlank() }.joinToString(" ").trim()
         if (combined.isBlank()) return
 
-        var senderFromTemplate: String? = null
-        var amount: Double? = null
-        val template = entry?.prefix?.trim() ?: ""
-        if (template.isNotBlank()) {
-            val parsed = parseWithTemplate(combined, template)
-            if (parsed == null) return // prefix didn't match → ignore
-            senderFromTemplate = parsed.first
-            amount = parsed.second
+        val prefix = entry?.prefix?.trim() ?: ""
+        val amount = if (prefix.isNotBlank()) {
+            extractAfterPrefix(combined, prefix) ?: return // prefix not found → ignore
+        } else {
+            extractFirstNumber(combined) ?: return
         }
-        if (amount == null) amount = extractFirstNumber(combined) ?: return
-        val effectiveSender = senderFromTemplate?.takeIf { it.isNotBlank() } ?: title
-        saveIncomeFromNotification(this, amount, effectiveSender, combined, sbn.packageName)
+        saveIncomeFromNotification(this, amount, title, combined, sbn.packageName)
     }
 
     companion object {
@@ -63,39 +58,15 @@ class IncomeNotificationService : NotificationListenerService() {
         }
 
         /**
-         * Parses text with a prefix template like "<Sender> โอนเงินให้คุณ ฿<Amount>".
-         * Returns Pair(sender, amount) if matched, null if template doesn't match.
+         * Simple prefix detection: find `prefix` in text and extract first number after it.
+         * E.g. prefix="โอนเงินให้คุณ ฿" and text="Somchai โอนเงินให้คุณ ฿1,250.00 ..." → 1250.0
          */
-        fun parseWithTemplate(text: String, template: String): Pair<String?, Double?>? {
-            if (template.isBlank()) return null
-            val hasSender = template.contains("<Sender>")
-            val hasAmount = template.contains("<Amount>")
-            if (!hasSender && !hasAmount) {
-                // Simple contains check
-                return if (text.contains(template)) Pair(null, extractFirstNumber(text)) else null
-            }
-            // Build regex from template
-            var regexStr = Regex.escape(template)
-            regexStr = regexStr.replace(Regex.escape("<Sender>"), "(.+?)")
-            regexStr = regexStr.replace(Regex.escape("<Amount>"), """([\d,]+\.?\d*)""")
-            // Allow flexible whitespace
-            regexStr = regexStr.replace(Regex.escape(" "), """\s+""")
-            val regex = Regex(regexStr)
-            val match = regex.find(text) ?: return null
-            var sender: String? = null
-            var amount: Double? = null
-            var groupIdx = 1
-            if (hasSender) {
-                sender = match.groupValues.getOrNull(groupIdx)?.trim()
-                groupIdx++
-            }
-            if (hasAmount) {
-                val raw = match.groupValues.getOrNull(groupIdx)?.replace(",", "")?.trim()
-                amount = raw?.toDoubleOrNull() ?: extractFirstNumber(text)
-            } else {
-                amount = extractFirstNumber(text)
-            }
-            return Pair(sender?.takeIf { it.isNotBlank() }, amount)
+        fun extractAfterPrefix(text: String, prefix: String): Double? {
+            if (prefix.isBlank()) return extractFirstNumber(text)
+            val idx = text.indexOf(prefix)
+            if (idx == -1) return null // prefix not found → ignore
+            val after = text.substring(idx + prefix.length)
+            return extractFirstNumber(after)
         }
 
         fun isEnabled(context: Context): Boolean {

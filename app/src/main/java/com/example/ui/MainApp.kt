@@ -371,7 +371,7 @@ fun MainApp(modifier: Modifier = Modifier) {
         containerColor = FireCashBackground,
         modifier = modifier.fillMaxSize()
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        Box(modifier = Modifier.fillMaxSize().padding(bottom = paddingValues.calculateBottomPadding())) {
         if (showPayload) {
             QrPayloadScreen(
                 payload = qrPayload,

@@ -88,6 +88,7 @@ fun SettingsScreen(
     checkDuplicates: Boolean,
     knownNames: List<String> = emptyList(),
     unverifiedCount: Int = 0,
+    notificationIncomeEnabled: Boolean = false,
     onCurrencyChange: (String) -> Unit,
     onToggleDriveSync: (Boolean) -> Unit,
     onToggleEasySlip: (Boolean) -> Unit,
@@ -96,6 +97,8 @@ fun SettingsScreen(
     onAddKnownName: (String) -> Unit = {},
     onRemoveKnownName: (String) -> Unit = {},
     onSyncUnverified: () -> Unit = {},
+    onToggleNotificationIncome: (Boolean) -> Unit = {},
+    onRequestNotificationPermission: () -> Unit = {},
     onAddRule: (keyword: String, category: String) -> Unit,
     onRemoveRule: (KeywordRule) -> Unit,
     onNavigateToBackup: () -> Unit,
@@ -506,6 +509,83 @@ fun SettingsScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // Card: Notification Income Detection
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FireCashSurfaceContainerLow)
+                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(FireCashSurfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.QrCodeScanner,
+                                    contentDescription = null,
+                                    tint = FireCashSecondary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Notification Income",
+                                    color = FireCashOnSurface,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Auto-capture income from bank notifications (first number → amount)",
+                                    color = FireCashOnSurfaceVariant,
+                                    fontSize = 12.sp,
+                                    lineHeight = 14.sp
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = notificationIncomeEnabled,
+                            onCheckedChange = onToggleNotificationIncome,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = FireCashOnPrimary,
+                                checkedTrackColor = FireCashSecondary,
+                                uncheckedThumbColor = FireCashOutline,
+                                uncheckedTrackColor = FireCashSurfaceVariant
+                            ),
+                            modifier = Modifier.testTag("notification_income_switch")
+                        )
+                    }
+                    if (notificationIncomeEnabled) {
+                        Button(
+                            onClick = onRequestNotificationPermission,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = FireCashSurfaceContainerHigh)
+                        ) {
+                            Text("Enable Notification Access", color = FireCashOnSurface)
+                        }
+                        Text(
+                            text = "Scoops the first number from any notification (e.g. ‘Received ฿1,250.00’) and saves as Income. Ensure FireCash is enabled in system Notification Access.",
+                            color = FireCashOnSurfaceVariant,
+                            fontSize = 11.sp
+                        )
                     }
                 }
             }

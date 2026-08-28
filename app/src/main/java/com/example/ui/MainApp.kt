@@ -73,8 +73,32 @@ fun MainApp(modifier: Modifier = Modifier) {
     var knownNames by remember {
         mutableStateOf(loadKnownNames(prefs))
     }
+    var notificationIncomeEnabled by remember {
+        mutableStateOf(prefs.getBoolean("notification_income_enabled", false))
+    }
     val seenPayloads = remember {
         mutableSetOf<String>().apply { addAll(loadSeenPayloads(prefs)) }
+    }
+
+    // Keep Account list live when IncomeNotificationService writes to prefs in background
+    androidx.compose.runtime.DisposableEffect(prefs) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == PREFS_SLIPS) {
+                val fresh = loadSlips(prefs)
+                // Simple diff check — replace if differs
+                if (fresh.size != savedSlips.size || fresh.toSet() != savedSlips.toSet()) {
+                    savedSlips.clear()
+                    savedSlips.addAll(fresh)
+                }
+                val freshSeen = loadSeenPayloads(prefs)
+                if (freshSeen != seenPayloads) {
+                    seenPayloads.clear()
+                    seenPayloads.addAll(freshSeen)
+                }
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
 
     suspend fun verifyWithEasySlip(payload: String): VerifySlipResponse? {
@@ -445,6 +469,22 @@ fun MainApp(modifier: Modifier = Modifier) {
                         saveKnownNames(prefs, knownNames)
                     },
                     onSyncUnverified = { resyncUnverifiedSlips() },
+                    notificationIncomeEnabled = notificationIncomeEnabled,
+                    onToggleNotificationIncome = { enabled ->
+                        notificationIncomeEnabled = enabled
+                        prefs.edit().putBoolean("notification_income_enabled", enabled).apply()
+                    },
+                    onRequestNotificationPermission = {
+                        try {
+                            context.startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS").apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            })
+                        } catch (_: Exception) {
+                            context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            })
+                        }
+                    },
                     onAddRule = { _, _ -> },
                     onRemoveRule = {},
                     onNavigateToBackup = {},

@@ -535,13 +535,18 @@ fun MainApp(modifier: Modifier = Modifier) {
                     },
                     onAddWhitelistedApp = { pkg, prefix ->
                         val t = pkg.trim()
-                        if (t.isNotEmpty() && notificationWhitelist.none { it.packageName == t }) {
-                            notificationWhitelist = notificationWhitelist + com.example.service.WhitelistedApp(packageName = t, prefix = prefix.trim())
+                        val p = prefix.trim()
+                        if (t.isNotEmpty() && notificationWhitelist.none { it.packageName == t && it.prefix == p }) {
+                            notificationWhitelist = notificationWhitelist + com.example.service.WhitelistedApp(packageName = t, prefix = p)
                             saveNotificationWhitelist(prefs, notificationWhitelist)
                         }
                     },
-                    onRemoveWhitelistedApp = { pkg ->
-                        notificationWhitelist = notificationWhitelist.filterNot { it.packageName == pkg }
+                    onRemoveWhitelistedApp = { pkgAndPrefix ->
+                        // pkgAndPrefix is "package|prefix" from Settings row
+                        val parts = pkgAndPrefix.split("|", limit = 2)
+                        val pkg = parts.getOrNull(0) ?: pkgAndPrefix
+                        val pref = parts.getOrNull(1) ?: ""
+                        notificationWhitelist = notificationWhitelist.filterNot { it.packageName == pkg && it.prefix == pref }
                         saveNotificationWhitelist(prefs, notificationWhitelist)
                     },
                     onRequestNotificationPermission = {

@@ -675,7 +675,7 @@ fun SettingsScreen(
                                                 modifier = Modifier.weight(1f)
                                             )
                                             IconButton(
-                                                onClick = { onRemoveWhitelistedApp(entry.packageName) },
+                                                onClick = { onRemoveWhitelistedApp(entry.packageName + "|" + entry.prefix) },
                                                 modifier = Modifier.size(24.dp)
                                             ) {
                                                 Icon(

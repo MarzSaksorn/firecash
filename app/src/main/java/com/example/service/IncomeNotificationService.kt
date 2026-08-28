@@ -21,10 +21,10 @@ class IncomeNotificationService : NotificationListenerService() {
         if (sbn.packageName == packageName) return
         val prefs = getSharedPreferences("firecash_settings", Context.MODE_PRIVATE)
         if (!prefs.getBoolean(PREFS_NOTIFICATION_INCOME, false)) return
-        // Whitelist: if non-empty, only listed packages are processed, with optional prefix template
+        // Whitelist: if non-empty, only listed packages are processed; each package may have multiple prefix entries
         val whitelist = loadWhitelist(prefs)
-        val entry = whitelist.find { it.packageName == sbn.packageName }
-        if (whitelist.isNotEmpty() && entry == null) return
+        val entriesForApp = whitelist.filter { it.packageName == sbn.packageName }
+        if (whitelist.isNotEmpty() && entriesForApp.isEmpty()) return
 
         val extras = sbn.notification.extras
         val title = extras.getCharSequence("android.title")?.toString() ?: ""
@@ -33,12 +33,19 @@ class IncomeNotificationService : NotificationListenerService() {
         val combined = listOf(title, text, bigText).filter { it.isNotBlank() }.joinToString(" ").trim()
         if (combined.isBlank()) return
 
-        val prefix = entry?.prefix?.trim() ?: ""
-        val amount = if (prefix.isNotBlank()) {
-            extractAfterPrefix(combined, prefix) ?: return // prefix not found → ignore
-        } else {
-            extractFirstNumber(combined) ?: return
-        }
+        val amount = when {
+            entriesForApp.isEmpty() -> extractFirstNumber(combined)
+            else -> {
+                // Try each prefix for this app; empty prefix = any number
+                var found: Double? = null
+                for (e in entriesForApp) {
+                    val p = e.prefix.trim()
+                    found = if (p.isBlank()) extractFirstNumber(combined) else extractAfterPrefix(combined, p)
+                    if (found != null) break
+                }
+                found
+            }
+        } ?: return
         saveIncomeFromNotification(this, amount, title, combined, sbn.packageName)
     }
 

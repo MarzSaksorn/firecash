@@ -104,7 +104,6 @@ fun AccountScreen(
     val moneyIn = slips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null }.sumOf { it.amount!! }
     val moneyOut = slips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null }.sumOf { it.amount!! }
     val balance = moneyIn - moneyOut
-    var slipToDelete by remember { mutableStateOf<SavedSlip?>(null) }
     var selectedKeys by remember { mutableStateOf(setOf<Long>()) }
     var showDeleteMultiDialog by remember { mutableStateOf(false) }
     val isSelectionMode = selectedKeys.isNotEmpty()
@@ -345,8 +344,7 @@ fun AccountScreen(
                             },
                             onLongClick = {
                                 selectedKeys = if (isSelected) selectedKeys - slip.savedAt else selectedKeys + slip.savedAt
-                            },
-                            onDelete = if (!isSelectionMode && isDeletable(slip)) ({ slipToDelete = slip }) else null
+                            }
                         )
                     }
                 }
@@ -374,33 +372,6 @@ fun AccountScreen(
                     )
                 }
             }
-        }
-
-        // Delete confirmation - single (only for unknown/invalid slips)
-        slipToDelete?.let { target ->
-            AlertDialog(
-                onDismissRequest = { slipToDelete = null },
-                title = { Text("Delete slip?", color = Color.White) },
-                text = {
-                    Text(
-                        "This slip has unknown/invalid data (amount missing or unverified). Delete it? This cannot be undone.",
-                        color = FireCashOnSurfaceVariant
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            onDeleteSlip(target)
-                            slipToDelete = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350))
-                    ) { Text("Delete", color = Color.White) }
-                },
-                dismissButton = {
-                    TextButton(onClick = { slipToDelete = null }) { Text("Cancel") }
-                },
-                containerColor = FireCashSurfaceContainerLow
-            )
         }
 
         // Multi-delete confirmation (only deletable among selected)
@@ -444,8 +415,7 @@ private fun TransactionRow(
     isSelected: Boolean = false,
     isSelectionMode: Boolean = false,
     onClick: () -> Unit,
-    onLongClick: () -> Unit = {},
-    onDelete: (() -> Unit)? = null
+    onLongClick: () -> Unit = {}
 ) {
     val effective = effectiveIsMoneyIn(slip, knownNames)
     val isSelf = effective == null
@@ -541,20 +511,6 @@ private fun TransactionRow(
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold
             )
-        }
-        if (onDelete != null) {
-            Spacer(modifier = Modifier.width(8.dp))
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete invalid slip",
-                    tint = Color(0xFFEF5350).copy(alpha = 0.9f),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
         }
     }
 }

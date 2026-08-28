@@ -16,12 +16,6 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -31,7 +25,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,7 +36,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import com.example.data.model.VerificationStatus
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -120,22 +112,6 @@ fun AccountScreen(
     val selectedSlips = remember(slips, selectedKeys) { slips.filter { it.savedAt in selectedKeys } }
     val deletableSelected = remember(selectedSlips) { selectedSlips.filter { isDeletable(it) } }
 
-    val lazyListState = rememberLazyListState()
-    var fabVisible by remember { mutableStateOf(true) }
-    var prevIndex by remember { mutableStateOf(0) }
-    var prevOffset by remember { mutableStateOf(0) }
-    LaunchedEffect(lazyListState) {
-        snapshotFlow { lazyListState.firstVisibleItemIndex to lazyListState.firstVisibleItemScrollOffset }
-            .collect { (index, offset) ->
-                val down = index > prevIndex || (index == prevIndex && offset > prevOffset + 6)
-                val up = index < prevIndex || (index == prevIndex && offset < prevOffset - 6)
-                if (down && fabVisible) fabVisible = false
-                else if (up && !fabVisible) fabVisible = true
-                prevIndex = index
-                prevOffset = offset
-            }
-    }
-
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -203,7 +179,7 @@ fun AccountScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Balance card
+        // Balance card - camera button persistent on right side, same level as money numbers
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -225,7 +201,8 @@ fun AccountScreen(
             Spacer(modifier = Modifier.height(16.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -249,27 +226,45 @@ fun AccountScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-                Column(horizontalAlignment = Alignment.End) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowUpward,
-                            contentDescription = null,
-                            tint = Color(0xFFEF5350),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowUpward,
+                                contentDescription = null,
+                                tint = Color(0xFFEF5350),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Money Out",
+                                color = FireCashOnSurfaceVariant,
+                                fontSize = 13.sp
+                            )
+                        }
                         Text(
-                            text = "Money Out",
-                            color = FireCashOnSurfaceVariant,
-                            fontSize = 13.sp
+                            text = "THB %.2f".format(Locale.US, moneyOut),
+                            color = Color(0xFFEF5350),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
-                    Text(
-                        text = "THB %.2f".format(Locale.US, moneyOut),
-                        color = Color(0xFFEF5350),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    IconButton(
+                        onClick = onOpenCamera,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(Color.White.copy(alpha = 0.12f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoCamera,
+                            contentDescription = "Open camera",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             }
         }
@@ -349,7 +344,7 @@ fun AccountScreen(
                 .map { (date, list) -> date to list.sortedByDescending { it.savedAt } }
                 .sortedByDescending { (date, _) -> date }
 
-            LazyColumn(state = lazyListState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 grouped.forEach { (date, dateSlips) ->
                     item(key = "header_$date") {
                         DateHeader(date = date, count = dateSlips.size)
@@ -374,31 +369,6 @@ fun AccountScreen(
                         )
                     }
                 }
-            }
-        }
-    }
-
-        // Camera FAB at bottom-end, hides on scroll
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-                .padding(bottom = 8.dp)
-        ) {
-            AnimatedVisibility(
-                visible = fabVisible && !isSelectionMode,
-                enter = fadeIn() + scaleIn(),
-                exit = fadeOut() + scaleOut()
-            ) {
-                FloatingActionButton(
-                    onClick = onOpenCamera,
-                containerColor = FireCashPrimary,
-                contentColor = Color.White
-            ) {
-                Icon(
-                    imageVector = Icons.Default.PhotoCamera,
-                    contentDescription = "Open camera"
-                )
             }
         }
         }

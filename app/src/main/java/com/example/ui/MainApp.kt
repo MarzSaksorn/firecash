@@ -448,7 +448,23 @@ fun MainApp(modifier: Modifier = Modifier) {
                 },
                 onSlipClick = { slip ->
                     qrPayload = slip.payload
-                    slipData = slip.slipData
+                    slipData = slip.slipData ?: VerifySlipResponse(
+                        success = false,
+                        isDuplicate = false,
+                        amount = slip.amount ?: extractAmount(slip.payload),
+                        transRef = slip.transRef,
+                        senderName = slip.senderName,
+                        receiverName = slip.receiverName,
+                        transDate = slip.date,
+                        transTime = slip.time,
+                        sendingBank = null,
+                        sendingBankName = null,
+                        receivingBank = null,
+                        receivingBankName = null,
+                        verificationStatus = slip.verificationStatus,
+                        errorMessage = "Not verified — enable EasySlip and Sync unverified in Settings",
+                        isAmountMatched = false
+                    )
                     slipWarning = ""
                     showSavedSlips = false
                     showPayload = true

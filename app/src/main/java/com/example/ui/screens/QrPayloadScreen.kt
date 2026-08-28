@@ -100,12 +100,10 @@ fun QrPayloadScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Verification status banner
+            // Verification status banner + details — always show card, fallback to payload-extracted amount if not verified
             if (slipData != null) {
                 StatusBanner(slipData = slipData)
                 Spacer(modifier = Modifier.height(12.dp))
-
-                // Slip details card
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -117,7 +115,7 @@ fun QrPayloadScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    DetailRow("Amount", slipData.amount?.let { "THB %.2f".format(Locale.US, it) } ?: "—")
+                    DetailRow("Amount", slipData.amount?.let { "THB %.2f".format(Locale.US, it) } ?: extractAmount(payload)?.let { "THB %.2f".format(Locale.US, it) } ?: "—")
                     DetailRow("Transaction Ref", slipData.transRef ?: "—")
                     DetailRow("Date", slipData.transDate ?: "—")
                     DetailRow("Time", slipData.transTime ?: "—")
@@ -126,6 +124,28 @@ fun QrPayloadScreen(
                     DetailRow("Receiver", slipData.receiverName ?: "—")
                     DetailRow("Receiver Bank", slipData.receivingBankName ?: slipData.receivingBank ?: "—")
                     DetailRow("Amount Matched", if (slipData.isAmountMatched) "Yes" else "No")
+                }
+            } else {
+                // Fallback for old slips where slipData was null — still show a card from raw payload
+                Spacer(modifier = Modifier.height(4.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            FireCashSurfaceContainerLow,
+                            RoundedCornerShape(16.dp)
+                        )
+                        .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    DetailRow("Amount", extractAmount(payload)?.let { "THB %.2f".format(Locale.US, it) } ?: "—")
+                    DetailRow("Transaction Ref", "—")
+                    DetailRow("Date", "—")
+                    DetailRow("Time", "—")
+                    DetailRow("Sender", "—")
+                    DetailRow("Receiver", "—")
+                    DetailRow("Status", "Not verified — enable EasySlip and Sync unverified")
                 }
             }
 
@@ -183,4 +203,9 @@ private fun DetailRow(label: String, value: String) {
             style = MaterialTheme.typography.bodyMedium
         )
     }
+}
+
+private fun extractAmount(text: String): Double? {
+    val regex = Regex("""\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?""")
+    return regex.find(text)?.value?.replace(",", "")?.toDoubleOrNull()
 }

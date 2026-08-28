@@ -179,25 +179,46 @@ fun AccountScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Balance card - camera button persistent on right side, same level as money numbers
+        // Balance card - camera button at top-right, persistent
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(FireCashSecondaryContainer, RoundedCornerShape(20.dp))
                 .padding(20.dp)
         ) {
-            Text(
-                text = "Current Balance",
-                color = FireCashOnSurfaceVariant,
-                fontSize = 13.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "THB %.2f".format(Locale.US, balance),
-                color = Color.White,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column {
+                    Text(
+                        text = "Current Balance",
+                        color = FireCashOnSurfaceVariant,
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "THB %.2f".format(Locale.US, balance),
+                        color = Color.White,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                IconButton(
+                    onClick = onOpenCamera,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(Color.White.copy(alpha = 0.12f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhotoCamera,
+                        contentDescription = "Open camera",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -226,45 +247,27 @@ fun AccountScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowUpward,
-                                contentDescription = null,
-                                tint = Color(0xFFEF5350),
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Money Out",
-                                color = FireCashOnSurfaceVariant,
-                                fontSize = 13.sp
-                            )
-                        }
-                        Text(
-                            text = "THB %.2f".format(Locale.US, moneyOut),
-                            color = Color(0xFFEF5350),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    IconButton(
-                        onClick = onOpenCamera,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .background(Color.White.copy(alpha = 0.12f), CircleShape)
-                    ) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = Icons.Default.PhotoCamera,
-                            contentDescription = "Open camera",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
+                            imageVector = Icons.Default.ArrowUpward,
+                            contentDescription = null,
+                            tint = Color(0xFFEF5350),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Money Out",
+                            color = FireCashOnSurfaceVariant,
+                            fontSize = 13.sp
                         )
                     }
+                    Text(
+                        text = "THB %.2f".format(Locale.US, moneyOut),
+                        color = Color(0xFFEF5350),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }

@@ -40,15 +40,20 @@ import com.example.ui.theme.FireCashSecondaryContainer
 import com.example.ui.theme.FireCashSurfaceContainerLow
 import java.util.Locale
 
-private fun isSelfTransfer(slip: SavedSlip): Boolean {
+private fun isSelfTransfer(slip: SavedSlip, knownNames: List<String> = emptyList()): Boolean {
     val s = slip.senderName?.trim()?.lowercase(Locale.ROOT)
     val r = slip.receiverName?.trim()?.lowercase(Locale.ROOT)
-    return !s.isNullOrEmpty() && s == r
+    if (!s.isNullOrEmpty() && s == r) return true
+    if (knownNames.isEmpty()) return false
+    val sKnown = !s.isNullOrEmpty() && knownNames.any { it.trim().lowercase(Locale.ROOT) == s }
+    val rKnown = !r.isNullOrEmpty() && knownNames.any { it.trim().lowercase(Locale.ROOT) == r }
+    return sKnown && rKnown
 }
 
 @Composable
 fun AccountScreen(
     slips: List<SavedSlip>,
+    knownNames: List<String> = emptyList(),
     isLoading: Boolean = false,
     isBackgroundSyncing: Boolean = false,
     onBack: () -> Unit,
@@ -62,8 +67,8 @@ fun AccountScreen(
     LaunchedEffect(Unit) {
         onAutoSync()
     }
-    val moneyIn = slips.filter { !isSelfTransfer(it) && it.isMoneyIn && it.amount != null }.sumOf { it.amount!! }
-    val moneyOut = slips.filter { !isSelfTransfer(it) && !it.isMoneyIn && it.amount != null }.sumOf { it.amount!! }
+    val moneyIn = slips.filter { !isSelfTransfer(it, knownNames) && it.isMoneyIn && it.amount != null }.sumOf { it.amount!! }
+    val moneyOut = slips.filter { !isSelfTransfer(it, knownNames) && !it.isMoneyIn && it.amount != null }.sumOf { it.amount!! }
     val balance = moneyIn - moneyOut
 
     Box(
@@ -257,7 +262,7 @@ fun AccountScreen(
                         DateHeader(date = date, count = dateSlips.size)
                     }
                     items(dateSlips, key = { it.savedAt }) { slip ->
-                        TransactionRow(slip = slip, onClick = { onSlipClick(slip) })
+                        TransactionRow(slip = slip, onClick = { onSlipClick(slip) }, knownNames = knownNames)
                     }
                 }
             }
@@ -289,8 +294,8 @@ fun AccountScreen(
 }
 
 @Composable
-private fun TransactionRow(slip: SavedSlip, onClick: () -> Unit) {
-    val isSelf = isSelfTransfer(slip)
+private fun TransactionRow(slip: SavedSlip, onClick: () -> Unit, knownNames: List<String> = emptyList()) {
+    val isSelf = isSelfTransfer(slip, knownNames)
     val isIn = slip.isMoneyIn
     val arrow = when {
         isSelf -> Icons.Default.SwapHoriz

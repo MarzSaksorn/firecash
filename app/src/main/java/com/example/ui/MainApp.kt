@@ -70,6 +70,9 @@ fun MainApp(modifier: Modifier = Modifier) {
     var trackedFolderUris by remember {
         mutableStateOf(loadTrackedFolders(prefs))
     }
+    var knownNames by remember {
+        mutableStateOf(loadKnownNames(prefs))
+    }
     val seenPayloads = remember {
         mutableSetOf<String>().apply { addAll(loadSeenPayloads(prefs)) }
     }
@@ -88,9 +91,28 @@ fun MainApp(modifier: Modifier = Modifier) {
         return easySlipClient.verifyPayload(payload, checkDuplicate = checkDuplicates)
     }
 
+    fun isKnownName(name: String?, known: List<String>): Boolean {
+        if (name.isNullOrBlank()) return false
+        val norm = name.trim().lowercase(java.util.Locale.ROOT)
+        return known.any { it.trim().lowercase(java.util.Locale.ROOT) == norm }
+    }
+
     suspend fun addSlip(payload: String, isMoneyIn: Boolean = false) {
         val result = runCatching { verifyWithEasySlip(payload) }.getOrNull()
         slipData = result
+        // Auto-resolve isMoneyIn based on known names:
+        // - if both sender & receiver are known -> transfer (neutral, stored as false, UI shows Transfer)
+        // - if receiver is known -> income
+        // - if sender is known -> expense
+        // - else fallback to requested isMoneyIn (manual toggle / default)
+        val senderKnown = isKnownName(result?.senderName, knownNames)
+        val receiverKnown = isKnownName(result?.receiverName, knownNames)
+        val resolvedIsMoneyIn = when {
+            senderKnown && receiverKnown -> false // transfer - will be excluded from balance
+            receiverKnown -> true
+            senderKnown -> false
+            else -> isMoneyIn
+        }
         val slip = SavedSlip(
             payload = payload,
             amount = result?.amount,
@@ -101,7 +123,7 @@ fun MainApp(modifier: Modifier = Modifier) {
             time = result?.transTime,
             verificationStatus = result?.verificationStatus ?: VerificationStatus.UNVERIFIED,
             slipData = result,
-            isMoneyIn = isMoneyIn
+            isMoneyIn = resolvedIsMoneyIn
         )
 
         // Dedupe: re-scanning the same slip updates the existing entry instead of adding a log
@@ -316,6 +338,7 @@ fun MainApp(modifier: Modifier = Modifier) {
         } else if (showSavedSlips) {
             AccountScreen(
                 slips = savedSlips,
+                knownNames = knownNames,
                 isLoading = isLoading,
                 isBackgroundSyncing = isBackgroundSyncing,
                 onBack = {
@@ -342,6 +365,7 @@ fun MainApp(modifier: Modifier = Modifier) {
         } else if (showAnalytics) {
             AnalyticsScreen(
                 slips = savedSlips,
+                knownNames = knownNames,
                 onBack = {
                     showAnalytics = false
                     showSavedSlips = true
@@ -356,6 +380,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     easySlipEnabled = easySlipEnabled,
     apiKey = apiKey,
     checkDuplicates = checkDuplicates,
+    knownNames = knownNames,
     onCurrencyChange = {},
     onToggleDriveSync = {},
     onToggleEasySlip = { enabled ->
@@ -370,6 +395,17 @@ fun MainApp(modifier: Modifier = Modifier) {
         checkDuplicates = enabled
         prefs.edit().putBoolean("check_duplicates", enabled).apply()
     },
+                    onAddKnownName = { name ->
+                        val trimmed = name.trim()
+                        if (trimmed.isNotEmpty() && trimmed !in knownNames) {
+                            knownNames = knownNames + trimmed
+                            saveKnownNames(prefs, knownNames)
+                        }
+                    },
+                    onRemoveKnownName = { name ->
+                        knownNames = knownNames - name
+                        saveKnownNames(prefs, knownNames)
+                    },
                     onAddRule = { _, _ -> },
                     onRemoveRule = {},
                     onNavigateToBackup = {},
@@ -390,6 +426,7 @@ fun MainApp(modifier: Modifier = Modifier) {
 private const val PREFS_SLIPS = "saved_slips"
 private const val PREFS_SEEN = "seen_payloads"
 private const val PREFS_FOLDERS = "tracked_folders"
+private const val PREFS_KNOWN_NAMES = "known_names"
 
 private fun loadTrackedFolders(prefs: SharedPreferences): List<String> {
     val raw = prefs.getString(PREFS_FOLDERS, null) ?: return emptyList()
@@ -402,6 +439,19 @@ private fun loadTrackedFolders(prefs: SharedPreferences): List<String> {
 private fun saveTrackedFolders(prefs: SharedPreferences, folders: List<String>) {
     val arr = JSONArray(folders)
     prefs.edit().putString(PREFS_FOLDERS, arr.toString()).apply()
+}
+
+private fun loadKnownNames(prefs: SharedPreferences): List<String> {
+    val raw = prefs.getString(PREFS_KNOWN_NAMES, null) ?: return emptyList()
+    return runCatching {
+        val arr = JSONArray(raw)
+        (0 until arr.length()).map { arr.getString(it) }
+    }.getOrDefault(emptyList())
+}
+
+private fun saveKnownNames(prefs: SharedPreferences, names: List<String>) {
+    val arr = JSONArray(names)
+    prefs.edit().putString(PREFS_KNOWN_NAMES, arr.toString()).apply()
 }
 
 private fun loadSlips(prefs: SharedPreferences): List<SavedSlip> {

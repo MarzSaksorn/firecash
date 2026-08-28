@@ -44,20 +44,25 @@ private data class TimeEntry(val label: String, val total: Double)
 
 private enum class TimeBucket { DAY, WEEK, MONTH }
 
-private fun isSelfTransfer(slip: SavedSlip): Boolean {
+private fun isSelfTransfer(slip: SavedSlip, knownNames: List<String> = emptyList()): Boolean {
     val s = slip.senderName?.trim()?.lowercase(Locale.ROOT)
     val r = slip.receiverName?.trim()?.lowercase(Locale.ROOT)
-    return !s.isNullOrEmpty() && s == r
+    if (!s.isNullOrEmpty() && s == r) return true
+    if (knownNames.isEmpty()) return false
+    val sKnown = !s.isNullOrEmpty() && knownNames.any { it.trim().lowercase(Locale.ROOT) == s }
+    val rKnown = !r.isNullOrEmpty() && knownNames.any { it.trim().lowercase(Locale.ROOT) == r }
+    return sKnown && rKnown
 }
 
 @Composable
 fun AnalyticsScreen(
     slips: List<SavedSlip>,
+    knownNames: List<String> = emptyList(),
     onBack: () -> Unit,
     onRefresh: () -> Unit
 ) {
-    val expenses = remember(slips) {
-        slips.filterNot { isSelfTransfer(it) }.mapNotNull { slip ->
+    val expenses = remember(slips, knownNames) {
+        slips.filterNot { isSelfTransfer(it, knownNames) }.mapNotNull { slip ->
             val amt = slip.amount ?: return@mapNotNull null
             Expense(
                 merchant = slip.senderName ?: slip.receiverName ?: "Unknown",
@@ -75,7 +80,7 @@ fun AnalyticsScreen(
     val insights = analytics.insights
 
     var selectedBucket by remember { mutableStateOf(TimeBucket.DAY) }
-    val timeEntries = remember(expenses, selectedBucket) {
+    val timeEntries = remember(expenses, selectedBucket, knownNames) {
         computeEntries(expenses.filter { it.date.isNotBlank() }, selectedBucket)
     }
 

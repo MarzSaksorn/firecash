@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Storage
@@ -84,11 +85,14 @@ fun SettingsScreen(
     easySlipEnabled: Boolean,
     apiKey: String,
     checkDuplicates: Boolean,
+    knownNames: List<String> = emptyList(),
     onCurrencyChange: (String) -> Unit,
     onToggleDriveSync: (Boolean) -> Unit,
     onToggleEasySlip: (Boolean) -> Unit,
     onUpdateApiKey: (String) -> Unit,
     onToggleCheckDuplicates: (Boolean) -> Unit,
+    onAddKnownName: (String) -> Unit = {},
+    onRemoveKnownName: (String) -> Unit = {},
     onAddRule: (keyword: String, category: String) -> Unit,
     onRemoveRule: (KeywordRule) -> Unit,
     onNavigateToBackup: () -> Unit,
@@ -101,6 +105,7 @@ fun SettingsScreen(
     var newCategory by remember { mutableStateOf("Travel") }
 
     var apiKeyText by remember { mutableStateOf(apiKey) }
+    var newKnownName by remember { mutableStateOf("") }
 
     val currencies = listOf("USD", "THB", "EUR", "GBP", "JPY")
 
@@ -363,6 +368,122 @@ fun SettingsScreen(
                                         checkedTrackColor = FireCashPrimary
                                     )
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Card: My Names (auto income / transfer detection)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FireCashSurfaceContainerLow)
+                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(FireCashSurfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                tint = FireCashPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "My Names",
+                                color = FireCashOnSurface,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Receiver = your name → Income • Both = your names → Transfer (excluded from balance)",
+                                color = FireCashOnSurfaceVariant,
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = newKnownName,
+                            onValueChange = { newKnownName = it },
+                            placeholder = { Text("e.g. Somchai / สมชาย ใจดี", fontSize = 13.sp) },
+                            singleLine = true,
+                            textStyle = TextStyle(color = FireCashOnSurface, fontSize = 13.sp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = FireCashSurfaceContainerHigh,
+                                unfocusedContainerColor = FireCashSurfaceContainerHigh,
+                                focusedBorderColor = FireCashPrimary,
+                                unfocusedBorderColor = FireCashOutlineVariant
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f).testTag("known_name_input")
+                        )
+                        Button(
+                            onClick = {
+                                val t = newKnownName.trim()
+                                if (t.isNotEmpty()) {
+                                    onAddKnownName(t)
+                                    newKnownName = ""
+                                }
+                            },
+                            modifier = Modifier.testTag("add_known_name_button")
+                        ) { Text("Add") }
+                    }
+                    if (knownNames.isEmpty()) {
+                        Text(
+                            text = "No names yet — add your Thai / English variants.",
+                            color = FireCashOnSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            knownNames.forEach { name ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(FireCashSurfaceContainerHighest)
+                                        .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = name,
+                                        color = FireCashOnSurface,
+                                        fontSize = 14.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(
+                                        onClick = { onRemoveKnownName(name) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Remove",
+                                            tint = FireCashOutline,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

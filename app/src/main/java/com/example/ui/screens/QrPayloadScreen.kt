@@ -47,6 +47,14 @@ fun QrPayloadScreen(
     warning: String = "",
     onBack: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    var payloadCopied by remember { mutableStateOf(false) }
+    LaunchedEffect(payloadCopied) {
+        if (payloadCopied) {
+            delay(1200)
+            payloadCopied = false
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -74,16 +82,28 @@ fun QrPayloadScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Raw payload display
-            Text(
-                text = if (payload.isBlank()) "No payload" else payload,
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color.White,
+            // Raw payload display — tap to copy with green Copied feedback
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
+                    .border(1.dp, if (payloadCopied) Color(0xFF66BB6A) else Color.Gray, RoundedCornerShape(8.dp))
+                    .clickable(enabled = payload.isNotBlank()) {
+                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("QR Payload", payload))
+                        payloadCopied = true
+                    }
                     .padding(12.dp)
-            )
+            ) {
+                Text(
+                    text = when {
+                        payload.isBlank() -> "No payload"
+                        payloadCopied -> "Copied"
+                        else -> payload
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (payloadCopied) Color(0xFF66BB6A) else Color.White
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 

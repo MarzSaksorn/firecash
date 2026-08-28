@@ -14,6 +14,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.rememberCoroutineScope
@@ -84,6 +85,27 @@ fun MainApp(modifier: Modifier = Modifier) {
     }
     val seenPayloads = remember {
         mutableSetOf<String>().apply { addAll(loadSeenPayloads(prefs)) }
+    }
+
+    // System back handling — mirrors in-app navigation, returns to previous state
+    BackHandler(enabled = showPayload) {
+        showPayload = false
+        showSavedSlips = true
+        showCapture = false
+        showAnalytics = false
+    }
+    BackHandler(enabled = showAnalytics) {
+        showAnalytics = false
+        showSavedSlips = true
+    }
+    BackHandler(enabled = showCapture) {
+        // Capture is now secondary (homepage is Account) → back returns to Account
+        showCapture = false
+        showSavedSlips = true
+    }
+    BackHandler(enabled = !showPayload && !showCapture && !showSavedSlips && !showAnalytics) {
+        // Settings (unified) → back to Account (homepage)
+        showSavedSlips = true
     }
 
     // Keep Account list live when IncomeNotificationService writes to prefs in background

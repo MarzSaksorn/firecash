@@ -30,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -111,6 +112,10 @@ fun AccountScreen(
     val isSelectionMode = selectedKeys.isNotEmpty()
     val selectedSlips = remember(slips, selectedKeys) { slips.filter { it.savedAt in selectedKeys } }
     val deletableSelected = remember(selectedSlips) { selectedSlips.filter { isDeletable(it) } }
+
+    BackHandler(enabled = isSelectionMode) {
+        selectedKeys = emptySet()
+    }
 
     Box(
         modifier = modifier

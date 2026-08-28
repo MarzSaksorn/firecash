@@ -171,7 +171,7 @@ fun AccountScreen(
                         painter = painterResource(id = R.drawable.firecash_icon),
                         contentDescription = "FireCash logo",
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(56.dp)
                             .clip(CircleShape)
                             .background(FireCashSurfaceContainerLow)
                     )

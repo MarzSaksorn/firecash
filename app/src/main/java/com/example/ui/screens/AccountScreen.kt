@@ -164,22 +164,23 @@ fun AccountScreen(
             } else {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.firecash_icon),
                         contentDescription = "FireCash logo",
                         modifier = Modifier
-                            .size(32.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
                             .background(FireCashSurfaceContainerLow)
                     )
                     Text(
                         text = "FireCash",
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.headlineMedium,
                         color = Color.White,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 26.sp
                     )
                 }
                 IconButton(onClick = onOpenSettings) {

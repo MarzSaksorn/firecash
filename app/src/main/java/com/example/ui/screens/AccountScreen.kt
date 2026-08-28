@@ -352,7 +352,7 @@ fun AccountScreen(
                 .map { (date, list) -> date to list.sortedByDescending { it.savedAt } }
                 .sortedByDescending { (date, _) -> date }
 
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(reverseLayout = true, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 grouped.forEach { (date, dateSlips) ->
                     item(key = "header_$date") {
                         DateHeader(date = date, count = dateSlips.size)

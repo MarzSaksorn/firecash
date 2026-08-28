@@ -157,11 +157,11 @@ fun MainApp(modifier: Modifier = Modifier) {
         }
     }
 
-    fun savePayload(isMoneyIn: Boolean) {
+    fun savePayload() {
         if (qrPayload.isBlank()) return
         isLoading = true
         scope.launch {
-            addSlip(qrPayload, isMoneyIn)
+            addSlip(qrPayload)
             isLoading = false
             showPayload = false
             showCapture = true
@@ -294,8 +294,8 @@ fun MainApp(modifier: Modifier = Modifier) {
                     showPayload = false
                     showCapture = true
                 },
-                onSave = { isMoneyIn ->
-                    savePayload(isMoneyIn)
+                onSave = {
+                    savePayload()
                 }
             )
         } else if (showCapture) {

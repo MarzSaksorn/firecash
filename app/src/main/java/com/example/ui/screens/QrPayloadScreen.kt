@@ -2,7 +2,6 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -10,8 +9,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowRightAlt
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Warning
@@ -22,10 +19,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,7 +31,6 @@ import com.example.ui.theme.FireCashBackground
 import com.example.ui.theme.FireCashOnSurface
 import com.example.ui.theme.FireCashOnSurfaceVariant
 import com.example.ui.theme.FireCashPrimary
-import com.example.ui.theme.FireCashSecondary
 import com.example.ui.theme.FireCashSurfaceContainerLow
 import java.util.Locale
 
@@ -48,9 +40,8 @@ fun QrPayloadScreen(
     slipData: VerifySlipResponse? = null,
     warning: String = "",
     onBack: () -> Unit = {},
-    onSave: (isMoneyIn: Boolean) -> Unit = {}
+    onSave: () -> Unit = {}
 ) {
-    var isMoneyIn by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -146,92 +137,9 @@ fun QrPayloadScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Money In / Money Out toggle
-            Text(
-                text = "Transaction Type",
-                color = FireCashOnSurface,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Money In button
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                        .background(
-                            if (isMoneyIn) Color(0xFF66BB6A).copy(alpha = 0.2f) else FireCashSurfaceContainerLow,
-                            RoundedCornerShape(12.dp)
-                        )
-                        .border(
-                            1.5.dp,
-                            if (isMoneyIn) Color(0xFF66BB6A) else Color.Gray.copy(alpha = 0.3f),
-                            RoundedCornerShape(12.dp)
-                        )
-                        .clickable { isMoneyIn = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowDownward,
-                            contentDescription = null,
-                            tint = if (isMoneyIn) Color(0xFF66BB6A) else FireCashOnSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Money In",
-                            color = if (isMoneyIn) Color(0xFF66BB6A) else FireCashOnSurfaceVariant,
-                            fontSize = 14.sp,
-                            fontWeight = if (isMoneyIn) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                }
-
-                // Money Out button
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                        .background(
-                            if (!isMoneyIn) Color(0xFFEF5350).copy(alpha = 0.2f) else FireCashSurfaceContainerLow,
-                            RoundedCornerShape(12.dp)
-                        )
-                        .border(
-                            1.5.dp,
-                            if (!isMoneyIn) Color(0xFFEF5350) else Color.Gray.copy(alpha = 0.3f),
-                            RoundedCornerShape(12.dp)
-                        )
-                        .clickable { isMoneyIn = false },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowUpward,
-                            contentDescription = null,
-                            tint = if (!isMoneyIn) Color(0xFFEF5350) else FireCashOnSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Money Out",
-                            color = if (!isMoneyIn) Color(0xFFEF5350) else FireCashOnSurfaceVariant,
-                            fontSize = 14.sp,
-                            fontWeight = if (!isMoneyIn) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Save button
+            // Save button - transaction type is auto-detected via My Names in Settings
             Button(
-                onClick = { onSave(isMoneyIn) },
+                onClick = { onSave() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),

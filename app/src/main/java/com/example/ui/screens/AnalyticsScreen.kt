@@ -221,30 +221,44 @@ private fun StickChart(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val count = data.size
                 if (count == 0) return@Canvas
-                val spacing = 12.dp.toPx()
-                val totalSpacing = spacing * (count - 1)
-                val availableWidth = size.width - totalSpacing
-                val barWidth = availableWidth / count
-                val chartBottom = size.height - 24.dp.toPx()
-                val chartHeight = chartBottom - 8.dp.toPx()
+                val stickWidth = 6.dp.toPx()
+                val columnWidth = size.width / count
+                val chartBottom = size.height - 4.dp.toPx()
+                val chartHeight = chartBottom - 18.dp.toPx()
+                val baselineColor = androidx.compose.ui.graphics.Color(0xFF2C3036)
+                val stickColor = androidx.compose.ui.graphics.Color(0xFFFF6B00)
+
+                drawLine(
+                    color = baselineColor,
+                    start = Offset(0f, chartBottom),
+                    end = Offset(size.width, chartBottom),
+                    strokeWidth = 2.dp.toPx()
+                )
 
                 data.forEachIndexed { index, spend ->
-                    val barHeight = if (maxAmount > 0) {
+                    val stickHeight = if (maxAmount > 0) {
                         (spend.totalAmount / maxAmount * chartHeight).toFloat()
                     } else 0f
-                    val x = index * (barWidth + spacing)
-                    val y = chartBottom - barHeight
+                    val centerX = columnWidth * index + columnWidth / 2f
+                    val topY = chartBottom - stickHeight
 
-                    drawRoundRect(
-                        color = androidx.compose.ui.graphics.Color(0xFFFF6B00),
-                        topLeft = Offset(x, y),
-                        size = androidx.compose.ui.geometry.Size(barWidth * 0.7f, barHeight),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(6.dp.toPx())
+                    drawLine(
+                        color = stickColor,
+                        start = Offset(centerX, chartBottom),
+                        end = Offset(centerX, topY),
+                        strokeWidth = stickWidth,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+
+                    drawCircle(
+                        color = stickColor,
+                        radius = stickWidth / 2f,
+                        center = Offset(centerX, topY)
                     )
                 }
             }
         }
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth()) {
             data.forEachIndexed { index, spend ->
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
@@ -254,9 +268,6 @@ private fun StickChart(
                         fontSize = 10.sp,
                         maxLines = 1
                     )
-                }
-                if (index < data.size - 1) {
-                    Spacer(modifier = Modifier.width(12.dp))
                 }
             }
         }

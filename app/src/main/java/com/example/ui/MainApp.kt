@@ -37,9 +37,9 @@ import com.example.ui.theme.FireCashBackground
 
 @Composable
 fun MainApp(modifier: Modifier = Modifier) {
-    var showCapture by remember { mutableStateOf(true) }
+    var showCapture by remember { mutableStateOf(false) }
     var showPayload by remember { mutableStateOf(false) }
-    var showSavedSlips by remember { mutableStateOf(false) }
+    var showSavedSlips by remember { mutableStateOf(true) }
     var showAnalytics by remember { mutableStateOf(false) }
     var qrPayload by remember { mutableStateOf("") }
     var slipData by remember { mutableStateOf<VerifySlipResponse?>(null) }
@@ -218,7 +218,8 @@ fun MainApp(modifier: Modifier = Modifier) {
             addSlip(qrPayload)
             isLoading = false
             showPayload = false
-            showCapture = true
+            showSavedSlips = true
+            showCapture = false
         }
     }
 
@@ -378,7 +379,8 @@ fun MainApp(modifier: Modifier = Modifier) {
                 warning = slipWarning,
                 onBack = {
                     showPayload = false
-                    showCapture = true
+                    showSavedSlips = true
+                    showCapture = false
                 }
             )
         } else if (showCapture) {
@@ -571,12 +573,14 @@ fun MainApp(modifier: Modifier = Modifier) {
                     onRemoveRule = {},
                     onNavigateToBackup = {},
                     onBack = {
-                        showCapture = true
-                        showSavedSlips = false
+                        showCapture = false
+                        showSavedSlips = true
+                        showAnalytics = false
                     },
                     onNavigateToCapture = {
                         showCapture = true
                         showSavedSlips = false
+                        showAnalytics = false
                     }
                 )
             }

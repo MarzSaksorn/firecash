@@ -54,6 +54,23 @@ private fun isSelfTransfer(slip: SavedSlip, knownNames: List<String> = emptyList
     return sKnown && rKnown
 }
 
+private fun isKnownName(name: String?, knownNames: List<String>): Boolean {
+    if (name.isNullOrBlank() || knownNames.isEmpty()) return false
+    val norm = name.trim().lowercase(Locale.ROOT)
+    return knownNames.any { it.trim().lowercase(Locale.ROOT) == norm }
+}
+
+private fun effectiveIsMoneyIn(slip: SavedSlip, knownNames: List<String>): Boolean? {
+    if (isSelfTransfer(slip, knownNames)) return null
+    val receiverKnown = isKnownName(slip.receiverName, knownNames)
+    val senderKnown = isKnownName(slip.senderName, knownNames)
+    return when {
+        receiverKnown -> true
+        senderKnown -> false
+        else -> slip.isMoneyIn
+    }
+}
+
 @Composable
 fun AnalyticsScreen(
     slips: List<SavedSlip>,
@@ -62,14 +79,16 @@ fun AnalyticsScreen(
     onRefresh: () -> Unit
 ) {
     val expenses = remember(slips, knownNames) {
-        slips.filterNot { isSelfTransfer(it, knownNames) }.mapNotNull { slip ->
+        slips.mapNotNull { slip ->
+            if (isSelfTransfer(slip, knownNames)) return@mapNotNull null
             val amt = slip.amount ?: return@mapNotNull null
+            val effective = effectiveIsMoneyIn(slip, knownNames) ?: return@mapNotNull null
             Expense(
                 merchant = slip.senderName ?: slip.receiverName ?: "Unknown",
                 amount = amt,
                 date = slip.date ?: "",
                 time = slip.time ?: "",
-                category = if (slip.isMoneyIn) "Income" else "Other"
+                category = if (effective) "Income" else "Other"
             )
         }
     }

@@ -50,6 +50,23 @@ private fun isSelfTransfer(slip: SavedSlip, knownNames: List<String> = emptyList
     return sKnown && rKnown
 }
 
+private fun isKnownName(name: String?, knownNames: List<String>): Boolean {
+    if (name.isNullOrBlank() || knownNames.isEmpty()) return false
+    val norm = name.trim().lowercase(Locale.ROOT)
+    return knownNames.any { it.trim().lowercase(Locale.ROOT) == norm }
+}
+
+private fun effectiveIsMoneyIn(slip: SavedSlip, knownNames: List<String>): Boolean? {
+    if (isSelfTransfer(slip, knownNames)) return null // Transfer - excluded from balance
+    val receiverKnown = isKnownName(slip.receiverName, knownNames)
+    val senderKnown = isKnownName(slip.senderName, knownNames)
+    return when {
+        receiverKnown -> true
+        senderKnown -> false
+        else -> slip.isMoneyIn
+    }
+}
+
 @Composable
 fun AccountScreen(
     slips: List<SavedSlip>,
@@ -67,8 +84,8 @@ fun AccountScreen(
     LaunchedEffect(Unit) {
         onAutoSync()
     }
-    val moneyIn = slips.filter { !isSelfTransfer(it, knownNames) && it.isMoneyIn && it.amount != null }.sumOf { it.amount!! }
-    val moneyOut = slips.filter { !isSelfTransfer(it, knownNames) && !it.isMoneyIn && it.amount != null }.sumOf { it.amount!! }
+    val moneyIn = slips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null }.sumOf { it.amount!! }
+    val moneyOut = slips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null }.sumOf { it.amount!! }
     val balance = moneyIn - moneyOut
 
     Box(
@@ -295,8 +312,9 @@ fun AccountScreen(
 
 @Composable
 private fun TransactionRow(slip: SavedSlip, onClick: () -> Unit, knownNames: List<String> = emptyList()) {
-    val isSelf = isSelfTransfer(slip, knownNames)
-    val isIn = slip.isMoneyIn
+    val effective = effectiveIsMoneyIn(slip, knownNames)
+    val isSelf = effective == null
+    val isIn = effective == true
     val arrow = when {
         isSelf -> Icons.Default.SwapHoriz
         isIn -> Icons.Default.ArrowDownward

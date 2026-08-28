@@ -48,6 +48,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     var slipData by remember { mutableStateOf<VerifySlipResponse?>(null) }
     var slipWarning by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+    var isBackgroundSyncing by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val easySlipClient = remember { EasySlipClient() }
@@ -202,6 +203,21 @@ fun MainApp(modifier: Modifier = Modifier) {
         }
     }
 
+    fun syncTrackedFolderInBackground() {
+        if (trackedFolderUris.isEmpty()) return
+        if (isLoading || isBackgroundSyncing) return
+        isBackgroundSyncing = true
+        scope.launch {
+            try {
+                for (uriStr in trackedFolderUris) {
+                    scanFolder(uriStr)
+                }
+            } finally {
+                isBackgroundSyncing = false
+            }
+        }
+    }
+
     fun onFolderSelected(uri: Uri) {
         runCatching {
             context.contentResolver.takePersistableUriPermission(
@@ -301,6 +317,7 @@ fun MainApp(modifier: Modifier = Modifier) {
             AccountScreen(
                 slips = savedSlips,
                 isLoading = isLoading,
+                isBackgroundSyncing = isBackgroundSyncing,
                 onBack = {
                     showSavedSlips = false
                     showCapture = true
@@ -320,7 +337,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                     showSavedSlips = false
                     showAnalytics = true
                 },
-                onAutoSync = { syncTrackedFolder() }
+                onAutoSync = { syncTrackedFolderInBackground() }
             )
         } else if (showAnalytics) {
             AnalyticsScreen(

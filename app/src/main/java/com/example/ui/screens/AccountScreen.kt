@@ -43,6 +43,7 @@ import java.util.Locale
 fun AccountScreen(
     slips: List<SavedSlip>,
     isLoading: Boolean = false,
+    isBackgroundSyncing: Boolean = false,
     onBack: () -> Unit,
     onSlipClick: (SavedSlip) -> Unit,
     onOpenSettings: () -> Unit,
@@ -50,7 +51,7 @@ fun AccountScreen(
     onAutoSync: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Auto-sync tracked folder when the page opens
+    // Background sync when the page opens — non-blocking
     LaunchedEffect(Unit) {
         onAutoSync()
     }
@@ -186,12 +187,31 @@ fun AccountScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        Text(
-            text = "Transactions",
-            color = FireCashOnSurface,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Transactions",
+                color = FireCashOnSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (isBackgroundSyncing) {
+                Spacer(modifier = Modifier.width(8.dp))
+                CircularProgressIndicator(
+                    modifier = Modifier.size(14.dp),
+                    strokeWidth = 2.dp,
+                    color = FireCashOnSurfaceVariant
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Syncing…",
+                    color = FireCashOnSurfaceVariant,
+                    fontSize = 12.sp
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(8.dp))
 
         if (slips.isEmpty()) {

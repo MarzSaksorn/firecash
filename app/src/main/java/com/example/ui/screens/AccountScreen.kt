@@ -15,6 +15,8 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +46,7 @@ fun AccountScreen(
     onBack: () -> Unit,
     onSlipClick: (SavedSlip) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAnalytics: () -> Unit,
     onAutoSync: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -163,6 +166,22 @@ fun AccountScreen(
                     )
                 }
             }
+        }
+
+        // Summary button
+        Button(
+            onClick = onOpenAnalytics,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = FireCashPrimary),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                text = "View Spending Summary",
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold
+            )
         }
 
         Spacer(modifier = Modifier.height(20.dp))

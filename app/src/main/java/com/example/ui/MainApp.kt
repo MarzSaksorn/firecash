@@ -33,6 +33,7 @@ import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.QrPayloadScreen
 import com.example.ui.screens.AccountScreen
 import com.example.ui.screens.AccountSettingsScreen
+import com.example.ui.screens.AnalyticsScreen
 import com.example.ui.components.CaptureBottomBar
 import com.example.ui.theme.FireCashBackground
 
@@ -42,6 +43,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     var showPayload by remember { mutableStateOf(false) }
     var showSavedSlips by remember { mutableStateOf(false) }
     var showAccountSettings by remember { mutableStateOf(false) }
+    var showAnalytics by remember { mutableStateOf(false) }
     var qrPayload by remember { mutableStateOf("") }
     var slipData by remember { mutableStateOf<VerifySlipResponse?>(null) }
     var slipWarning by remember { mutableStateOf("") }
@@ -314,7 +316,20 @@ fun MainApp(modifier: Modifier = Modifier) {
                     showSavedSlips = false
                     showAccountSettings = true
                 },
+                onOpenAnalytics = {
+                    showSavedSlips = false
+                    showAnalytics = true
+                },
                 onAutoSync = { syncTrackedFolder() }
+            )
+        } else if (showAnalytics) {
+            AnalyticsScreen(
+                slips = savedSlips,
+                onBack = {
+                    showAnalytics = false
+                    showSavedSlips = true
+                },
+                onRefresh = { syncTrackedFolder() }
             )
         } else {
             SettingsScreen(

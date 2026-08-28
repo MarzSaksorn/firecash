@@ -76,8 +76,14 @@ fun MainApp(modifier: Modifier = Modifier) {
     var notificationIncomeEnabled by remember {
         mutableStateOf(prefs.getBoolean("notification_income_enabled", false))
     }
+    var notificationExpenseEnabled by remember {
+        mutableStateOf(prefs.getBoolean("notification_expense_enabled", false))
+    }
     var notificationWhitelist by remember {
         mutableStateOf(loadNotificationWhitelist(prefs))
+    }
+    var notificationExpenseWhitelist by remember {
+        mutableStateOf(loadNotificationWhitelistExpense(prefs))
     }
     val seenPayloads = remember {
         mutableSetOf<String>().apply { addAll(loadSeenPayloads(prefs)) }
@@ -528,10 +534,16 @@ fun MainApp(modifier: Modifier = Modifier) {
                     },
                     onSyncUnverified = { resyncUnverifiedSlips() },
                     notificationIncomeEnabled = notificationIncomeEnabled,
+                    notificationExpenseEnabled = notificationExpenseEnabled,
                     notificationWhitelist = notificationWhitelist,
+                    notificationExpenseWhitelist = notificationExpenseWhitelist,
                     onToggleNotificationIncome = { enabled ->
                         notificationIncomeEnabled = enabled
                         prefs.edit().putBoolean("notification_income_enabled", enabled).apply()
+                    },
+                    onToggleNotificationExpense = { enabled ->
+                        notificationExpenseEnabled = enabled
+                        prefs.edit().putBoolean("notification_expense_enabled", enabled).apply()
                     },
                     onAddWhitelistedApp = { pkg, prefix ->
                         val t = pkg.trim()
@@ -542,12 +554,26 @@ fun MainApp(modifier: Modifier = Modifier) {
                         }
                     },
                     onRemoveWhitelistedApp = { pkgAndPrefix ->
-                        // pkgAndPrefix is "package|prefix" from Settings row
                         val parts = pkgAndPrefix.split("|", limit = 2)
                         val pkg = parts.getOrNull(0) ?: pkgAndPrefix
                         val pref = parts.getOrNull(1) ?: ""
                         notificationWhitelist = notificationWhitelist.filterNot { it.packageName == pkg && it.prefix == pref }
                         saveNotificationWhitelist(prefs, notificationWhitelist)
+                    },
+                    onAddExpenseWhitelistedApp = { pkg, prefix ->
+                        val t = pkg.trim()
+                        val p = prefix.trim()
+                        if (t.isNotEmpty() && notificationExpenseWhitelist.none { it.packageName == t && it.prefix == p }) {
+                            notificationExpenseWhitelist = notificationExpenseWhitelist + com.example.service.WhitelistedApp(packageName = t, prefix = p)
+                            saveNotificationWhitelistExpense(prefs, notificationExpenseWhitelist)
+                        }
+                    },
+                    onRemoveExpenseWhitelistedApp = { pkgAndPrefix ->
+                        val parts = pkgAndPrefix.split("|", limit = 2)
+                        val pkg = parts.getOrNull(0) ?: pkgAndPrefix
+                        val pref = parts.getOrNull(1) ?: ""
+                        notificationExpenseWhitelist = notificationExpenseWhitelist.filterNot { it.packageName == pkg && it.prefix == pref }
+                        saveNotificationWhitelistExpense(prefs, notificationExpenseWhitelist)
                     },
                     onRequestNotificationPermission = {
                         try {
@@ -609,6 +635,7 @@ private fun saveKnownNames(prefs: SharedPreferences, names: List<String>) {
 }
 
 private const val PREFS_NOTIFICATION_WHITELIST = "notification_whitelist"
+private const val PREFS_NOTIFICATION_WHITELIST_EXPENSE = "notification_whitelist_expense"
 
 private fun loadNotificationWhitelist(prefs: SharedPreferences): List<com.example.service.WhitelistedApp> {
     val raw = prefs.getString(PREFS_NOTIFICATION_WHITELIST, null) ?: return emptyList()
@@ -637,6 +664,35 @@ private fun saveNotificationWhitelist(prefs: SharedPreferences, list: List<com.e
         arr.put(obj)
     }
     prefs.edit().putString(PREFS_NOTIFICATION_WHITELIST, arr.toString()).apply()
+}
+
+private fun loadNotificationWhitelistExpense(prefs: SharedPreferences): List<com.example.service.WhitelistedApp> {
+    val raw = prefs.getString(PREFS_NOTIFICATION_WHITELIST_EXPENSE, null) ?: return emptyList()
+    return runCatching {
+        val arr = JSONArray(raw)
+        (0 until arr.length()).mapNotNull { i ->
+            val el = arr.get(i)
+            when (el) {
+                is String -> com.example.service.WhitelistedApp(packageName = el, prefix = "")
+                is JSONObject -> com.example.service.WhitelistedApp(
+                    packageName = el.optString("package"),
+                    prefix = el.optString("prefix", "")
+                )
+                else -> null
+            }
+        }.filter { it.packageName.isNotBlank() }
+    }.getOrDefault(emptyList())
+}
+
+private fun saveNotificationWhitelistExpense(prefs: SharedPreferences, list: List<com.example.service.WhitelistedApp>) {
+    val arr = JSONArray()
+    list.forEach { e ->
+        val obj = JSONObject()
+        obj.put("package", e.packageName)
+        obj.put("prefix", e.prefix)
+        arr.put(obj)
+    }
+    prefs.edit().putString(PREFS_NOTIFICATION_WHITELIST_EXPENSE, arr.toString()).apply()
 }
 
 private fun loadSlips(prefs: SharedPreferences): List<SavedSlip> {

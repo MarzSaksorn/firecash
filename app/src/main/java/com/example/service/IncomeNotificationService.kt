@@ -17,15 +17,8 @@ class IncomeNotificationService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null) return
-        // Ignore our own app notifications
         if (sbn.packageName == packageName) return
         val prefs = getSharedPreferences("firecash_settings", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean(PREFS_NOTIFICATION_INCOME, false)) return
-        // Whitelist: if non-empty, only listed packages are processed; each package may have multiple prefix entries
-        val whitelist = loadWhitelist(prefs)
-        val entriesForApp = whitelist.filter { it.packageName == sbn.packageName }
-        if (whitelist.isNotEmpty() && entriesForApp.isEmpty()) return
-
         val extras = sbn.notification.extras
         val title = extras.getCharSequence("android.title")?.toString() ?: ""
         val text = extras.getCharSequence("android.text")?.toString() ?: ""
@@ -33,25 +26,46 @@ class IncomeNotificationService : NotificationListenerService() {
         val combined = listOf(title, text, bigText).filter { it.isNotBlank() }.joinToString(" ").trim()
         if (combined.isBlank()) return
 
-        val amount = when {
-            entriesForApp.isEmpty() -> extractFirstNumber(combined)
-            else -> {
-                // Try each prefix for this app; empty prefix = any number
-                var found: Double? = null
-                for (e in entriesForApp) {
-                    val p = e.prefix.trim()
-                    found = if (p.isBlank()) extractFirstNumber(combined) else extractAfterPrefix(combined, p)
-                    if (found != null) break
+        // Try income whitelist first
+        if (prefs.getBoolean(PREFS_NOTIFICATION_INCOME, false)) {
+            val wl = loadWhitelist(prefs)
+            val entries = wl.filter { it.packageName == sbn.packageName }
+            if (wl.isEmpty() || entries.isNotEmpty()) {
+                val amount = extractForEntries(combined, entries) ?: if (wl.isEmpty()) extractFirstNumber(combined) else null
+                if (amount != null) {
+                    saveIncomeFromNotification(this, amount, title, combined, sbn.packageName)
+                    return
                 }
-                found
             }
-        } ?: return
-        saveIncomeFromNotification(this, amount, title, combined, sbn.packageName)
+        }
+        // Then expense (money out)
+        if (prefs.getBoolean(PREFS_NOTIFICATION_EXPENSE, false)) {
+            val wl = loadWhitelistExpense(prefs)
+            val entries = wl.filter { it.packageName == sbn.packageName }
+            if (wl.isEmpty() || entries.isNotEmpty()) {
+                val amount = extractForEntries(combined, entries) ?: if (wl.isEmpty()) extractFirstNumber(combined) else null
+                if (amount != null) {
+                    saveExpenseFromNotification(this, amount, title, combined, sbn.packageName)
+                }
+            }
+        }
+    }
+
+    private fun extractForEntries(combined: String, entries: List<WhitelistedApp>): Double? {
+        if (entries.isEmpty()) return extractFirstNumber(combined)
+        for (e in entries) {
+            val p = e.prefix.trim()
+            val found = if (p.isBlank()) extractFirstNumber(combined) else extractAfterPrefix(combined, p)
+            if (found != null) return found
+        }
+        return null
     }
 
     companion object {
         const val PREFS_NOTIFICATION_INCOME = "notification_income_enabled"
         const val PREFS_NOTIFICATION_WHITELIST = "notification_whitelist"
+        const val PREFS_NOTIFICATION_EXPENSE = "notification_expense_enabled"
+        const val PREFS_NOTIFICATION_WHITELIST_EXPENSE = "notification_whitelist_expense"
         private const val PREFS_SLIPS = "saved_slips"
         private const val PREFS_SEEN = "seen_payloads"
 
@@ -94,10 +108,26 @@ class IncomeNotificationService : NotificationListenerService() {
             title: String,
             fullText: String,
             packageName: String
+        ) = saveNotificationSlip(context, amount, title, fullText, packageName, isMoneyIn = true)
+
+        fun saveExpenseFromNotification(
+            context: Context,
+            amount: Double,
+            title: String,
+            fullText: String,
+            packageName: String
+        ) = saveNotificationSlip(context, amount, title, fullText, packageName, isMoneyIn = false)
+
+        private fun saveNotificationSlip(
+            context: Context,
+            amount: Double,
+            title: String,
+            fullText: String,
+            packageName: String,
+            isMoneyIn: Boolean
         ) {
             try {
                 val prefs = context.getSharedPreferences("firecash_settings", Context.MODE_PRIVATE)
-                // Build a semi-unique payload for dedupe
                 val now = System.currentTimeMillis()
                 val payload = "notif:$packageName:$amount:${fullText.hashCode()}:$now"
                 val seen = loadSeenPayloads(prefs)
@@ -112,13 +142,13 @@ class IncomeNotificationService : NotificationListenerService() {
                     payload = payload,
                     amount = amount,
                     transRef = "NOTIF-${now}",
-                    senderName = title.takeIf { it.isNotBlank() } ?: packageName,
-                    receiverName = null, // will be resolved as income via knownNames or fallback to "Me"
+                    senderName = if (isMoneyIn) title.takeIf { it.isNotBlank() } ?: packageName else null,
+                    receiverName = if (!isMoneyIn) title.takeIf { it.isNotBlank() } ?: packageName else null,
                     date = dateStr,
                     time = timeStr,
                     verificationStatus = VerificationStatus.UNVERIFIED,
                     slipData = null,
-                    isMoneyIn = true,
+                    isMoneyIn = isMoneyIn,
                     savedAt = now
                 )
 
@@ -128,9 +158,9 @@ class IncomeNotificationService : NotificationListenerService() {
 
                 seen.add(payload)
                 saveSeenPayloads(prefs, seen)
-                Log.i("IncomeNotification", "Saved income $amount from $packageName: $title")
+                Log.i("IncomeNotification", "Saved ${if (isMoneyIn) "income" else "expense"} $amount from $packageName: $title")
             } catch (e: Exception) {
-                Log.w("IncomeNotification", "Failed to save notification income: ${e.message}")
+                Log.w("IncomeNotification", "Failed to save notification ${if (isMoneyIn) "income" else "expense"}: ${e.message}")
             }
         }
 
@@ -203,6 +233,35 @@ class IncomeNotificationService : NotificationListenerService() {
                 arr.put(obj)
             }
             prefs.edit().putString(PREFS_NOTIFICATION_WHITELIST, arr.toString()).apply()
+        }
+
+        fun loadWhitelistExpense(prefs: SharedPreferences): List<WhitelistedApp> {
+            val raw = prefs.getString(PREFS_NOTIFICATION_WHITELIST_EXPENSE, null) ?: return emptyList()
+            return runCatching {
+                val arr = JSONArray(raw)
+                (0 until arr.length()).mapNotNull { i ->
+                    val el = arr.get(i)
+                    when (el) {
+                        is String -> WhitelistedApp(packageName = el, prefix = "")
+                        is JSONObject -> WhitelistedApp(
+                            packageName = el.optString("package"),
+                            prefix = el.optString("prefix", "")
+                        )
+                        else -> null
+                    }
+                }.filter { it.packageName.isNotBlank() }
+            }.getOrDefault(emptyList())
+        }
+
+        fun saveWhitelistExpense(prefs: SharedPreferences, list: List<WhitelistedApp>) {
+            val arr = JSONArray()
+            list.forEach { entry ->
+                val obj = JSONObject()
+                obj.put("package", entry.packageName)
+                obj.put("prefix", entry.prefix)
+                arr.put(obj)
+            }
+            prefs.edit().putString(PREFS_NOTIFICATION_WHITELIST_EXPENSE, arr.toString()).apply()
         }
 
         // Legacy helpers for migration (String list) — kept for reference

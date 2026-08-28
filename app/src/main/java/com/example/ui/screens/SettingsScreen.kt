@@ -89,7 +89,9 @@ fun SettingsScreen(
     knownNames: List<String> = emptyList(),
     unverifiedCount: Int = 0,
     notificationIncomeEnabled: Boolean = false,
+    notificationExpenseEnabled: Boolean = false,
     notificationWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
+    notificationExpenseWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
     onCurrencyChange: (String) -> Unit,
     onToggleDriveSync: (Boolean) -> Unit,
     onToggleEasySlip: (Boolean) -> Unit,
@@ -99,8 +101,11 @@ fun SettingsScreen(
     onRemoveKnownName: (String) -> Unit = {},
     onSyncUnverified: () -> Unit = {},
     onToggleNotificationIncome: (Boolean) -> Unit = {},
+    onToggleNotificationExpense: (Boolean) -> Unit = {},
     onAddWhitelistedApp: (String, String) -> Unit = { _, _ -> },
     onRemoveWhitelistedApp: (String) -> Unit = {},
+    onAddExpenseWhitelistedApp: (String, String) -> Unit = { _, _ -> },
+    onRemoveExpenseWhitelistedApp: (String) -> Unit = {},
     onRequestNotificationPermission: () -> Unit = {},
     onAddRule: (keyword: String, category: String) -> Unit,
     onRemoveRule: (KeywordRule) -> Unit,
@@ -117,6 +122,8 @@ fun SettingsScreen(
     var newKnownName by remember { mutableStateOf("") }
     var newWhitelistApp by remember { mutableStateOf("") }
     var newWhitelistPrefix by remember { mutableStateOf("โอนเงินให้คุณ ฿") }
+    var newExpenseWhitelistApp by remember { mutableStateOf("") }
+    var newExpenseWhitelistPrefix by remember { mutableStateOf("โอนเงินสำเร็จ ฿") }
 
     val currencies = listOf("USD", "THB", "EUR", "GBP", "JPY")
 
@@ -698,6 +705,186 @@ fun SettingsScreen(
                                                 color = FireCashOnSurfaceVariant,
                                                 fontSize = 11.sp
                                             )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Card: Notification Expense (Money Out) — same logic as Income but isMoneyIn=false
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FireCashSurfaceContainerLow)
+                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(FireCashSurfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.QrCodeScanner,
+                                    contentDescription = null,
+                                    tint = Color(0xFFEF5350),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Notification Expense",
+                                    color = FireCashOnSurface,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Auto-capture expense from notifications (first number after prefix → amount)",
+                                    color = FireCashOnSurfaceVariant,
+                                    fontSize = 12.sp,
+                                    lineHeight = 14.sp
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = notificationExpenseEnabled,
+                            onCheckedChange = onToggleNotificationExpense,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = FireCashOnPrimary,
+                                checkedTrackColor = Color(0xFFEF5350),
+                                uncheckedThumbColor = FireCashOutline,
+                                uncheckedTrackColor = FireCashSurfaceVariant
+                            ),
+                            modifier = Modifier.testTag("notification_expense_switch")
+                        )
+                    }
+                    if (notificationExpenseEnabled) {
+                        Button(
+                            onClick = onRequestNotificationPermission,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = FireCashSurfaceContainerHigh)
+                        ) {
+                            Text("Enable Notification Access", color = FireCashOnSurface)
+                        }
+                        Text(
+                            text = "Same service as Income — ensure FireCash is enabled in Notification Access.",
+                            color = FireCashOnSurfaceVariant,
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            text = "Whitelist (only these apps will be read)",
+                            color = FireCashOnSurface,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                        Text(
+                            text = "Prefix: only notifications containing this text will be read, amount is first number after it. e.g. โอนเงินสำเร็จ ฿",
+                            color = FireCashOnSurfaceVariant,
+                            fontSize = 11.sp
+                        )
+                        OutlinedTextField(
+                            value = newExpenseWhitelistApp,
+                            onValueChange = { newExpenseWhitelistApp = it },
+                            placeholder = { Text("App package e.g. com.kasikornbank.kplus", fontSize = 12.sp) },
+                            singleLine = true,
+                            textStyle = TextStyle(color = FireCashOnSurface, fontSize = 12.sp, fontFamily = FontFamily.Monospace),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = FireCashSurfaceContainerHigh,
+                                unfocusedContainerColor = FireCashSurfaceContainerHigh,
+                                focusedBorderColor = FireCashPrimary,
+                                unfocusedBorderColor = FireCashOutlineVariant
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth().testTag("expense_whitelist_input")
+                        )
+                        OutlinedTextField(
+                            value = newExpenseWhitelistPrefix,
+                            onValueChange = { newExpenseWhitelistPrefix = it },
+                            placeholder = { Text("Prefix e.g. โอนเงินสำเร็จ ฿ (empty = any)", fontSize = 11.sp) },
+                            singleLine = true,
+                            textStyle = TextStyle(color = FireCashOnSurface, fontSize = 12.sp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = FireCashSurfaceContainerHigh,
+                                unfocusedContainerColor = FireCashSurfaceContainerHigh,
+                                focusedBorderColor = FireCashPrimary,
+                                unfocusedBorderColor = FireCashOutlineVariant
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth().testTag("expense_whitelist_prefix_input")
+                        )
+                        Button(
+                            onClick = {
+                                val pkg = newExpenseWhitelistApp.trim()
+                                if (pkg.isNotEmpty()) {
+                                    onAddExpenseWhitelistedApp(pkg, newExpenseWhitelistPrefix.trim())
+                                    newExpenseWhitelistApp = ""
+                                    newExpenseWhitelistPrefix = ""
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("add_expense_whitelist_button")
+                        ) { Text("Add to whitelist") }
+                        if (notificationExpenseWhitelist.isEmpty()) {
+                            Text(
+                                text = "No whitelist — all apps will be read. Add package names to restrict.",
+                                color = FireCashOnSurfaceVariant,
+                                fontSize = 11.sp
+                            )
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                notificationExpenseWhitelist.forEach { entry ->
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(FireCashSurfaceContainerHighest)
+                                            .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                                    ) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                text = entry.packageName,
+                                                color = FireCashOnSurface,
+                                                fontSize = 12.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            IconButton(
+                                                onClick = { onRemoveExpenseWhitelistedApp(entry.packageName + "|" + entry.prefix) },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Remove",
+                                                    tint = FireCashOutline,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
+                                        if (entry.prefix.isNotBlank()) {
+                                            Text(text = "Prefix: ${entry.prefix}", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
+                                        } else {
+                                            Text(text = "Prefix: (any)", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
                                         }
                                     }
                                 }

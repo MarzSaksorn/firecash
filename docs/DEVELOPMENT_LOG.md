@@ -43,11 +43,11 @@ FireCash started as research-driven. **Days 1-2 were pure research via a separat
 
 ---
 
-## Day 2 Night — 2026-08-28 — This Opencode Convo Intensive (Stitch Design as Input)
+## Day 3 — 2026-08-28 — This Opencode Convo Intensive (Stitch Design as Input)
 
-This is **Day 2 night** in real time but `2026-08-28` in git (`~60` commits) — the entire intensive `opencode + Muse Spark` session rebuilding from the Google Stitch design. Presented in chronological order as they happened.
+This is **Day 3** (2026-08-28) — the entire intensive `opencode + Muse Spark` session rebuilding from the Google Stitch design. Presented in chronological order as they happened (git timestamps match this day).
 
-> Note: `Stitch + AI Studio` moved to **2026-08-26 night** per user; the `opencode` intensive below runs `2026-08-28` (git timestamps) as one long session.
+> Note: `Stitch + AI Studio` moved to **2026-08-26 night** per user; the `opencode` intensive below is **Day 3 = 2026-08-28**.
 
 ### 00:00–02:00 — Core Scan & Persistence
 

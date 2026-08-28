@@ -14,8 +14,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -23,8 +26,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.example.data.model.VerificationStatus
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -67,6 +76,11 @@ private fun effectiveIsMoneyIn(slip: SavedSlip, knownNames: List<String>): Boole
     }
 }
 
+private fun isDeletable(slip: SavedSlip): Boolean {
+    // Only allow delete for unknown/invalid slips (e.g. failed verification, no amount/data)
+    return slip.amount == null || slip.verificationStatus == VerificationStatus.UNVERIFIED
+}
+
 @Composable
 fun AccountScreen(
     slips: List<SavedSlip>,
@@ -75,6 +89,7 @@ fun AccountScreen(
     isBackgroundSyncing: Boolean = false,
     onBack: () -> Unit,
     onSlipClick: (SavedSlip) -> Unit,
+    onDeleteSlip: (SavedSlip) -> Unit = {},
     onOpenSettings: () -> Unit,
     onOpenAnalytics: () -> Unit,
     onAutoSync: () -> Unit,
@@ -87,6 +102,7 @@ fun AccountScreen(
     val moneyIn = slips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null }.sumOf { it.amount!! }
     val moneyOut = slips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null }.sumOf { it.amount!! }
     val balance = moneyIn - moneyOut
+    var slipToDelete by remember { mutableStateOf<SavedSlip?>(null) }
 
     Box(
         modifier = modifier
@@ -279,7 +295,12 @@ fun AccountScreen(
                         DateHeader(date = date, count = dateSlips.size)
                     }
                     items(dateSlips, key = { it.savedAt }) { slip ->
-                        TransactionRow(slip = slip, onClick = { onSlipClick(slip) }, knownNames = knownNames)
+                        TransactionRow(
+                            slip = slip,
+                            onClick = { onSlipClick(slip) },
+                            knownNames = knownNames,
+                            onDelete = if (isDeletable(slip)) ({ slipToDelete = slip }) else null
+                        )
                     }
                 }
             }
@@ -307,11 +328,43 @@ fun AccountScreen(
                 }
             }
         }
+
+        // Delete confirmation - only for unknown/invalid slips
+        slipToDelete?.let { target ->
+            AlertDialog(
+                onDismissRequest = { slipToDelete = null },
+                title = { Text("Delete slip?", color = Color.White) },
+                text = {
+                    Text(
+                        "This slip has unknown/invalid data (amount missing or unverified). Delete it? This cannot be undone.",
+                        color = FireCashOnSurfaceVariant
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            onDeleteSlip(target)
+                            slipToDelete = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350))
+                    ) { Text("Delete", color = Color.White) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { slipToDelete = null }) { Text("Cancel") }
+                },
+                containerColor = FireCashSurfaceContainerLow
+            )
+        }
     }
 }
 
 @Composable
-private fun TransactionRow(slip: SavedSlip, onClick: () -> Unit, knownNames: List<String> = emptyList()) {
+private fun TransactionRow(
+    slip: SavedSlip,
+    onClick: () -> Unit,
+    knownNames: List<String> = emptyList(),
+    onDelete: (() -> Unit)? = null
+) {
     val effective = effectiveIsMoneyIn(slip, knownNames)
     val isSelf = effective == null
     val isIn = effective == true
@@ -377,6 +430,20 @@ private fun TransactionRow(slip: SavedSlip, onClick: () -> Unit, knownNames: Lis
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold
             )
+        }
+        if (onDelete != null) {
+            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete invalid slip",
+                    tint = Color(0xFFEF5350).copy(alpha = 0.9f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }

@@ -322,6 +322,20 @@ fun MainApp(modifier: Modifier = Modifier) {
         saveTrackedFolders(prefs, trackedFolderUris)
     }
 
+    fun onDeleteSlip(slip: SavedSlip) {
+        // Only allow delete for unknown/invalid slips (safety)
+        val isDeletable = slip.amount == null || slip.verificationStatus == VerificationStatus.UNVERIFIED
+        if (!isDeletable) return
+        val idx = savedSlips.indexOfFirst { it.payload == slip.payload && it.savedAt == slip.savedAt }
+        if (idx >= 0) {
+            savedSlips.removeAt(idx)
+            saveSlips(prefs, savedSlips)
+            // also remove from seen set so it can be re-scanned if valid later
+            seenPayloads.remove(slip.payload)
+            saveSeenPayloads(prefs, seenPayloads)
+        }
+    }
+
     Scaffold(
         containerColor = FireCashBackground,
         modifier = modifier.fillMaxSize(),
@@ -400,6 +414,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                 knownNames = knownNames,
                 isLoading = isLoading,
                 isBackgroundSyncing = isBackgroundSyncing,
+                onDeleteSlip = { slip -> onDeleteSlip(slip) },
                 onBack = {
                     showSavedSlips = false
                     showCapture = true

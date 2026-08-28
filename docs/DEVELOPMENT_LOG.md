@@ -100,23 +100,11 @@ This is **Day 3** (2026-08-27) — the entire intensive `opencode + Muse Spark` 
 - **feat: tap detail row to copy, shows green Copied feedback** (`6b02680`) + **feat: tap QR payload to copy** (`1ab7099`) — `DetailRow` `clickable` + `ClipboardManager` + `copied` 1200ms delay → `Copied` `0xFF66BB6A` green.
 - **style: make back control a pill button with Back label** (`b423617`) — `QrPayloadScreen` `IconButton(ArrowRightAlt)` → `Button(RoundedCornerShape 12dp, BorderStroke 1dp Gray 30%, FireCashSurfaceContainerLow, 14×10dp)` with `ArrowBack 18dp + Back 14sp`.
 
-### Current State (End of 2026-08-28)
-
-**Build:** `BUILD SUCCESSFUL` (last two `assembleDebug` 17-18s, warnings only: `EasySlipClient.kt:254 String?`, `FireCashDatabase.kt:27 fallbackToDestructiveMigration`, `BottomNavBar` deprecated `ReceiptLong`, `AnalyticsScreen` `TrendingUp`, `PhotoCaptureScreen` `LocalLifecycleOwner/setTargetResolution`, `SettingsScreen` `Label`).
-
-**Homepage:** `AccountScreen` (balance card with 56dp cat + `FireCash 26sp`, `Money In/Out` + camera at top-right, `View Spending Summary`, searchable `Transactions` (`reverseLayout` bottom→top, `DateHeader` with net total), long-press multi-select, time above amount, `SwapHoriz` grey `Transfer`).
-
-**Settings (unified):** Base Currency, EasySlip (API key + duplicate toggle + Sync unverified), My Names, Notification Income/Expense (whitelist per-app with multiple prefixes, string `prefix → first number after`), Tracked Folders (add/sync/import), Keyword Mapping, Drive Backup.
-
-**Not yet implemented (vs `firecash_full_plan.md`):** `Screen.Onboarding`, `Screen.Export`/`BackupRestore` routes (`MainViewModel` defines them, `MainApp` else is `Settings`), Drive sync execution (`MainApp` `googleDriveSync=false`), keyword `rules` persistence (`MainApp` `emptyList()`), `BottomNavBar` component now dead code after `7c364a9`.
-
-**Next steps you mentioned:** keep launcher untouched, potentially revisit `Onboarding`, `Export` unlimited, Drive restore, and verification rate-limit UX.
-
 ---
 
-## Day 2 Night (Continued) — 2026-08-28 — CameraX, Permissions & OCR Wiring
+## Day 3 (Continued) — 2026-08-27 → 2026-08-28 — CameraX, Permissions & OCR Wiring
 
-> This session continued the `opencode + Muse Spark` intensive. Focused on adding a working CameraX preview, runtime permission handling, and wiring the captured image to the OCR pipeline.
+> Same `opencode + Muse Spark` session (Day 3). Focused on adding a working CameraX preview, runtime permission handling, and wiring the captured image to the OCR pipeline.
 
 ### CameraX Integration & Runtime Permission
 
@@ -167,6 +155,20 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 | `gradle/libs.versions.toml` | CameraX + Accompanist versions (unchanged) |
 | `PROJECT_STATUS.md` | Created with status summary |
 | `docs/DEVELOPMENT_LOG.md` | This entry |
+
+---
+
+### Current State (End of 2026-08-28)
+
+**Build:** `BUILD SUCCESSFUL` (last two `assembleDebug` 17-18s, warnings only: `EasySlipClient.kt:254 String?`, `FireCashDatabase.kt:27 fallbackToDestructiveMigration`, `BottomNavBar` deprecated `ReceiptLong`, `AnalyticsScreen` `TrendingUp`, `PhotoCaptureScreen` `LocalLifecycleOwner/setTargetResolution`, `SettingsScreen` `Label`).
+
+**Homepage:** `AccountScreen` (balance card with 56dp cat + `FireCash 26sp`, `Money In/Out` + camera at top-right, `View Spending Summary`, searchable `Transactions` (`reverseLayout` bottom→top, `DateHeader` with net total), long-press multi-select, time above amount, `SwapHoriz` grey `Transfer`).
+
+**Settings (unified):** Base Currency, EasySlip (API key + duplicate toggle + Sync unverified), My Names, Notification Income/Expense (whitelist per-app with multiple prefixes, string `prefix → first number after`), Tracked Folders (add/sync/import), Keyword Mapping, Drive Backup.
+
+**Not yet implemented (vs `firecash_full_plan.md`):** `Screen.Onboarding`, `Screen.Export`/`BackupRestore` routes (`MainViewModel` defines them, `MainApp` else is `Settings`), Drive sync execution (`MainApp` `googleDriveSync=false`), keyword `rules` persistence (`MainApp` `emptyList()`), `BottomNavBar` component now dead code after `7c364a9`.
+
+**Next steps you mentioned:** keep launcher untouched, potentially revisit `Onboarding`, `Export` unlimited, Drive restore, and verification rate-limit UX.
 
 ---
 

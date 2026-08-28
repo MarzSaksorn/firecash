@@ -541,6 +541,14 @@ private fun TransactionRow(
         }
 
         Column(horizontalAlignment = Alignment.End) {
+            if (!slip.time.isNullOrBlank()) {
+                Text(
+                    text = slip.time!!,
+                    color = FireCashOnSurfaceVariant,
+                    fontSize = 11.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+            }
             Text(
                 text = if (isSelf) "THB %.2f".format(Locale.US, slip.amount ?: 0.0)
                 else "${if (isIn) "+" else "-"}THB %.2f".format(Locale.US, slip.amount ?: 0.0),

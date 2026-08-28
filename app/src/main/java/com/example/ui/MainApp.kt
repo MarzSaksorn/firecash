@@ -33,7 +33,6 @@ import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.QrPayloadScreen
 import com.example.ui.screens.AccountScreen
 import com.example.ui.screens.AnalyticsScreen
-import com.example.ui.components.CaptureBottomBar
 import com.example.ui.theme.FireCashBackground
 
 @Composable
@@ -369,32 +368,9 @@ fun MainApp(modifier: Modifier = Modifier) {
 
     Scaffold(
         containerColor = FireCashBackground,
-        modifier = modifier.fillMaxSize(),
-        bottomBar = {
-            if (!showPayload) {
-                CaptureBottomBar(
-                    showSettings = !showCapture && !showSavedSlips,
-                    showSavedSlips = showSavedSlips,
-                    onSettingsClick = {
-                        showCapture = false
-                        showSavedSlips = false
-                        showAnalytics = false
-                    },
-                    onCaptureClick = {
-                        showCapture = true
-                        showSavedSlips = false
-                        showAnalytics = false
-                    },
-                    onSavedSlipsClick = {
-                        showCapture = false
-                        showSavedSlips = true
-                        showAnalytics = false
-                    }
-                )
-            }
-        }
+        modifier = modifier.fillMaxSize()
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(bottom = paddingValues.calculateBottomPadding())) {
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
         if (showPayload) {
             QrPayloadScreen(
                 payload = qrPayload,
@@ -425,6 +401,12 @@ fun MainApp(modifier: Modifier = Modifier) {
                 onNavigateToSettings = {
                     showCapture = false
                     showSavedSlips = false
+                    showAnalytics = false
+                },
+                onNavigateToAccount = {
+                    showCapture = false
+                    showSavedSlips = true
+                    showAnalytics = false
                 },
                 payloadText = qrPayload,
                 modifier = Modifier.fillMaxSize()

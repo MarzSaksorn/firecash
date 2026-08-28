@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
@@ -65,6 +66,7 @@ fun PhotoCaptureScreen(
     onQrDetected: (String) -> Unit = {},
     isLoading: Boolean = false,
     onNavigateToSettings: () -> Unit = {},
+    onNavigateToAccount: () -> Unit = {},
     payloadText: String? = null,
     modifier: Modifier = Modifier
 ) {
@@ -174,19 +176,34 @@ fun PhotoCaptureScreen(
             )
         }
 
-        // Settings button
-        IconButton(
-            onClick = onNavigateToSettings,
+        // Top bar: Account (left) and Settings (right)
+        Row(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(12.dp)
-                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(
-                imageVector = Icons.Default.Settings,
-                contentDescription = "Settings",
-                tint = Color.White
-            )
+            IconButton(
+                onClick = onNavigateToAccount,
+                modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AccountBalanceWallet,
+                    contentDescription = "Account",
+                    tint = Color.White
+                )
+            }
+            IconButton(
+                onClick = onNavigateToSettings,
+                modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Settings",
+                    tint = Color.White
+                )
+            }
         }
 
         // Loading overlay while scanning / verifying

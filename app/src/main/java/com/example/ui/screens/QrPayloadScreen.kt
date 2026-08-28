@@ -12,14 +12,24 @@ import androidx.compose.material.icons.automirrored.filled.ArrowRightAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Warning
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.data.easyslip.VerifySlipResponse
 import com.example.data.model.VerificationStatus
@@ -28,6 +38,7 @@ import com.example.ui.theme.FireCashOnSurface
 import com.example.ui.theme.FireCashOnSurfaceVariant
 import com.example.ui.theme.FireCashSurfaceContainerLow
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 @Composable
 fun QrPayloadScreen(
@@ -188,9 +199,27 @@ private fun StatusBanner(slipData: VerifySlipResponse) {
 
 @Composable
 private fun DetailRow(label: String, value: String) {
+    val context = LocalContext.current
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(1200)
+            copied = false
+        }
+    }
+    val isCopyable = value != "—" && value.isNotBlank()
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = isCopyable) {
+                if (!isCopyable) return@clickable
+                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText(label, value))
+                copied = true
+            }
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
@@ -198,8 +227,8 @@ private fun DetailRow(label: String, value: String) {
             style = MaterialTheme.typography.bodyMedium
         )
         Text(
-            text = value,
-            color = FireCashOnSurface,
+            text = if (copied) "Copied" else value,
+            color = if (copied) Color(0xFF66BB6A) else FireCashOnSurface,
             style = MaterialTheme.typography.bodyMedium
         )
     }

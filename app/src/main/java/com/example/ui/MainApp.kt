@@ -483,6 +483,10 @@ fun MainApp(modifier: Modifier = Modifier) {
                     showSavedSlips = false
                     showAnalytics = true
                 },
+                onOpenCamera = {
+                    showSavedSlips = false
+                    showCapture = true
+                },
                 onAutoSync = { syncTrackedFolderInBackground() }
             )
         } else if (showAnalytics) {

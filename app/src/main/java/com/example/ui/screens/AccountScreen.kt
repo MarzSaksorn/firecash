@@ -16,14 +16,22 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import com.example.data.model.VerificationStatus
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -94,6 +103,7 @@ fun AccountScreen(
     onDeleteSlip: (SavedSlip) -> Unit = {},
     onOpenSettings: () -> Unit,
     onOpenAnalytics: () -> Unit,
+    onOpenCamera: () -> Unit = {},
     onAutoSync: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -109,6 +119,22 @@ fun AccountScreen(
     val isSelectionMode = selectedKeys.isNotEmpty()
     val selectedSlips = remember(slips, selectedKeys) { slips.filter { it.savedAt in selectedKeys } }
     val deletableSelected = remember(selectedSlips) { selectedSlips.filter { isDeletable(it) } }
+
+    val lazyListState = rememberLazyListState()
+    var fabVisible by remember { mutableStateOf(true) }
+    var prevIndex by remember { mutableStateOf(0) }
+    var prevOffset by remember { mutableStateOf(0) }
+    LaunchedEffect(lazyListState) {
+        snapshotFlow { lazyListState.firstVisibleItemIndex to lazyListState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                val down = index > prevIndex || (index == prevIndex && offset > prevOffset + 6)
+                val up = index < prevIndex || (index == prevIndex && offset < prevOffset - 6)
+                if (down && fabVisible) fabVisible = false
+                else if (up && !fabVisible) fabVisible = true
+                prevIndex = index
+                prevOffset = offset
+            }
+    }
 
     Box(
         modifier = modifier
@@ -323,7 +349,7 @@ fun AccountScreen(
                 .map { (date, list) -> date to list.sortedByDescending { it.savedAt } }
                 .sortedByDescending { (date, _) -> date }
 
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(state = lazyListState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 grouped.forEach { (date, dateSlips) ->
                     item(key = "header_$date") {
                         DateHeader(date = date, count = dateSlips.size)
@@ -351,6 +377,31 @@ fun AccountScreen(
             }
         }
     }
+
+        // Camera FAB at bottom-end, hides on scroll
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+                .padding(bottom = 8.dp)
+        ) {
+            AnimatedVisibility(
+                visible = fabVisible && !isSelectionMode,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut()
+            ) {
+                FloatingActionButton(
+                    onClick = onOpenCamera,
+                containerColor = FireCashPrimary,
+                contentColor = Color.White
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PhotoCamera,
+                    contentDescription = "Open camera"
+                )
+            }
+        }
+        }
 
         // Loading overlay while syncing
         if (isLoading) {

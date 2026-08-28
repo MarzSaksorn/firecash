@@ -32,7 +32,6 @@ import com.example.ui.screens.PhotoCaptureScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.QrPayloadScreen
 import com.example.ui.screens.AccountScreen
-import com.example.ui.screens.AccountSettingsScreen
 import com.example.ui.screens.AnalyticsScreen
 import com.example.ui.components.CaptureBottomBar
 import com.example.ui.theme.FireCashBackground
@@ -42,7 +41,6 @@ fun MainApp(modifier: Modifier = Modifier) {
     var showCapture by remember { mutableStateOf(true) }
     var showPayload by remember { mutableStateOf(false) }
     var showSavedSlips by remember { mutableStateOf(false) }
-    var showAccountSettings by remember { mutableStateOf(false) }
     var showAnalytics by remember { mutableStateOf(false) }
     var qrPayload by remember { mutableStateOf("") }
     var slipData by remember { mutableStateOf<VerifySlipResponse?>(null) }
@@ -373,21 +371,24 @@ fun MainApp(modifier: Modifier = Modifier) {
         containerColor = FireCashBackground,
         modifier = modifier.fillMaxSize(),
         bottomBar = {
-            if (!showPayload && !showAccountSettings) {
+            if (!showPayload) {
                 CaptureBottomBar(
                     showSettings = !showCapture && !showSavedSlips,
                     showSavedSlips = showSavedSlips,
                     onSettingsClick = {
                         showCapture = false
                         showSavedSlips = false
+                        showAnalytics = false
                     },
                     onCaptureClick = {
                         showCapture = true
                         showSavedSlips = false
+                        showAnalytics = false
                     },
                     onSavedSlipsClick = {
                         showCapture = false
                         showSavedSlips = true
+                        showAnalytics = false
                     }
                 )
             }
@@ -428,19 +429,6 @@ fun MainApp(modifier: Modifier = Modifier) {
                 payloadText = qrPayload,
                 modifier = Modifier.fillMaxSize()
             )
-        } else if (showAccountSettings) {
-            AccountSettingsScreen(
-                isLoading = isLoading,
-                trackedFolders = trackedFolderUris,
-                onBack = {
-                    showAccountSettings = false
-                    showSavedSlips = true
-                },
-                onFolderSelected = { uri -> onFolderSelected(uri) },
-                onRemoveFolder = { uriStr -> onRemoveFolder(uriStr) },
-                onSyncNow = { syncTrackedFolder() },
-                onImportSlips = { paths -> importSlips(paths) }
-            )
         } else if (showSavedSlips) {
             AccountScreen(
                 slips = savedSlips,
@@ -477,7 +465,8 @@ fun MainApp(modifier: Modifier = Modifier) {
                 },
                 onOpenSettings = {
                     showSavedSlips = false
-                    showAccountSettings = true
+                    showCapture = false
+                    showAnalytics = false
                 },
                 onOpenAnalytics = {
                     showSavedSlips = false
@@ -537,6 +526,12 @@ fun MainApp(modifier: Modifier = Modifier) {
                         saveKnownNames(prefs, knownNames)
                     },
                     onSyncUnverified = { resyncUnverifiedSlips() },
+                    isLoading = isLoading,
+                    trackedFolders = trackedFolderUris,
+                    onFolderSelected = { uri -> onFolderSelected(uri) },
+                    onRemoveFolder = { uriStr -> onRemoveFolder(uriStr) },
+                    onSyncNow = { syncTrackedFolder() },
+                    onImportSlips = { paths -> importSlips(paths) },
                     notificationIncomeEnabled = notificationIncomeEnabled,
                     notificationExpenseEnabled = notificationExpenseEnabled,
                     notificationWhitelist = notificationWhitelist,

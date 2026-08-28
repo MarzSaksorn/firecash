@@ -14,16 +14,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowRightAlt
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Payments
@@ -31,8 +36,11 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -53,13 +61,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.documentfile.provider.DocumentFile
 import com.example.data.model.KeywordRule
+import java.io.File
+import java.io.FileOutputStream
 import com.example.ui.components.FireCashTopBar
 import com.example.ui.theme.FireCashBackground
 import com.example.ui.theme.FireCashOnBackground
@@ -92,6 +104,8 @@ fun SettingsScreen(
     notificationExpenseEnabled: Boolean = false,
     notificationWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
     notificationExpenseWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
+    isLoading: Boolean = false,
+    trackedFolders: List<String> = emptyList(),
     onCurrencyChange: (String) -> Unit,
     onToggleDriveSync: (Boolean) -> Unit,
     onToggleEasySlip: (Boolean) -> Unit,
@@ -107,6 +121,10 @@ fun SettingsScreen(
     onAddExpenseWhitelistedApp: (String, String) -> Unit = { _, _ -> },
     onRemoveExpenseWhitelistedApp: (String) -> Unit = {},
     onRequestNotificationPermission: () -> Unit = {},
+    onFolderSelected: (Uri) -> Unit = {},
+    onRemoveFolder: (String) -> Unit = {},
+    onSyncNow: () -> Unit = {},
+    onImportSlips: (List<String>) -> Unit = {},
     onAddRule: (keyword: String, category: String) -> Unit,
     onRemoveRule: (KeywordRule) -> Unit,
     onNavigateToBackup: () -> Unit,
@@ -124,6 +142,27 @@ fun SettingsScreen(
     var newWhitelistPrefix by remember { mutableStateOf("โอนเงินให้คุณ ฿") }
     var newExpenseWhitelistApp by remember { mutableStateOf("") }
     var newExpenseWhitelistPrefix by remember { mutableStateOf("โอนเงินสำเร็จ ฿") }
+
+    val context = LocalContext.current
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri -> if (uri != null) onFolderSelected(uri) }
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            val paths = uris.mapIndexedNotNull { index, uri ->
+                val tempFile = File(context.cacheDir, "sync_${System.currentTimeMillis()}_$index.jpg")
+                val ok = runCatching {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        FileOutputStream(tempFile).use { output -> input.copyTo(output) }
+                    }
+                }.isSuccess
+                if (ok) tempFile.absolutePath else null
+            }
+            if (paths.isNotEmpty()) onImportSlips(paths)
+        }
+    }
 
     val currencies = listOf("USD", "THB", "EUR", "GBP", "JPY")
 
@@ -891,6 +930,83 @@ fun SettingsScreen(
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            // Card: Tracked Folders (migrated from AccountSettingsScreen)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FireCashSurfaceContainerLow)
+                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(FireCashSurfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(imageVector = Icons.Default.Folder, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(22.dp))
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Tracked Folders", color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text(text = "Auto-scan for new slips", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                        }
+                    }
+                    if (trackedFolders.isEmpty()) {
+                        Text(text = "No folders tracked yet. Add folders to auto-scan for new slips.", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            trackedFolders.forEach { uriStr ->
+                                val name = runCatching { DocumentFile.fromTreeUri(context, Uri.parse(uriStr))?.name }.getOrNull()
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(FireCashSurfaceContainerHighest, RoundedCornerShape(12.dp))
+                                        .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                                        .padding(start = 14.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(imageVector = Icons.Default.Folder, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(text = name ?: uriStr, color = FireCashOnSurface, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                                    IconButton(onClick = { onRemoveFolder(uriStr) }) {
+                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Remove folder", tint = FireCashOnSurfaceVariant, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    OutlinedButton(onClick = { folderPickerLauncher.launch(null) }, enabled = !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Add Tracked Folder", color = FireCashPrimary)
+                    }
+                    OutlinedButton(onClick = onSyncNow, enabled = trackedFolders.isNotEmpty() && !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                        Icon(imageVector = Icons.Default.Sync, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Sync Tracked Folders Now", color = FireCashPrimary)
+                    }
+                    OutlinedButton(onClick = { photoPickerLauncher.launch(arrayOf("image/*")) }, enabled = !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                        Icon(imageVector = Icons.Default.Sync, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Import Slip Photos from Device", color = FireCashPrimary)
+                    }
+                    Text(text = "Slips in the tracked folder are scanned automatically for QR codes and added to your account.", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                    if (isLoading) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = FireCashPrimary)
+                            Text(text = "Syncing slips...", color = FireCashOnSurfaceVariant, fontSize = 12.sp)
                         }
                     }
                 }

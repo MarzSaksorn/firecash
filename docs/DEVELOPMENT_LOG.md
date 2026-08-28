@@ -11,7 +11,7 @@
 
 ## Overview
 
-FireCash started as research-driven. **Days 1-2 were pure research via a separate `opencode` convo** — that convo produced the Stitch UI plan (`docs/firecash_ui_stitch_plan.md` with MD3 dark tokens `#121316`/`#FF6B00`/`#10B981`/`#6366F1`). That plan was fed to **Google Stitch** to generate the initial UI. **On Day 2 daylight** an **unplanned Google AI Studio** spike was tried and was **not satisfying (not in the original plan)** and abandoned; **at Day 2 night we came to this `opencode + Muse Spark` convo with the Google Stitch design as input** and rebuilt/iterated the entire app in one long `2026-08-28` night session — from `Account Settings` scaffolding through to notification whitelists, reverse chat-style list, search, copy-to-clipboard, logo, navigation and homepage changes. All commits below are from `git log --reverse --date=short` (local time).
+FireCash started as research-driven. **Days 1-2 were pure research via a separate `opencode` convo** — that convo produced the Stitch UI plan (`docs/firecash_ui_stitch_plan.md` with MD3 dark tokens `#121316`/`#FF6B00`/`#10B981`/`#6366F1`). That plan was fed to **Google Stitch** on **2026-08-26 night**, then an **unplanned Google AI Studio** spike was tried the same night and was **not satisfying (not in the original plan)** and abandoned; **after that we came to this `opencode + Muse Spark` convo with the Google Stitch design as input** and rebuilt/iterated the entire app in one long `2026-08-28` night session — from `Account Settings` scaffolding through to notification whitelists, reverse chat-style list, search, copy-to-clipboard, logo, navigation and homepage changes. All commits below are from `git log --reverse --date=short` (local time).
 
 ---
 
@@ -32,20 +32,22 @@ FireCash started as research-driven. **Days 1-2 were pure research via a separat
 
 ---
 
-## Day 2 — 2026-08-27 → 2026-08-28 — Stitch + Google AI Studio (Daylight, Off-Plan)
+## Day 2 — 2026-08-26 Night — Stitch + Google AI Studio (Off-Plan)
 
-**Daylight — Google Stitch then Google AI Studio (both off-plan, not satisfying):**
+**Night — Google Stitch then Google AI Studio (both off-plan, not satisfying):**
 - Fed the `firecash_ui_stitch_plan.md` from the first opencode convo into **Google Stitch** to generate the initial UI stitch. Stitch produced the dark-theme shell, card spacing, `14-20dp` radii, and test tags (`search_expenses_input` etc.) as a starting point.
-- Then tried to continue the Stitch output in **Google AI Studio** in the same daylight window for faster iteration. Hit prompt limits, non-deterministic scaffolding, and no access to local `Room`/`CameraX`/`ML Kit` toolchain; generated code didn't compile against `FireCashDatabase`/`OcrProcessor` contracts and styling drifted from the Stitch design. Validated `docs/account-settings-summary.md` in parallel but AI Studio was not satisfying.
+- Then tried to continue the Stitch output in **Google AI Studio** in the same night window for faster iteration. Hit prompt limits, non-deterministic scaffolding, and no access to local `Room`/`CameraX`/`ML Kit` toolchain; generated code didn't compile against `FireCashDatabase`/`OcrProcessor` contracts and styling drifted from the Stitch design. Validated `docs/account-settings-summary.md` in parallel but AI Studio was not satisfying.
 - Decision: **abandon AI Studio**.
 
-> **Pivot at Day 2 night:** Came to **this `opencode + Muse Spark` convo (`muse-spark-1.2-contributor-free`) with the Google Stitch design as input** — allowed `scaffold → recon → hunt → validate → report` discipline and real `bash` builds (`./gradlew assembleDebug`).
+> **Pivot after 26th night:** Came to **this `opencode + Muse Spark` convo (`muse-spark-1.2-contributor-free`) with the Google Stitch design as input** — allowed `scaffold → recon → hunt → validate → report` discipline and real `bash` builds (`./gradlew assembleDebug`).
 
 ---
 
 ## Day 2 Night — 2026-08-28 — This Opencode Convo Intensive (Stitch Design as Input)
 
 This is **Day 2 night** in real time but `2026-08-28` in git (`~60` commits) — the entire intensive `opencode + Muse Spark` session rebuilding from the Google Stitch design. Presented in chronological order as they happened.
+
+> Note: `Stitch + AI Studio` moved to **2026-08-26 night** per user; the `opencode` intensive below runs `2026-08-28` (git timestamps) as one long session.
 
 ### 00:00–02:00 — Core Scan & Persistence
 

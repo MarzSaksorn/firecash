@@ -120,7 +120,20 @@ fun PhotoCaptureScreen(
                         val input = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
                         barcodeScanner.process(input)
                             .addOnSuccessListener { barcodes ->
-                                val value = barcodes.firstOrNull()?.rawValue
+                                val w = imageProxy.width.toFloat()
+                                val h = imageProxy.height.toFloat()
+                                // Center selection ~ 60% of frame (matches 280dp overlay)
+                                val left = w * 0.20f
+                                val right = w * 0.80f
+                                val top = h * 0.20f
+                                val bottom = h * 0.80f
+                                val inFrame = barcodes.firstOrNull { bc ->
+                                    val box = bc.boundingBox ?: return@firstOrNull false
+                                    val cx = box.centerX().toFloat()
+                                    val cy = box.centerY().toFloat()
+                                    cx in left..right && cy in top..bottom && bc.rawValue != null
+                                }
+                                val value = inFrame?.rawValue
                                 if (value != null && scanLock.compareAndSet(false, true)) {
                                     currentOnQrDetected(value)
                                 }

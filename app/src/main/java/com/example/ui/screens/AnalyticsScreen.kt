@@ -47,7 +47,6 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.WeekFields
 import java.util.Locale
-import kotlin.math.min
 
 private data class MoneyEntry(
     val sortKey: String,
@@ -456,9 +455,11 @@ private fun DualStickChart(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val count = data.size
                 if (count == 0 || maxAmount <= 0) return@Canvas
-                val columnWidth = size.width / count
-                val gapPx = 2.dp.toPx()
-                val stickPx = min(6.dp.toPx(), (columnWidth - gapPx) / 2f).coerceAtLeast(1.5f)
+                val axisPad = 30.dp.toPx()
+                val plotWidth = size.width - axisPad
+                val columnWidth = plotWidth / count
+                val gapPx = 3.dp.toPx()
+                val stickPx = ((columnWidth - 2 * gapPx) / 2f).coerceAtLeast(4.dp.toPx())
                 val chartBottom = size.height - 4.dp.toPx()
                 val chartTop = 22.dp.toPx()
                 val chartHeight = chartBottom - chartTop
@@ -468,7 +469,7 @@ private fun DualStickChart(
 
                 drawLine(
                     color = baselineColor,
-                    start = Offset(0f, chartBottom),
+                    start = Offset(axisPad, chartBottom),
                     end = Offset(size.width, chartBottom),
                     strokeWidth = 2.dp.toPx()
                 )
@@ -482,20 +483,20 @@ private fun DualStickChart(
                     val y = chartBottom - chartHeight * i / gridSteps
                     drawLine(
                         color = Color(0xFF2A2E35),
-                        start = Offset(0f, y),
+                        start = Offset(axisPad, y),
                         end = Offset(size.width, y),
                         strokeWidth = 1.dp.toPx()
                     )
                     drawContext.canvas.nativeCanvas.drawText(
                         compactAmount(maxAmount * i / gridSteps),
-                        6.dp.toPx(),
+                        2.dp.toPx(),
                         y - 3.dp.toPx(),
                         gridPaint
                     )
                 }
 
                 data.forEachIndexed { index, entry ->
-                    val centerX = columnWidth * index + columnWidth / 2f
+                    val centerX = axisPad + columnWidth * index + columnWidth / 2f
                     val inH = (entry.inTotal / maxAmount * chartHeight).toFloat()
                     val outH = (entry.outTotal / maxAmount * chartHeight).toFloat()
                     val inX = centerX - gapPx / 2f - stickPx
@@ -527,38 +528,46 @@ private fun DualStickChart(
                     textSize = 9.dp.toPx()
                     isFakeBoldText = true
                 }
+                fun drawValueLabel(text: String, barCenterX: Float, topY: Float, color: Int) {
+                    valuePaint.color = color
+                    val textW = valuePaint.measureText(text)
+                    var x = barCenterX - textW / 2f
+                    if (x < axisPad) x = axisPad
+                    val maxX = size.width - textW - 2.dp.toPx()
+                    if (x > maxX) x = maxX.coerceAtLeast(axisPad)
+                    drawContext.canvas.nativeCanvas.drawText(text, x, topY, valuePaint)
+                }
                 val maxInEntry = data.maxByOrNull { it.inTotal }?.takeIf { it.inTotal > 0 }
                 if (maxInEntry != null) {
                     val idx = data.indexOf(maxInEntry)
-                    val centerX = columnWidth * idx + columnWidth / 2f
-                    val x = centerX - gapPx / 2f - stickPx
+                    val centerX = axisPad + columnWidth * idx + columnWidth / 2f
+                    val inX = centerX - gapPx / 2f - stickPx
                     val h = (maxInEntry.inTotal / maxAmount * chartHeight).toFloat()
-                    valuePaint.color = android.graphics.Color.rgb(0x66, 0xBB, 0x6A)
-                    drawContext.canvas.nativeCanvas.drawText(
+                    drawValueLabel(
                         compactAmount(maxInEntry.inTotal),
-                        x - 22.dp.toPx(),
+                        inX + stickPx / 2f,
                         chartBottom - h - 3.dp.toPx(),
-                        valuePaint
+                        android.graphics.Color.rgb(0x66, 0xBB, 0x6A)
                     )
                 }
                 val maxOutEntry = data.maxByOrNull { it.outTotal }?.takeIf { it.outTotal > 0 }
                 if (maxOutEntry != null) {
                     val idx = data.indexOf(maxOutEntry)
-                    val centerX = columnWidth * idx + columnWidth / 2f
-                    val x = centerX + gapPx / 2f
+                    val centerX = axisPad + columnWidth * idx + columnWidth / 2f
+                    val outX = centerX + gapPx / 2f
                     val h = (maxOutEntry.outTotal / maxAmount * chartHeight).toFloat()
-                    valuePaint.color = android.graphics.Color.rgb(0xFF, 0x6B, 0x00)
-                    drawContext.canvas.nativeCanvas.drawText(
+                    drawValueLabel(
                         compactAmount(maxOutEntry.outTotal),
-                        x + 2.dp.toPx(),
+                        outX + stickPx / 2f,
                         chartBottom - h - 3.dp.toPx(),
-                        valuePaint
+                        android.graphics.Color.rgb(0xFF, 0x6B, 0x00)
                     )
                 }
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth()) {
+            Spacer(modifier = Modifier.width(30.dp))
             data.forEach { entry ->
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
                     Text(

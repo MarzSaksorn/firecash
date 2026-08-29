@@ -105,6 +105,7 @@ fun AccountScreen(
     knownNames: List<String> = emptyList(),
     isLoading: Boolean = false,
     isBackgroundSyncing: Boolean = false,
+    isUserSyncing: Boolean = false,
     onBack: () -> Unit,
     onSlipClick: (SavedSlip) -> Unit,
     onDeleteSlip: (SavedSlip) -> Unit = {},
@@ -360,7 +361,7 @@ fun AccountScreen(
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )
-                if (isBackgroundSyncing) {
+                if (isBackgroundSyncing || isUserSyncing) {
                     Spacer(modifier = Modifier.width(8.dp))
                     CircularProgressIndicator(
                         modifier = Modifier.size(14.dp),
@@ -369,7 +370,7 @@ fun AccountScreen(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Syncing…",
+                        text = if (isUserSyncing) "Syncing…" else "Auto-sync…",
                         color = FireCashOnSurfaceVariant,
                         fontSize = 12.sp
                     )

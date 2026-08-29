@@ -48,6 +48,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     var qrPhotoPath by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var isBackgroundSyncing by remember { mutableStateOf(false) }
+    var isUserSyncing by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val easySlipClient = remember { EasySlipClient() }
@@ -351,6 +352,7 @@ fun MainApp(modifier: Modifier = Modifier) {
         if (trackedFolderUris.isEmpty()) return
         if (isLoading || isBackgroundSyncing) return
         isBackgroundSyncing = true
+        isUserSyncing = true
         scope.launch {
             try {
                 for (uriStr in trackedFolderUris) {
@@ -358,6 +360,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                 }
             } finally {
                 isBackgroundSyncing = false
+                isUserSyncing = false
             }
         }
     }
@@ -368,6 +371,7 @@ fun MainApp(modifier: Modifier = Modifier) {
         processedFiles.clear()
         saveProcessedFiles(prefs, processedFiles)
         isLoading = true
+        isUserSyncing = true
         scope.launch {
             try {
                 for (uriStr in trackedFolderUris) {
@@ -443,6 +447,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                 saveSlips(prefs, savedSlips)
             } finally {
                 isLoading = false
+                isUserSyncing = false
             }
         }
     }
@@ -534,6 +539,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                 knownNames = knownNames,
                 isLoading = isLoading,
                 isBackgroundSyncing = isBackgroundSyncing,
+                isUserSyncing = isUserSyncing,
                 onDeleteSlip = { slip -> onDeleteSlip(slip) },
                 onBack = {
                     showSavedSlips = false

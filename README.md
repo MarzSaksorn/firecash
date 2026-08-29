@@ -1,26 +1,50 @@
-# FireCash — Receipt Logging & EasySlip Verification Android App
+# FireCash — Slip & Income Tracker
 
-FireCash is a modern, offline-first Android application built with **Jetpack Compose**, **Room Database**, and **Material Design 3**. It allows users to capture receipts and bank transfer slips, extract transaction data via intelligent OCR (including Tag 91 bank slip QR CRC parsing), verify slips with EasySlip through a secure proxy, auto-categorize spending with custom keyword rules, generate AI spending analytics, and perform unlimited bulk exports (CSV / PDF) and Google Drive backups.
+FireCash is an offline-first Android app (Jetpack Compose, Material 3 dark theme) for logging Thai bank transfer slips and tracking income/expense. Scan a PromptPay/bank-slip QR, verify it with EasySlip when configured, and keep everything locally — no account required.
 
-## Key Features
+## Features
 
-1. **Receipt & Bank Slip Capture**
-   - Live camera viewfinder simulation with alignment guides, flash controls, and laser scanning animations.
-   - Gallery image picker, document/PDF upload, and sample bank slip quick testing.
-2. **Intelligent OCR & Tag 91 CRC Parser**
-   - Automatically extracts Merchant name, Total Amount, Date, Time, Currency, and Tag 91 PromptPay/EMVCo CRC payloads.
-3. **EasySlip Slip Verification**
-   - Communicates with `/api/verifySlip` backend proxy.
-   - Verifies CRC, sending bank, and transaction reference with duplicate detection and amount validation.
-4. **Offline-First Room Persistence**
-   - Fully local storage with Room DB (`Expense`/`ReceiptEntity`, `KeywordRule`).
-   - No forced user account required.
-5. **Smart Auto-Categorization & Keyword Rules**
-   - Instant categorization rules (e.g., Starbucks → Food & Dining, Uber → Travel).
-   - Full user-editable keyword mapping UI.
-6. **AI Analytics & Spending Insights**
-   - On-device trend detection, week-over-week comparisons, category clustering, and recurring expense alerts.
-7. **Unlimited Bulk Export**
-   - Filter by date range (This Month, Last Month, YTD, Custom) and export clean CSV or formatted PDF reports.
-8. **Google Drive Cloud Backup & Restore**
-   - One-tap database snapshot export and encrypted cloud sync.
+**Capture & OCR**
+- Live CameraX preview with center-frame QR scanning (60% ROI — only QRs inside the frame are detected)
+- Gallery picker and photo import; scanned slips auto-save to your Account
+- EasySlip verification (`api.easyslip.com/v2/verify/bank`) with offline fallback: unverified slips show unknown data and a **Sync unverified** button once an API key is set
+
+**Account (homepage)**
+- Balance card: Money In / Money Out, camera shortcut at top-right, in-app logo + FireCash title
+- Slip list scrolls bottom → top, grouped by day with **daily net total** in the date header; time shown above each amount
+- Search slips by date, title, or amount — **exact match** for QR payload / transaction ref
+- Long-press to multi-select and delete unknown/invalid slips only
+- Manual income/expense entry (amount + note)
+- Sync button: **tap** = only new photos, **hold 10s** = full resync (re-detect all photos + re-verify every slip on server)
+- Each slip links to its actual photo on the device (persistent app storage)
+
+**Smart detection**
+- **My Names**: add your name variants (Thai/English); slips where the receiver is you → Income, sender is you → Expense, both you → Transfer (excluded from balance) — applied retroactively
+- **Notification Income/Expense**: `NotificationListenerService` scoops the first number after a configurable prefix (e.g. `โอนเงินให้คุณ ฿`), per-app whitelist with multiple prefixes per app, separate whitelists for money-in and money-out
+- Optional **Keep listening in background**: music-player-style non-dismissible status notification + battery-optimization exemption so notifications keep being caught
+
+**Analytics**
+- Spending summary with vertical stick chart (Day / Week / Month) and AI insights (recurring vendors, peaks, category dominance)
+
+**Settings (Safe / Dangerous)**
+- **Safe**: Base Currency, My Names, Tracked Folders (auto-scan folders for new slips), Keyword Mapping
+- **Dangerous** (collapsible red section): EasySlip API key + duplicate check, Notification Income/Expense whitelists, Background & Battery, **Data Transfer**
+
+**Data transfer**
+- Export everything (slips, API key, all options, whitelists) to a single JSON file — import it on another phone to clone your app state
+
+**Navigation**
+- Android back gesture mirrors in-app navigation; Account is the homepage
+
+## Build
+
+```bash
+./gradlew assembleDebug
+```
+
+Requires: Android SDK (compileSdk 36, minSdk 24). The debug build uses `debug.keystore`; release signing reads `KEYSTORE_PATH`/`STORE_PASSWORD`/`KEY_PASSWORD` env vars.
+
+## Docs
+
+- `docs/DEVELOPMENT_LOG.md` — day-by-day build journal
+- `docs/firecash_full_plan.md`, `docs/firecash_ai_studio_systems_plan.md` — original planning docs

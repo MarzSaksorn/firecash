@@ -49,15 +49,12 @@ This is **Day 3** (2026-08-27) — the entire intensive `opencode + Muse Spark` 
 
 > Note: `Stitch + AI Studio` moved to **2026-08-26 night** per user; the `opencode` intensive below is **Day 3 = 2026-08-27**.
 
-### 00:00–02:00 — Core Scan & Persistence
-
 - **feat: add save-to-account with money-in/out toggle on QR scan** — `MainApp` `savePayload(isMoneyIn)` + `QrPayloadScreen` toggle, `SavedSlip(isMoneyIn)` deduped by `transRef/payload`.
 - **fix: auto-save scanned QR slip to account + make addSlip resilient** — `handlePayload` now `addSlip(payload)` immediately (`runCatching { verifyWithEasySlip }` so verification failure never blocks save). Scan → appears in Account instantly.
 - **fix: Scaffold padding — last slip behind nav bar / top double push** — `Scaffold { paddingValues -> Box(padding(bottom=calculateBottomPadding())) }` (only bottom inset; top handled by `statusBarsPadding()` in screens). This fix re-appeared twice after navigation refactors (`9d8f837`, `9d8f837`).
 - **feat: AnalyticsScreen with spending summary + AI insights** — new `ui/screens/AnalyticsScreen.kt` (`AnalyticsEngine.generateAnalytics` → `categorySpends/insights`), `AccountScreen` `View Spending Summary` button below balance card; `MainApp` `showAnalytics` branch.
 - **Chart iterations:** `replace horizontal bar with vertical stick chart` → `style: thinner with circular caps + baseline` (`Canvas` `drawLine` 6dp round + dot) → `feat: time-based vertical stick chart with Day/Week/Month toggle` (`TimeBucket DAY/WEEK/MONTH`, `computeEntries` with `LocalDate`/`WeekFields`).
 
-### 02:00–06:00 — Account & Sync UX
 
 - **fix: background sync for Account page without blocking overlay** — split `syncTrackedFolder()` (foreground `isLoading` overlay) vs `syncTrackedFolderInBackground()` (`isBackgroundSyncing` inline `Syncing…` 14dp next to Transactions).
 - **feat: exclude self-transfers from balance/analytics, show as Transfer** — `isSelfTransfer(sender==receiver)` → grey `SwapHoriz` `#9E9E9E`, `Transfer` label, `THB x` without `+/-`, excluded from `moneyIn/moneyOut`.
@@ -67,7 +64,6 @@ This is **Day 3** (2026-08-27) — the entire intensive `opencode + Muse Spark` 
 - **fix: unknown fallback for unverified slips + background resync when EasySlip enabled** — `EasySlipClient.simulateSlipVerification` no longer returns hard `Starbucks Thailand / Roasters 45.20`; now `UNVERIFIED` with `amount = extractAmount(payload)` or `null`; `MainApp.resyncUnverifiedSlips()` + Settings **Sync N unverified** button, auto-triggered on `onToggleEasySlip(true)`/`onUpdateApiKey`.
 - **fix: limit QR scan to center frame (60% ROI)** — `PhotoCaptureScreen.kt:117` filters `barcodes.firstOrNull { bbox.center in [w*0.20..0.80, h*0.20..0.80] }` vs full `InputImage`.
 
-### 06:00–10:00 — Notifications & Whitelist
 
 - **feat: notification income detection scooping first number** — `service/IncomeNotificationService.kt` (`NotificationListenerService`, `AMOUNT_REGEX [-+]?\d{1,3}(,\d{3})*` → first number), `AndroidManifest.xml` `BIND_NOTIFICATION_LISTENER_SERVICE`, `firecash_settings` `PREFS_SLIPS/SEEN`, `MainApp.DisposableEffect` listener keeps `savedSlips` live.
 - **feat: deletable only for unknown/invalid slips** + **feat: long-press multi-select to delete/manage** + **refactor: only multi-select delete** — `isDeletable = amount==null || UNVERIFIED` (`AccountScreen.kt:79`), `selectedKeys:Set<Long>`, `combinedClickable` `onLongClick`, `TopBar: ${n} selected + Delete + All`, per-row `Delete` removed, kept only multi; `DateHeader` still shows `• n`.
@@ -77,7 +73,6 @@ This is **Day 3** (2026-08-27) — the entire intensive `opencode + Muse Spark` 
 - **fix: slip details always visible offline** — `EasySlipClient` `extractAmount()` fallback + `MainApp.addSlip` fallback `VerifySlipResponse(UNVERIFIED, amount=extractAmount)` + `QrPayloadScreen` fallback card; `AccountScreen.onSlipClick` builds fallback `VerifySlipResponse` from `SavedSlip` so old slips show details.
 - **fix: slip details card always visible even for unverified/old slips** — `QrPayloadScreen.kt:103` always renders card (uses `extractAmount(payload)` if `slipData==null`).
 
-### 10:00–14:00 — Logo & Navigation
 
 - **feat: set custom launcher icon from provided flame mascot (adaptive + legacy mipmap)** — generated `drawable/firecash_icon.png` (1024) via `System.Drawing`, `drawable/ic_launcher_background.xml #121316`, `mipmap-*/ic_launcher*.png` 48/72/96/144/192 + `ic_launcher_foreground.png`; `mipmap-anydpi-v26` adaptive XML.
 - **feat: move camera to FAB on Account with scroll-hide** → **refactor: persistent camera button inside balance card at right side** → **refactor: move camera button to top-right of balance card** — `AccountScreen` balance card `Row(SpaceBetween, Top)` with `Column(Current Balance + THB 32sp Bold)` left and `44dp` circular `PhotoCamera` `IconButton(white 12% bg)` right; FAB with `rememberLazyListState` + `snapshotFlow` + `AnimatedVisibility(fade+scale)` removed after user feedback.
@@ -88,7 +83,6 @@ This is **Day 3** (2026-08-27) — the entire intensive `opencode + Muse Spark` 
 - **feat: system back gesture mirrors in-app navigation** (`709cf38`) — `BackHandler` in `MainApp` (`showPayload→Account`, `showAnalytics→Account`, `showCapture→Account`, `Settings→Account`) + `AccountScreen` `BackHandler(isSelectionMode) → clear selection`.
 - **fix: prevent top double padding after removing bottom bar** (`9d8f837`) — back to `padding(bottom=calculateBottomPadding())`.
 
-### 14:00–18:00 — List & Search Polish
 
 - **feat: reverse layout for slips list (bottom to top)** (`4cc5050` `LazyColumn(reverseLayout=true)`) + **fix: keep reversed slips list anchored at top** (`6e2d897` `fillMaxWidth` wrap) — newest at bottom, scroll up for older.
 - **fix: date header on top of day group with reverse layout** (`3dc91f7`) — emit `items` before `item(header)` so header visually sits above its day's slips; also **feat: show daily net total in date header** (`c4c0cfe` `DateHeader(date,count,total:Double)` `THB %.2f • n` green/red).
@@ -172,7 +166,7 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 
 ---
 
-## Day 3 (Continued II) — Sync Caching, Photos, Transfer & Settings Overhaul
+## Day 4 — Sync Caching, Photos, Transfer & Settings Overhaul
 
 > Post-"Current State" iteration in the same `opencode + Muse Spark` session (2026-08-28 late). All commits below.
 

@@ -321,6 +321,109 @@ fun MainApp(modifier: Modifier = Modifier) {
         saveSeenPayloads(prefs, seenPayloads)
     }
 
+    // Export everything (slips + settings + prefs) to a JSON file and share it
+    fun exportAllData() {
+        try {
+            val root = JSONObject()
+            root.put("app", "FireCash")
+            root.put("version", 1)
+            root.put("exportedAt", System.currentTimeMillis())
+
+            val slipsArr = JSONArray()
+            savedSlips.forEach { slipsArr.put(slipToJson(it)) }
+            root.put("slips", slipsArr)
+
+            root.put("seenPayloads", JSONArray(seenPayloads.toList()))
+            root.put("processedFiles", JSONArray(processedFiles.toList()))
+            root.put("trackedFolders", JSONArray(trackedFolderUris))
+            root.put("knownNames", JSONArray(knownNames))
+
+            fun wlArr(list: List<com.example.service.WhitelistedApp>): JSONArray {
+                val arr = JSONArray()
+                list.forEach { e -> arr.put(JSONObject().put("package", e.packageName).put("prefix", e.prefix)) }
+                return arr
+            }
+            root.put("notificationWhitelist", wlArr(notificationWhitelist))
+            root.put("notificationExpenseWhitelist", wlArr(notificationExpenseWhitelist))
+
+            val settings = JSONObject()
+            settings.put("easy_slip_enabled", easySlipEnabled)
+            settings.put("api_key", apiKey)
+            settings.put("check_duplicates", checkDuplicates)
+            settings.put("notification_income_enabled", notificationIncomeEnabled)
+            settings.put("notification_expense_enabled", notificationExpenseEnabled)
+            settings.put("background_listening", backgroundListening)
+            root.put("settings", settings)
+
+            val dir = context.getExternalFilesDir(null) ?: context.filesDir
+            val file = File(dir, "FireCash_Backup_${System.currentTimeMillis()}.json")
+            file.writeText(root.toString(2))
+
+            val uri = androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/json"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            runCatching { context.startActivity(Intent.createChooser(intent, "Export FireCash data")) }
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(context, "Export failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
+    // Import everything from an exported JSON file (phone-to-phone transfer)
+    fun importAllData(path: String) {
+        try {
+            val text = java.io.File(path).readText()
+            val root = JSONObject(text)
+
+            root.optJSONArray("slips")?.let { arr ->
+                val newSlips = mutableListOf<SavedSlip>()
+                for (i in 0 until arr.length()) {
+                    slipFromJson(arr.getJSONObject(i))?.let { newSlips.add(it) }
+                }
+                savedSlips.clear()
+                savedSlips.addAll(newSlips)
+                saveSlips(prefs, savedSlips)
+            }
+
+            fun readStrArr(name: String): List<String> =
+                root.optJSONArray(name)?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList()
+
+            seenPayloads.clear(); seenPayloads.addAll(readStrArr("seenPayloads")); saveSeenPayloads(prefs, seenPayloads)
+            processedFiles.clear(); processedFiles.addAll(readStrArr("processedFiles")); saveProcessedFiles(prefs, processedFiles)
+            trackedFolderUris = readStrArr("trackedFolders"); saveTrackedFolders(prefs, trackedFolderUris)
+            knownNames = readStrArr("knownNames"); saveKnownNames(prefs, knownNames)
+
+            fun readWl(name: String): List<com.example.service.WhitelistedApp> =
+                root.optJSONArray(name)?.let { arr ->
+                    (0 until arr.length()).mapNotNull { i ->
+                        val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                        com.example.service.WhitelistedApp(o.optString("package"), o.optString("prefix"))
+                    }
+                } ?: emptyList()
+
+            notificationWhitelist = readWl("notificationWhitelist"); saveNotificationWhitelist(prefs, notificationWhitelist)
+            notificationExpenseWhitelist = readWl("notificationExpenseWhitelist"); saveNotificationWhitelistExpense(prefs, notificationExpenseWhitelist)
+
+            root.optJSONObject("settings")?.let { s ->
+                easySlipEnabled = s.optBoolean("easy_slip_enabled", false); prefs.edit().putBoolean("easy_slip_enabled", easySlipEnabled).apply()
+                apiKey = s.optString("api_key", ""); prefs.edit().putString("api_key", apiKey).apply()
+                checkDuplicates = s.optBoolean("check_duplicates", false); prefs.edit().putBoolean("check_duplicates", checkDuplicates).apply()
+                notificationIncomeEnabled = s.optBoolean("notification_income_enabled", false); prefs.edit().putBoolean("notification_income_enabled", notificationIncomeEnabled).apply()
+                notificationExpenseEnabled = s.optBoolean("notification_expense_enabled", false); prefs.edit().putBoolean("notification_expense_enabled", notificationExpenseEnabled).apply()
+                backgroundListening = s.optBoolean("background_listening", false); prefs.edit().putBoolean("background_listening", backgroundListening).apply()
+            }
+
+            if (backgroundListening) {
+                runCatching { context.startForegroundService(Intent(context, BackgroundListenerService::class.java)) }
+            }
+            android.widget.Toast.makeText(context, "Import complete (${savedSlips.size} slips)", android.widget.Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(context, "Import failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
     fun importSlips(paths: List<String>) {
         if (paths.isEmpty()) return
         isLoading = true
@@ -679,6 +782,8 @@ fun MainApp(modifier: Modifier = Modifier) {
                     onRemoveFolder = { uriStr -> onRemoveFolder(uriStr) },
                     onSyncNow = { syncTrackedFolder() },
                     onImportSlips = { paths -> importSlips(paths) },
+                    onExportData = { exportAllData() },
+                    onImportData = { path -> importAllData(path) },
                     notificationIncomeEnabled = notificationIncomeEnabled,
                     notificationExpenseEnabled = notificationExpenseEnabled,
                     notificationWhitelist = notificationWhitelist,

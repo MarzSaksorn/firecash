@@ -49,6 +49,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     var isLoading by remember { mutableStateOf(false) }
     var isBackgroundSyncing by remember { mutableStateOf(false) }
     var isUserSyncing by remember { mutableStateOf(false) }
+    var batteryOptIgnored by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val easySlipClient = remember { EasySlipClient() }
@@ -91,6 +92,14 @@ fun MainApp(modifier: Modifier = Modifier) {
     // Cache of already-processed tracked-folder files (by content:// uri) — only new files get OCR'd/synced
     val processedFiles = remember {
         mutableSetOf<String>().apply { addAll(loadProcessedFiles(prefs)) }
+    }
+
+    // Refresh battery-optimization status whenever we land on Settings
+    androidx.compose.runtime.LaunchedEffect(!showCapture && !showSavedSlips && !showPayload && !showAnalytics) {
+        if (!showCapture && !showSavedSlips && !showPayload && !showAnalytics) {
+            batteryOptIgnored = (context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager)
+                .isIgnoringBatteryOptimizations(context.packageName)
+        }
     }
 
     // System back handling — mirrors in-app navigation, returns to previous state
@@ -647,6 +656,24 @@ fun MainApp(modifier: Modifier = Modifier) {
                     notificationExpenseEnabled = notificationExpenseEnabled,
                     notificationWhitelist = notificationWhitelist,
                     notificationExpenseWhitelist = notificationExpenseWhitelist,
+                    batteryOptIgnored = batteryOptIgnored,
+                    onRequestDisableBatteryOptimization = {
+                        try {
+                            context.startActivity(
+                                Intent(
+                                    android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                    Uri.parse("package:${context.packageName}")
+                                ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                            )
+                        } catch (_: Exception) {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                        .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                )
+                            }
+                        }
+                    },
                     onToggleNotificationIncome = { enabled ->
                         notificationIncomeEnabled = enabled
                         prefs.edit().putBoolean("notification_income_enabled", enabled).apply()

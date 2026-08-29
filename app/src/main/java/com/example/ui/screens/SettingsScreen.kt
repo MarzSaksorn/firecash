@@ -26,6 +26,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Folder
@@ -104,6 +105,8 @@ fun SettingsScreen(
     notificationExpenseEnabled: Boolean = false,
     notificationWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
     notificationExpenseWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
+    batteryOptIgnored: Boolean = false,
+    onRequestDisableBatteryOptimization: () -> Unit = {},
     isLoading: Boolean = false,
     trackedFolders: List<String> = emptyList(),
     onCurrencyChange: (String) -> Unit,
@@ -1010,6 +1013,53 @@ fun SettingsScreen(
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = FireCashPrimary)
                             Text(text = "Syncing slips...", color = FireCashOnSurfaceVariant, fontSize = 12.sp)
                         }
+                    }
+                }
+            }
+
+            // Card: Background & Battery (keeps NotificationListener alive)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FireCashSurfaceContainerLow)
+                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(FireCashSurfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(imageVector = Icons.Default.BatterySaver, contentDescription = null, tint = if (batteryOptIgnored) FireCashSecondary else FireCashPrimary, modifier = Modifier.size(22.dp))
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Background & Battery", color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text(text = "Keep the app alive so notifications are caught", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                        }
+                    }
+                    Text(
+                        text = if (batteryOptIgnored)
+                            "Battery optimization is disabled — notification income/expense will run in background."
+                        else
+                            "Battery optimization is enabled. Disable it so the app can keep listening for notifications in the background.",
+                        color = if (batteryOptIgnored) FireCashSecondary else FireCashOnSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                    Button(
+                        onClick = onRequestDisableBatteryOptimization,
+                        enabled = !batteryOptIgnored,
+                        modifier = Modifier.fillMaxWidth().testTag("disable_battery_optimization_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = FireCashPrimary)
+                    ) {
+                        Text(if (batteryOptIgnored) "Battery Optimization Disabled" else "Disable Battery Optimization", color = FireCashOnPrimary)
                     }
                 }
             }

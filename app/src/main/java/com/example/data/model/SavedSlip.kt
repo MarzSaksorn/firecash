@@ -13,5 +13,6 @@ data class SavedSlip(
     val verificationStatus: VerificationStatus = VerificationStatus.UNVERIFIED,
     val slipData: VerifySlipResponse? = null,
     val isMoneyIn: Boolean = false,
-    val savedAt: Long = System.currentTimeMillis()
+    val savedAt: Long = System.currentTimeMillis(),
+    val photoPath: String? = null
 )

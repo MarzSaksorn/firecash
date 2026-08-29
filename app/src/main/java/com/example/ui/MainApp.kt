@@ -45,6 +45,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     var qrPayload by remember { mutableStateOf("") }
     var slipData by remember { mutableStateOf<VerifySlipResponse?>(null) }
     var slipWarning by remember { mutableStateOf("") }
+    var qrPhotoPath by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var isBackgroundSyncing by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -158,7 +159,7 @@ fun MainApp(modifier: Modifier = Modifier) {
         return regex.find(text)?.value?.replace(",", "")?.toDoubleOrNull()
     }
 
-    suspend fun addSlip(payload: String, isMoneyIn: Boolean = false) {
+    suspend fun addSlip(payload: String, isMoneyIn: Boolean = false, photoPath: String? = null) {
         val verified = runCatching { verifyWithEasySlip(payload) }.getOrNull()
         // Fallback when EasySlip disabled/offline: keep amount from raw payload so details page still shows data
         val fallbackAmount = extractAmount(payload)
@@ -203,7 +204,8 @@ fun MainApp(modifier: Modifier = Modifier) {
             time = result.transTime,
             verificationStatus = result.verificationStatus,
             slipData = result,
-            isMoneyIn = resolvedIsMoneyIn
+            isMoneyIn = resolvedIsMoneyIn,
+            photoPath = photoPath
         )
 
         // Dedupe: re-scanning the same slip updates the existing entry instead of adding a log
@@ -214,10 +216,16 @@ fun MainApp(modifier: Modifier = Modifier) {
                 saved.payload == payload
             }
         }
-        if (existingIndex >= 0) {
-            savedSlips[existingIndex] = slip
+        val finalSlip = if (existingIndex >= 0 && savedSlips[existingIndex].photoPath != null && photoPath == null) {
+            // keep existing photo when re-adding without one
+            slip.copy(photoPath = savedSlips[existingIndex].photoPath)
         } else {
-            savedSlips.add(slip)
+            slip
+        }
+        if (existingIndex >= 0) {
+            savedSlips[existingIndex] = finalSlip
+        } else {
+            savedSlips.add(finalSlip)
         }
 
         seenPayloads.add(payload)
@@ -225,12 +233,13 @@ fun MainApp(modifier: Modifier = Modifier) {
         saveSeenPayloads(prefs, seenPayloads)
     }
 
-    fun handlePayload(payload: String) {
+    fun handlePayload(payload: String, photoPath: String? = null) {
         if (payload.isBlank()) return
         qrPayload = payload
+        qrPhotoPath = photoPath
         isLoading = true
         scope.launch {
-            addSlip(payload)
+            addSlip(payload, photoPath = photoPath)
             isLoading = false
             showCapture = false
             showPayload = true
@@ -256,7 +265,7 @@ fun MainApp(modifier: Modifier = Modifier) {
             for (path in paths) {
                 val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
                 if (payload.isNotBlank()) {
-                    addSlip(payload)
+                    addSlip(payload, photoPath = path)
                 }
             }
             isLoading = false
@@ -293,7 +302,8 @@ fun MainApp(modifier: Modifier = Modifier) {
                 .rawText
             if (payload.isNotBlank() && payload !in seenPayloads) {
                 seenPayloads.add(payload)
-                addSlip(payload)
+                // store the original content:// uri so the slip links to the real photo on device
+                addSlip(payload, photoPath = file.uri.toString())
             }
             // Mark processed (even blank OCR) so future opens only handle genuinely new files
             processedFiles.add(fileKey)
@@ -410,6 +420,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                 payload = qrPayload,
                 slipData = slipData,
                 warning = slipWarning,
+                photoPath = qrPhotoPath,
                 onBack = {
                     showPayload = false
                     showSavedSlips = true
@@ -421,14 +432,14 @@ fun MainApp(modifier: Modifier = Modifier) {
                 onPhotoCaptured = { path ->
                     scope.launch {
                         val payload = OcrProcessor(context).processReceipt(path).rawText
-                        handlePayload(payload)
+                        handlePayload(payload, photoPath = path)
                     }
                 },
                 onFileSelected = { /* unused – picker handled inside PhotoCaptureScreen */ },
                 onImageSelected = { path ->
                     scope.launch {
                         val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
-                        handlePayload(payload)
+                        handlePayload(payload, photoPath = path)
                     }
                 },
                 onQrDetected = { payload -> handlePayload(payload) },
@@ -476,6 +487,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                         errorMessage = "Not verified — enable EasySlip and Sync unverified in Settings",
                         isAmountMatched = false
                     )
+                    qrPhotoPath = slip.photoPath
                     slipWarning = ""
                     showSavedSlips = false
                     showPayload = true
@@ -765,6 +777,7 @@ private fun slipToJson(slip: SavedSlip): JSONObject {
     slip.date?.let { obj.put("date", it) }
     slip.time?.let { obj.put("time", it) }
     obj.put("verificationStatus", slip.verificationStatus.name)
+    slip.photoPath?.let { obj.put("photoPath", it) }
     obj.put("isMoneyIn", slip.isMoneyIn)
     obj.put("savedAt", slip.savedAt)
     slip.slipData?.let { obj.put("slipData", responseToJson(it)) }
@@ -784,7 +797,8 @@ private fun slipFromJson(obj: JSONObject): SavedSlip? {
             verificationStatus = parseStatus(obj.optString("verificationStatus")),
             slipData = if (obj.has("slipData")) responseFromJson(obj.getJSONObject("slipData")) else null,
             isMoneyIn = obj.optBoolean("isMoneyIn", false),
-            savedAt = obj.optLong("savedAt", System.currentTimeMillis())
+            savedAt = obj.optLong("savedAt", System.currentTimeMillis()),
+            photoPath = obj.optString("photoPath").ifEmpty { null }
         )
     }.getOrNull()
 }

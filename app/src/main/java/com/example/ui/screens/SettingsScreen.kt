@@ -107,6 +107,8 @@ fun SettingsScreen(
     notificationExpenseWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
     batteryOptIgnored: Boolean = false,
     onRequestDisableBatteryOptimization: () -> Unit = {},
+    backgroundListening: Boolean = false,
+    onToggleBackgroundListening: (Boolean) -> Unit = {},
     isLoading: Boolean = false,
     trackedFolders: List<String> = emptyList(),
     onCurrencyChange: (String) -> Unit,
@@ -1053,6 +1055,27 @@ fun SettingsScreen(
                         color = if (batteryOptIgnored) FireCashSecondary else FireCashOnSurfaceVariant,
                         fontSize = 12.sp
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Keep listening in background", color = FireCashOnSurface, fontSize = 14.sp)
+                            Text(text = "Persistent status-bar notification like a music player, so bank notifications are caught even after you leave the app", color = FireCashOnSurfaceVariant, fontSize = 11.sp, lineHeight = 14.sp)
+                        }
+                        Switch(
+                            checked = backgroundListening,
+                            onCheckedChange = onToggleBackgroundListening,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = FireCashOnPrimary,
+                                checkedTrackColor = FireCashSecondary,
+                                uncheckedThumbColor = FireCashOutline,
+                                uncheckedTrackColor = FireCashSurfaceVariant
+                            ),
+                            modifier = Modifier.testTag("background_listening_switch")
+                        )
+                    }
                     if (!batteryOptIgnored) {
                         Button(
                             onClick = onRequestDisableBatteryOptimization,

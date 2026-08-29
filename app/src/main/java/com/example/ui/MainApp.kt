@@ -15,10 +15,13 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.documentfile.provider.DocumentFile
+import com.example.service.BackgroundListenerService
 import com.example.data.ocr.OcrProcessor
 import com.example.data.easyslip.EasySlipClient
 import com.example.data.easyslip.VerifySlipResponse
@@ -54,6 +57,25 @@ fun MainApp(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     val easySlipClient = remember { EasySlipClient() }
     val prefs = remember { context.getSharedPreferences("firecash_settings", Context.MODE_PRIVATE) }
+    var backgroundListening by remember { mutableStateOf(prefs.getBoolean("background_listening", false)) }
+
+    // Restart background listener on app launch if it was enabled
+    val postNotifPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted && backgroundListening) {
+            runCatching {
+                context.startForegroundService(Intent(context, BackgroundListenerService::class.java))
+            }
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (backgroundListening && !isListenerRunning(context)) {
+            runCatching {
+                context.startForegroundService(Intent(context, BackgroundListenerService::class.java))
+            }
+        }
+    }
 
     val savedSlips = remember {
         mutableStateListOf<SavedSlip>().apply { addAll(loadSlips(prefs)) }
@@ -657,6 +679,21 @@ fun MainApp(modifier: Modifier = Modifier) {
                     notificationWhitelist = notificationWhitelist,
                     notificationExpenseWhitelist = notificationExpenseWhitelist,
                     batteryOptIgnored = batteryOptIgnored,
+                    backgroundListening = backgroundListening,
+                    onToggleBackgroundListening = { enabled ->
+                        backgroundListening = enabled
+                        prefs.edit().putBoolean("background_listening", enabled).apply()
+                        if (enabled) {
+                            postNotifPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            runCatching {
+                                context.startForegroundService(Intent(context, BackgroundListenerService::class.java))
+                            }
+                        } else {
+                            runCatching {
+                                context.stopService(Intent(context, BackgroundListenerService::class.java))
+                            }
+                        }
+                    },
                     onRequestDisableBatteryOptimization = {
                         try {
                             context.startActivity(
@@ -740,6 +777,13 @@ fun MainApp(modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+private fun isListenerRunning(context: Context): Boolean {
+    return runCatching {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+        am.getRunningServices(Int.MAX_VALUE).any { it.service.className == BackgroundListenerService::class.java.name }
+    }.getOrDefault(false)
 }
 
 private const val PREFS_SLIPS = "saved_slips"

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BatterySaver
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Folder
@@ -110,6 +111,7 @@ fun SettingsScreen(
     notificationExpenseEnabled: Boolean = false,
     notificationWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
     notificationExpenseWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
+    notificationAccessGranted: Boolean = false,
     batteryOptIgnored: Boolean = false,
     onRequestDisableBatteryOptimization: () -> Unit = {},
     backgroundListening: Boolean = false,
@@ -913,12 +915,24 @@ fun SettingsScreen(
                         )
                     }
                     if (notificationIncomeEnabled) {
-                        Button(
-                            onClick = onRequestNotificationPermission,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = FireCashSurfaceContainerHigh)
-                        ) {
-                            Text("Enable Notification Access", color = FireCashOnSurface)
+                        if (notificationAccessGranted) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = FireCashSecondary, modifier = Modifier.size(16.dp))
+                                Text(
+                                    text = "Notification access granted",
+                                    color = FireCashSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        } else {
+                            Button(
+                                onClick = onRequestNotificationPermission,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = FireCashSurfaceContainerHigh)
+                            ) {
+                                Text("Enable Notification Access", color = FireCashOnSurface)
+                            }
                         }
                         Text(
                             text = "Scoops the first number from notifications and saves as Income. Ensure FireCash is enabled in system Notification Access.",
@@ -1103,12 +1117,24 @@ fun SettingsScreen(
                         )
                     }
                     if (notificationExpenseEnabled) {
-                        Button(
-                            onClick = onRequestNotificationPermission,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = FireCashSurfaceContainerHigh)
-                        ) {
-                            Text("Enable Notification Access", color = FireCashOnSurface)
+                        if (notificationAccessGranted) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = FireCashSecondary, modifier = Modifier.size(16.dp))
+                                Text(
+                                    text = "Notification access granted",
+                                    color = FireCashSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        } else {
+                            Button(
+                                onClick = onRequestNotificationPermission,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = FireCashSurfaceContainerHigh)
+                            ) {
+                                Text("Enable Notification Access", color = FireCashOnSurface)
+                            }
                         }
                         Text(
                             text = "Same service as Income — ensure FireCash is enabled in Notification Access.",

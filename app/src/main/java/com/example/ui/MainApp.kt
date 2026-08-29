@@ -53,11 +53,26 @@ fun MainApp(modifier: Modifier = Modifier) {
     var isBackgroundSyncing by remember { mutableStateOf(false) }
     var isUserSyncing by remember { mutableStateOf(false) }
     var batteryOptIgnored by remember { mutableStateOf(false) }
+    var notificationAccessGranted by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val easySlipClient = remember { EasySlipClient() }
     val prefs = remember { context.getSharedPreferences("firecash_settings", Context.MODE_PRIVATE) }
     var backgroundListening by remember { mutableStateOf(prefs.getBoolean("background_listening", false)) }
+
+    // Refresh statuses whenever the activity resumes (e.g. returning from system settings)
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                batteryOptIgnored = (context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager)
+                    .isIgnoringBatteryOptimizations(context.packageName)
+                notificationAccessGranted = com.example.service.IncomeNotificationService.hasPermission(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // Restart background listener on app launch if it was enabled
     val postNotifPermissionLauncher = rememberLauncherForActivityResult(
@@ -114,14 +129,6 @@ fun MainApp(modifier: Modifier = Modifier) {
     // Cache of already-processed tracked-folder files (by content:// uri) — only new files get OCR'd/synced
     val processedFiles = remember {
         mutableSetOf<String>().apply { addAll(loadProcessedFiles(prefs)) }
-    }
-
-    // Refresh battery-optimization status whenever we land on Settings
-    androidx.compose.runtime.LaunchedEffect(!showCapture && !showSavedSlips && !showPayload && !showAnalytics) {
-        if (!showCapture && !showSavedSlips && !showPayload && !showAnalytics) {
-            batteryOptIgnored = (context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager)
-                .isIgnoringBatteryOptimizations(context.packageName)
-        }
     }
 
     // System back handling — mirrors in-app navigation, returns to previous state
@@ -676,6 +683,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                     notificationExpenseEnabled = notificationExpenseEnabled,
                     notificationWhitelist = notificationWhitelist,
                     notificationExpenseWhitelist = notificationExpenseWhitelist,
+                    notificationAccessGranted = notificationAccessGranted,
                     batteryOptIgnored = batteryOptIgnored,
                     backgroundListening = backgroundListening,
                     onToggleBackgroundListening = { enabled ->

@@ -95,7 +95,6 @@ import com.example.ui.theme.FireCashSurfaceVariant
 fun SettingsScreen(
     currentCurrency: String,
     rules: List<KeywordRule>,
-    googleDriveSync: Boolean,
     easySlipEnabled: Boolean,
     apiKey: String,
     checkDuplicates: Boolean,
@@ -112,7 +111,6 @@ fun SettingsScreen(
     isLoading: Boolean = false,
     trackedFolders: List<String> = emptyList(),
     onCurrencyChange: (String) -> Unit,
-    onToggleDriveSync: (Boolean) -> Unit,
     onToggleEasySlip: (Boolean) -> Unit,
     onUpdateApiKey: (String) -> Unit,
     onToggleCheckDuplicates: (Boolean) -> Unit,
@@ -132,7 +130,6 @@ fun SettingsScreen(
     onImportSlips: (List<String>) -> Unit = {},
     onAddRule: (keyword: String, category: String) -> Unit,
     onRemoveRule: (KeywordRule) -> Unit,
-    onNavigateToBackup: () -> Unit,
     onBack: () -> Unit, onNavigateToCapture: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1245,71 +1242,6 @@ fun SettingsScreen(
                             }
                         }
                     }
-                }
-            }
-
-            Text(
-                text = "Data & Storage",
-                color = FireCashOnSurface,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(start = 4.dp, top = 8.dp)
-            )
-
-            // Card 3: Google Drive Sync & Backup
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(FireCashSurfaceContainerLow)
-                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                    .clickable { onNavigateToBackup() }
-                    .padding(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(FireCashSurfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CloudSync,
-                                contentDescription = null,
-                                tint = FireCashPrimary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-
-                        Column {
-                            Text(
-                                text = "Google Drive & Local Backup",
-                                color = FireCashOnSurface,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Manage snapshots and encrypted exports",
-                                color = FireCashOnSurfaceVariant,
-                                fontSize = 13.sp
-                            )
-                        }
-                    }
-
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowRightAlt,
-                        contentDescription = null,
-                        tint = FireCashPrimary
-                    )
                 }
             }
 

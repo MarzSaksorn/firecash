@@ -634,14 +634,12 @@ fun MainApp(modifier: Modifier = Modifier) {
             SettingsScreen(
     currentCurrency = "THB",
     rules = emptyList(),
-    googleDriveSync = false,
     easySlipEnabled = easySlipEnabled,
     apiKey = apiKey,
     checkDuplicates = checkDuplicates,
     knownNames = knownNames,
     unverifiedCount = savedSlips.count { it.verificationStatus == VerificationStatus.UNVERIFIED },
     onCurrencyChange = {},
-    onToggleDriveSync = {},
     onToggleEasySlip = { enabled ->
         easySlipEnabled = enabled
         prefs.edit().putBoolean("easy_slip_enabled", enabled).apply()
@@ -762,7 +760,6 @@ fun MainApp(modifier: Modifier = Modifier) {
                     },
                     onAddRule = { _, _ -> },
                     onRemoveRule = {},
-                    onNavigateToBackup = {},
                     onBack = {
                         showCapture = false
                         showSavedSlips = true

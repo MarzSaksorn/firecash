@@ -684,56 +684,6 @@ fun SettingsScreen(
                 }
             }
 
-            // Card: Data Transfer (export/import JSON between phones)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(FireCashSurfaceContainerLow)
-                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                    .padding(16.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(FireCashSurfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(22.dp))
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Data Transfer", color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text(text = "Export everything (slips, API key, options) as JSON — import on another phone", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
-                        }
-                    }
-                    Button(
-                        onClick = onExportData,
-                        modifier = Modifier.fillMaxWidth().testTag("export_data_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = FireCashPrimary)
-                    ) {
-                        Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = FireCashOnPrimary, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Export Data (JSON)", color = FireCashOnPrimary)
-                    }
-                    OutlinedButton(
-                        onClick = { importJsonLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
-                        modifier = Modifier.fillMaxWidth().testTag("import_data_button")
-                    ) {
-                        Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Import Data (JSON)", color = FireCashPrimary)
-                    }
-                    Text(text = "Import replaces current data with the exported one (same format as Export).", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
-                }
-            }
-
-
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1379,6 +1329,55 @@ fun SettingsScreen(
                             Text("Disable Battery Optimization", color = FireCashOnPrimary)
                         }
                     }
+                }
+            }
+
+            // Card: Data Transfer (export/import JSON between phones)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FireCashSurfaceContainerLow)
+                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(FireCashSurfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = Color(0xFFEF5350), modifier = Modifier.size(22.dp))
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Data Transfer", color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text(text = "Export everything (slips, API key, options) as JSON — import on another phone", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                        }
+                    }
+                    Button(
+                        onClick = onExportData,
+                        modifier = Modifier.fillMaxWidth().testTag("export_data_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = FireCashPrimary)
+                    ) {
+                        Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = FireCashOnPrimary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Export Data (JSON)", color = FireCashOnPrimary)
+                    }
+                    OutlinedButton(
+                        onClick = { importJsonLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                        modifier = Modifier.fillMaxWidth().testTag("import_data_button")
+                    ) {
+                        Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Import Data (JSON)", color = FireCashPrimary)
+                    }
+                    Text(text = "Import replaces current data with the exported one (same format as Export).", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
                 }
             }
                 }

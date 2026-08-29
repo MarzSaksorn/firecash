@@ -1053,13 +1053,14 @@ fun SettingsScreen(
                         color = if (batteryOptIgnored) FireCashSecondary else FireCashOnSurfaceVariant,
                         fontSize = 12.sp
                     )
-                    Button(
-                        onClick = onRequestDisableBatteryOptimization,
-                        enabled = !batteryOptIgnored,
-                        modifier = Modifier.fillMaxWidth().testTag("disable_battery_optimization_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = FireCashPrimary)
-                    ) {
-                        Text(if (batteryOptIgnored) "Battery Optimization Disabled" else "Disable Battery Optimization", color = FireCashOnPrimary)
+                    if (!batteryOptIgnored) {
+                        Button(
+                            onClick = onRequestDisableBatteryOptimization,
+                            modifier = Modifier.fillMaxWidth().testTag("disable_battery_optimization_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = FireCashPrimary)
+                        ) {
+                            Text("Disable Battery Optimization", color = FireCashOnPrimary)
+                        }
                     }
                 }
             }

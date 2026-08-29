@@ -24,6 +24,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowRightAlt
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BatterySaver
@@ -134,6 +140,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     var currencyMenuExpanded by remember { mutableStateOf(false) }
+    var dangerousExpanded by remember { mutableStateOf(false) }
     var showAddRuleDialog by remember { mutableStateOf(false) }
     var newKeyword by remember { mutableStateOf("") }
     var newCategory by remember { mutableStateOf("Travel") }
@@ -661,13 +668,38 @@ fun SettingsScreen(
             }
 
 
-            Text(
-                text = "Dangerous",
-                color = Color(0xFFEF5350),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(start = 4.dp, top = 6.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { dangerousExpanded = !dangerousExpanded }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (dangerousExpanded) Icons.Default.ArrowDropDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = Color(0xFFEF5350)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Dangerous",
+                    color = Color(0xFFEF5350),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (dangerousExpanded) "tap to collapse" else "tap to expand",
+                    color = FireCashOnSurfaceVariant,
+                    fontSize = 12.sp
+                )
+            }
+            AnimatedVisibility(
+                visible = dangerousExpanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             // EasySlip Verification Configuration
             Text(
                 text = "Bank Slip Verification (EasySlip Proxy)",
@@ -1250,6 +1282,8 @@ fun SettingsScreen(
                             Text("Disable Battery Optimization", color = FireCashOnPrimary)
                         }
                     }
+                }
+            }
                 }
             }
 

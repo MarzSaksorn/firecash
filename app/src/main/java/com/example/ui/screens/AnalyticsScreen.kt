@@ -273,8 +273,9 @@ private fun PieChart(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val strokeWidth = 36.dp.toPx()
             val inset = strokeWidth / 2f + 2.dp.toPx()
-            val arcSize = Size(size.width - inset * 2, size.height - inset * 2)
-            val topLeft = Offset(inset, inset)
+            val side = minOf(size.width, size.height) - inset * 2
+            val arcSize = Size(side, side)
+            val topLeft = Offset((size.width - side) / 2f, (size.height - side) / 2f)
             val startAngle = -90f
             val inSweep = (inFraction * 360f).toFloat()
             if (inSweep > 0f) {

@@ -164,11 +164,47 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 
 **Homepage:** `AccountScreen` (balance card with 56dp cat + `FireCash 26sp`, `Money In/Out` + camera at top-right, `View Spending Summary`, searchable `Transactions` (`reverseLayout` bottom→top, `DateHeader` with net total), long-press multi-select, time above amount, `SwapHoriz` grey `Transfer`).
 
-**Settings (unified):** Base Currency, EasySlip (API key + duplicate toggle + Sync unverified), My Names, Notification Income/Expense (whitelist per-app with multiple prefixes, string `prefix → first number after`), Tracked Folders (add/sync/import), Keyword Mapping, Drive Backup.
+**Settings:** Safe (Base Currency, My Names, Tracked Folders, Keyword Mapping) / **Dangerous** collapsible red section (EasySlip, Notification Income/Expense whitelists, Background & Battery, Data Transfer).
 
-**Not yet implemented (vs `firecash_full_plan.md`):** `Screen.Onboarding`, `Screen.Export`/`BackupRestore` routes (`MainViewModel` defines them, `MainApp` else is `Settings`), Drive sync execution (`MainApp` `googleDriveSync=false`), keyword `rules` persistence (`MainApp` `emptyList()`), `BottomNavBar` component now dead code after `7c364a9`.
+**Not yet implemented (vs `firecash_full_plan.md`):** `Screen.Onboarding`, `Screen.Export`/`BackupRestore` routes, keyword `rules` persistence (`MainApp` `emptyList()`), `BottomNavBar` dead code after `7c364a9`. Google Drive removed by request (`19eb207`).
 
-**Next steps you mentioned:** keep launcher untouched, potentially revisit `Onboarding`, `Export` unlimited, Drive restore, and verification rate-limit UX.
+**Next steps you mentioned:** keep launcher untouched, potentially revisit `Onboarding`, `Export` unlimited, verification rate-limit UX.
+
+---
+
+## Day 3 (Continued II) — Sync Caching, Photos, Transfer & Settings Overhaul
+
+> Post-"Current State" iteration in the same `opencode + Muse Spark` session (2026-08-28 late). All commits below.
+
+### Performance & Sync
+
+- **feat: cache processed folder files, sync only new slips on open** (`0c99bd9`) — new `PREFS_PROCESSED_FILES` cache (`processedFiles: Set<String>` of `content://` URIs); `scanFolder()` skips already-processed files (no re-OCR/verify on every open), marks each processed even if OCR blank.
+- **feat: sync button on slip list — tap = new photos, hold 10s = full resync** (`fce790a`) — `Sync` icon next to `+`/search in Transactions header; `awaitEachGesture` + `withTimeoutOrNull(10_000)` → tap = `syncTrackedFolderInBackground()`; 10s hold = `fullResync()` (clears `processedFiles` → re-OCRs every photo → re-verifies **all** real slips via EasySlip, skipping `manual:`/`notif:` payloads).
+- **feat: show syncing spinner beside Transactions on manual sync tap** (`5095889`) — new `isUserSyncing` state; 14dp `CircularProgressIndicator` + `"Syncing…"` (vs `"Auto-sync…"` for background) next to the Transactions title.
+
+### Slip Photos
+
+- **feat: link each slip to its actual photo on device** (`6835ca7`) — `SavedSlip.photoPath: String?` (persisted in JSON); capture/gallery/import/sync thread the image path through `handlePayload → addSlip(photoPath)`; tracked folders store the original `content://` URI; dedupe keeps existing photo on re-add. `QrPayloadScreen` **PhotoSection**: Coil `AsyncImage` thumbnail + **Open photo on device** (`ACTION_VIEW` via `FileProvider` `${applicationId}.fileprovider`); `res/xml/file_paths.xml` + provider added to manifest.
+- **fix: persist captured/picked slip photos** (`e83d547`) — camera shutter, gallery picker, and Settings import now save into `getExternalFilesDir(DIRECTORY_PICTURES)` (persistent) instead of `cacheDir` so the photo link survives.
+
+### Manual Entry & Background Survival
+
+- **feat: manual income/expense entry from Account page** (`aad249a`) — `+` button in Transactions header → **Add Transaction** dialog (Money In/Out pills, THB amount decimal field, optional note); `MainApp.addManualSlip` creates `manual:<ts>` slips (`MANUAL-<ts>` ref, `UNVERIFIED`, note as sender/receiver); `resyncUnverifiedSlips` now skips `manual:`/`notif:` payloads.
+- **feat: request disabling battery optimization for background notification catching** (`f37cc38`) — `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` permission; **Background & Battery** card with status + button; status refreshed via `LifecycleEventObserver` on `ON_RESUME`.
+- **style: hide battery optimization button when already granted** (`7016397`).
+- **feat: music-player style foreground service** (`9fc0098`) — `BackgroundListenerService` (`specialUse` FGS): silent `IMPORTANCE_LOW` ongoing notification *"FireCash listening"* with tap-to-open + **Stop** action, `START_STICKY`; `Keep listening in background` toggle in Settings (requests `POST_NOTIFICATIONS` on 13+), auto-restart on launch via `isListenerRunning`.
+- **feat: make background listener notification explicitly non-dismissible** (`cf93877`) — `FLAG_NO_CLEAR | FLAG_ONGOING_EVENT` raw flags; cannot be swiped/cleared while running.
+
+### Settings Overhaul
+
+- **refactor: remove Google Drive backup option from settings** (`19eb207`) — deleted Drive card + dead `googleDriveSync`/`onToggleDriveSync`/`onNavigateToBackup` params (DriveBackupManager stays unreferenced in `data/`).
+- **refactor: organize settings into Safe and Dangerous categories** (`7b04431`) — Safe (green title): Base Currency, My Names, Tracked Folders, Keyword Mapping; **Dangerous** (red title): EasySlip, Notification Income/Expense, Background & Battery.
+- **feat: put all dangerous settings in a collapsible toggle menu** (`8baa784`) — Dangerous header is a tappable row (chevron + `tap to expand/collapse`), `AnimatedVisibility(expandVertically/shrinkVertically + fade)` wraps all dangerous cards.
+- **style: red background behind dangerous settings section** (`226f3b9`) — 10% `#EF5350` tinted container behind the cards (cards keep their own surface).
+- **feat: hide notification access button when access already granted** (`47e4906`) — `notificationAccessGranted` (via `IncomeNotificationService.hasPermission`) refreshed on `ON_RESUME`; both Income/Expense cards show green *"Notification access granted"* instead of the button.
+- **feat: JSON export/import for phone-to-phone data transfer** (`f56ec1d`) — `exportAllData()` writes slips + seen/processed sets + folders + names + whitelists + settings (incl. API key) to `FireCash_Backup_<ts>.json`, shared via `ACTION_SEND`; `importAllData()` reads the JSON, replaces all state, restarts listener if enabled; **Data Transfer** card with Export/Import buttons (system `OpenDocument` picker).
+- **refactor: move Data Transfer card into Dangerous section** (`3c56586`).
+- **docs: rewrite README to match actual app features** (`2edbdd6`).
 
 ---
 

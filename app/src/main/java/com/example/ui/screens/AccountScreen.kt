@@ -4,6 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -15,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -103,6 +105,7 @@ fun AccountScreen(
     onOpenSettings: () -> Unit,
     onOpenAnalytics: () -> Unit,
     onOpenCamera: () -> Unit = {},
+    onAddManual: (amount: Double, isMoneyIn: Boolean, note: String) -> Unit = { _, _, _ -> },
     onAutoSync: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -121,6 +124,10 @@ fun AccountScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var isSearchActive by remember { mutableStateOf(false) }
+    var showAddManualDialog by remember { mutableStateOf(false) }
+    var manualAmount by remember { mutableStateOf("") }
+    var manualIsIn by remember { mutableStateOf(true) }
+    var manualNote by remember { mutableStateOf("") }
     val filteredSlips = remember(slips, searchQuery, knownNames) {
         if (searchQuery.isBlank()) slips
         else {
@@ -360,19 +367,37 @@ fun AccountScreen(
                     )
                 }
             }
-            IconButton(
-                onClick = {
-                    isSearchActive = !isSearchActive
-                    if (!isSearchActive) searchQuery = ""
-                },
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
-                    contentDescription = if (isSearchActive) "Close search" else "Search slips",
-                    tint = FireCashPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = {
+                        isSearchActive = !isSearchActive
+                        if (!isSearchActive) searchQuery = ""
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
+                        contentDescription = if (isSearchActive) "Close search" else "Search slips",
+                        tint = FireCashPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        showAddManualDialog = true
+                        manualAmount = ""
+                        manualNote = ""
+                        manualIsIn = true
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add income/expense manually",
+                        tint = FireCashPrimary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
         }
         if (isSearchActive) {
@@ -518,6 +543,96 @@ fun AccountScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = { showDeleteMultiDialog = false }) { Text("Cancel") }
+                },
+                containerColor = FireCashSurfaceContainerLow
+            )
+        }
+
+        // Add manual income/expense dialog
+        if (showAddManualDialog) {
+            AlertDialog(
+                onDismissRequest = { showAddManualDialog = false },
+                title = { Text("Add Transaction", color = Color.White, fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp)
+                                    .background(if (manualIsIn) Color(0xFF66BB6A).copy(alpha = 0.2f) else FireCashSurfaceContainerLow, RoundedCornerShape(12.dp))
+                                    .border(1.5.dp, if (manualIsIn) Color(0xFF66BB6A) else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                    .clickable { manualIsIn = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Money In", color = if (manualIsIn) Color(0xFF66BB6A) else FireCashOnSurfaceVariant, fontWeight = if (manualIsIn) FontWeight.Bold else FontWeight.Normal)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp)
+                                    .background(if (!manualIsIn) Color(0xFFEF5350).copy(alpha = 0.2f) else FireCashSurfaceContainerLow, RoundedCornerShape(12.dp))
+                                    .border(1.5.dp, if (!manualIsIn) Color(0xFFEF5350) else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                    .clickable { manualIsIn = false },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Money Out", color = if (!manualIsIn) Color(0xFFEF5350) else FireCashOnSurfaceVariant, fontWeight = if (!manualIsIn) FontWeight.Bold else FontWeight.Normal)
+                            }
+                        }
+                        OutlinedTextField(
+                            value = manualAmount,
+                            onValueChange = { manualAmount = it.filter { c -> c.isDigit() || c == '.' } },
+                            label = { Text("Amount (THB)") },
+                            placeholder = { Text("e.g. 1500.00") },
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = androidx.compose.ui.text.TextStyle(color = com.example.ui.theme.FireCashOnSurface, fontSize = 15.sp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = FireCashPrimary,
+                                unfocusedBorderColor = FireCashOnSurfaceVariant.copy(alpha = 0.4f),
+                                focusedContainerColor = FireCashSurfaceContainerLow,
+                                unfocusedContainerColor = FireCashSurfaceContainerLow,
+                                cursorColor = FireCashPrimary
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        OutlinedTextField(
+                            value = manualNote,
+                            onValueChange = { manualNote = it },
+                            label = { Text("Note (optional)") },
+                            placeholder = { Text("e.g. Groceries, Salary, Food") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = androidx.compose.ui.text.TextStyle(color = com.example.ui.theme.FireCashOnSurface, fontSize = 14.sp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = FireCashPrimary,
+                                unfocusedBorderColor = FireCashOnSurfaceVariant.copy(alpha = 0.4f),
+                                focusedContainerColor = FireCashSurfaceContainerLow,
+                                unfocusedContainerColor = FireCashSurfaceContainerLow,
+                                cursorColor = FireCashPrimary
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val amt = manualAmount.toDoubleOrNull()
+                            if (amt != null && amt > 0) {
+                                onAddManual(amt, manualIsIn, manualNote.trim())
+                                showAddManualDialog = false
+                            }
+                        },
+                        enabled = (manualAmount.toDoubleOrNull() ?: 0.0) > 0
+                    ) { Text("Add") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAddManualDialog = false }) { Text("Cancel") }
                 },
                 containerColor = FireCashSurfaceContainerLow
             )

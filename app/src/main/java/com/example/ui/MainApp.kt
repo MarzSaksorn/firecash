@@ -258,6 +258,30 @@ fun MainApp(modifier: Modifier = Modifier) {
         }
     }
 
+    fun addManualSlip(amount: Double, isMoneyIn: Boolean, note: String) {
+        if (amount <= 0) return
+        val now = System.currentTimeMillis()
+        val sdfDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        val sdfTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
+        val slip = SavedSlip(
+            payload = "manual:${now}",
+            amount = amount,
+            transRef = "MANUAL-${now}",
+            senderName = if (!isMoneyIn) note.ifBlank { "Manual" } else null,
+            receiverName = if (isMoneyIn) note.ifBlank { "Manual" } else null,
+            date = sdfDate.format(java.util.Date(now)),
+            time = sdfTime.format(java.util.Date(now)),
+            verificationStatus = VerificationStatus.UNVERIFIED,
+            slipData = null,
+            isMoneyIn = isMoneyIn,
+            savedAt = now
+        )
+        savedSlips.add(slip)
+        seenPayloads.add(slip.payload)
+        saveSlips(prefs, savedSlips)
+        saveSeenPayloads(prefs, seenPayloads)
+    }
+
     fun importSlips(paths: List<String>) {
         if (paths.isEmpty()) return
         isLoading = true
@@ -341,7 +365,10 @@ fun MainApp(modifier: Modifier = Modifier) {
     fun resyncUnverifiedSlips() {
         if (!easySlipEnabled || apiKey.isBlank()) return
         if (isLoading || isBackgroundSyncing) return
-        val unverified = savedSlips.filter { it.verificationStatus == VerificationStatus.UNVERIFIED }
+        val unverified = savedSlips.filter {
+            it.verificationStatus == VerificationStatus.UNVERIFIED &&
+            !it.payload.startsWith("manual:") && !it.payload.startsWith("notif:")
+        }
         if (unverified.isEmpty()) return
         isLoading = true
         scope.launch {
@@ -504,6 +531,9 @@ fun MainApp(modifier: Modifier = Modifier) {
                 onOpenCamera = {
                     showSavedSlips = false
                     showCapture = true
+                },
+                onAddManual = { amount, isMoneyIn, note ->
+                    addManualSlip(amount, isMoneyIn, note)
                 },
                 onAutoSync = { syncTrackedFolderInBackground() }
             )

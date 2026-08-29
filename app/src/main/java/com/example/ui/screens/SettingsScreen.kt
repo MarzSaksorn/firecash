@@ -191,13 +191,12 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "General Settings",
-                color = FireCashOnSurface,
+                text = "Safe Settings",
+                color = FireCashSecondary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(start = 4.dp)
             )
-
             // Card 1: Base Currency
             Box(
                 modifier = Modifier
@@ -308,6 +307,367 @@ fun SettingsScreen(
                 }
             }
 
+            // Card: My Names (auto income / transfer detection)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FireCashSurfaceContainerLow)
+                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(FireCashSurfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                tint = FireCashPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "My Names",
+                                color = FireCashOnSurface,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Receiver = your name → Income • Both = your names → Transfer (excluded from balance)",
+                                color = FireCashOnSurfaceVariant,
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = newKnownName,
+                            onValueChange = { newKnownName = it },
+                            placeholder = { Text("e.g. Somchai / สมชาย ใจดี", fontSize = 13.sp) },
+                            singleLine = true,
+                            textStyle = TextStyle(color = FireCashOnSurface, fontSize = 13.sp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = FireCashSurfaceContainerHigh,
+                                unfocusedContainerColor = FireCashSurfaceContainerHigh,
+                                focusedBorderColor = FireCashPrimary,
+                                unfocusedBorderColor = FireCashOutlineVariant
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f).testTag("known_name_input")
+                        )
+                        Button(
+                            onClick = {
+                                val t = newKnownName.trim()
+                                if (t.isNotEmpty()) {
+                                    onAddKnownName(t)
+                                    newKnownName = ""
+                                }
+                            },
+                            modifier = Modifier.testTag("add_known_name_button")
+                        ) { Text("Add") }
+                    }
+                    if (knownNames.isEmpty()) {
+                        Text(
+                            text = "No names yet — add your Thai / English variants.",
+                            color = FireCashOnSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            knownNames.forEach { name ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(FireCashSurfaceContainerHighest)
+                                        .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = name,
+                                        color = FireCashOnSurface,
+                                        fontSize = 14.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(
+                                        onClick = { onRemoveKnownName(name) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Remove",
+                                            tint = FireCashOutline,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Card: Tracked Folders (migrated from AccountSettingsScreen)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FireCashSurfaceContainerLow)
+                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(FireCashSurfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(imageVector = Icons.Default.Folder, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(22.dp))
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Tracked Folders", color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text(text = "Auto-scan for new slips", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                        }
+                    }
+                    if (trackedFolders.isEmpty()) {
+                        Text(text = "No folders tracked yet. Add folders to auto-scan for new slips.", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            trackedFolders.forEach { uriStr ->
+                                val name = runCatching { DocumentFile.fromTreeUri(context, Uri.parse(uriStr))?.name }.getOrNull()
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(FireCashSurfaceContainerHighest, RoundedCornerShape(12.dp))
+                                        .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                                        .padding(start = 14.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(imageVector = Icons.Default.Folder, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(text = name ?: uriStr, color = FireCashOnSurface, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                                    IconButton(onClick = { onRemoveFolder(uriStr) }) {
+                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Remove folder", tint = FireCashOnSurfaceVariant, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    OutlinedButton(onClick = { folderPickerLauncher.launch(null) }, enabled = !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Add Tracked Folder", color = FireCashPrimary)
+                    }
+                    OutlinedButton(onClick = onSyncNow, enabled = trackedFolders.isNotEmpty() && !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                        Icon(imageVector = Icons.Default.Sync, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Sync Tracked Folders Now", color = FireCashPrimary)
+                    }
+                    OutlinedButton(onClick = { photoPickerLauncher.launch(arrayOf("image/*")) }, enabled = !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                        Icon(imageVector = Icons.Default.Sync, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Import Slip Photos from Device", color = FireCashPrimary)
+                    }
+                    Text(text = "Slips in the tracked folder are scanned automatically for QR codes and added to your account.", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                    if (isLoading) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = FireCashPrimary)
+                            Text(text = "Syncing slips...", color = FireCashOnSurfaceVariant, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            // Card 2: Keyword Mapping Pro
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FireCashSurfaceContainerLow)
+                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(FireCashSurfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Label,
+                                contentDescription = null,
+                                tint = FireCashPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "Keyword Mapping",
+                                    color = FireCashOnSurface,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(FireCashPrimary.copy(alpha = 0.2f))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "Smart",
+                                        color = FireCashPrimary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Auto-assign categories based on extracted keywords.",
+                                color = FireCashOnSurfaceVariant,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+
+                    // Rules List
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rules.forEach { rule ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(FireCashSurfaceContainerHighest)
+                                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(FireCashSurfaceDim)
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = rule.keyword,
+                                            color = FireCashOnSurface,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowRightAlt,
+                                        contentDescription = null,
+                                        tint = FireCashOutline,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+
+                                    Text(
+                                        text = rule.category,
+                                        color = FireCashSecondary,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = { onRemoveRule(rule) },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Remove rule",
+                                        tint = FireCashOutline,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Add Rule Button
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(
+                                    width = 1.dp,
+                                    color = FireCashOutline.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                                .clickable { showAddRuleDialog = true }
+                                .padding(vertical = 10.dp)
+                                .testTag("add_rule_button"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = FireCashPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = "Add Rule",
+                                    color = FireCashPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            Text(
+                text = "Dangerous",
+                color = Color(0xFFEF5350),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 4.dp, top = 6.dp)
+            )
             // EasySlip Verification Configuration
             Text(
                 text = "Bank Slip Verification (EasySlip Proxy)",
@@ -445,122 +805,6 @@ fun SettingsScreen(
                                         color = FireCashOnSurfaceVariant,
                                         fontSize = 11.sp
                                     )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Card: My Names (auto income / transfer detection)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(FireCashSurfaceContainerLow)
-                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                    .padding(16.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(FireCashSurfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                tint = FireCashPrimary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "My Names",
-                                color = FireCashOnSurface,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Receiver = your name → Income • Both = your names → Transfer (excluded from balance)",
-                                color = FireCashOnSurfaceVariant,
-                                fontSize = 12.sp,
-                                lineHeight = 16.sp
-                            )
-                        }
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = newKnownName,
-                            onValueChange = { newKnownName = it },
-                            placeholder = { Text("e.g. Somchai / สมชาย ใจดี", fontSize = 13.sp) },
-                            singleLine = true,
-                            textStyle = TextStyle(color = FireCashOnSurface, fontSize = 13.sp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = FireCashSurfaceContainerHigh,
-                                unfocusedContainerColor = FireCashSurfaceContainerHigh,
-                                focusedBorderColor = FireCashPrimary,
-                                unfocusedBorderColor = FireCashOutlineVariant
-                            ),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f).testTag("known_name_input")
-                        )
-                        Button(
-                            onClick = {
-                                val t = newKnownName.trim()
-                                if (t.isNotEmpty()) {
-                                    onAddKnownName(t)
-                                    newKnownName = ""
-                                }
-                            },
-                            modifier = Modifier.testTag("add_known_name_button")
-                        ) { Text("Add") }
-                    }
-                    if (knownNames.isEmpty()) {
-                        Text(
-                            text = "No names yet — add your Thai / English variants.",
-                            color = FireCashOnSurfaceVariant,
-                            fontSize = 12.sp
-                        )
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            knownNames.forEach { name ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(FireCashSurfaceContainerHighest)
-                                        .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
-                                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = name,
-                                        color = FireCashOnSurface,
-                                        fontSize = 14.sp,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    IconButton(
-                                        onClick = { onRemoveKnownName(name) },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "Remove",
-                                            tint = FireCashOutline,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -939,82 +1183,6 @@ fun SettingsScreen(
                 }
             }
 
-            // Card: Tracked Folders (migrated from AccountSettingsScreen)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(FireCashSurfaceContainerLow)
-                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                    .padding(16.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(FireCashSurfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(imageVector = Icons.Default.Folder, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(22.dp))
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Tracked Folders", color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text(text = "Auto-scan for new slips", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
-                        }
-                    }
-                    if (trackedFolders.isEmpty()) {
-                        Text(text = "No folders tracked yet. Add folders to auto-scan for new slips.", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            trackedFolders.forEach { uriStr ->
-                                val name = runCatching { DocumentFile.fromTreeUri(context, Uri.parse(uriStr))?.name }.getOrNull()
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(FireCashSurfaceContainerHighest, RoundedCornerShape(12.dp))
-                                        .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                                        .padding(start = 14.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(imageVector = Icons.Default.Folder, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(20.dp))
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(text = name ?: uriStr, color = FireCashOnSurface, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                                    IconButton(onClick = { onRemoveFolder(uriStr) }) {
-                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Remove folder", tint = FireCashOnSurfaceVariant, modifier = Modifier.size(18.dp))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    OutlinedButton(onClick = { folderPickerLauncher.launch(null) }, enabled = !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "Add Tracked Folder", color = FireCashPrimary)
-                    }
-                    OutlinedButton(onClick = onSyncNow, enabled = trackedFolders.isNotEmpty() && !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                        Icon(imageVector = Icons.Default.Sync, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "Sync Tracked Folders Now", color = FireCashPrimary)
-                    }
-                    OutlinedButton(onClick = { photoPickerLauncher.launch(arrayOf("image/*")) }, enabled = !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                        Icon(imageVector = Icons.Default.Sync, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "Import Slip Photos from Device", color = FireCashPrimary)
-                    }
-                    Text(text = "Slips in the tracked folder are scanned automatically for QR codes and added to your account.", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
-                    if (isLoading) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = FireCashPrimary)
-                            Text(text = "Syncing slips...", color = FireCashOnSurfaceVariant, fontSize = 12.sp)
-                        }
-                    }
-                }
-            }
 
             // Card: Background & Battery (keeps NotificationListener alive)
             Box(
@@ -1080,166 +1248,6 @@ fun SettingsScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = FireCashPrimary)
                         ) {
                             Text("Disable Battery Optimization", color = FireCashOnPrimary)
-                        }
-                    }
-                }
-            }
-
-            // Card 2: Keyword Mapping Pro
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(FireCashSurfaceContainerLow)
-                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                    .padding(16.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(FireCashSurfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Label,
-                                contentDescription = null,
-                                tint = FireCashPrimary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-
-                        Column {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = "Keyword Mapping",
-                                    color = FireCashOnSurface,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(FireCashPrimary.copy(alpha = 0.2f))
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "Smart",
-                                        color = FireCashPrimary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "Auto-assign categories based on extracted keywords.",
-                                color = FireCashOnSurfaceVariant,
-                                fontSize = 13.sp
-                            )
-                        }
-                    }
-
-                    // Rules List
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        rules.forEach { rule ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(FireCashSurfaceContainerHighest)
-                                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(FireCashSurfaceDim)
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    ) {
-                                        Text(
-                                            text = rule.keyword,
-                                            color = FireCashOnSurface,
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowRightAlt,
-                                        contentDescription = null,
-                                        tint = FireCashOutline,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-
-                                    Text(
-                                        text = rule.category,
-                                        color = FireCashSecondary,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = { onRemoveRule(rule) },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Remove rule",
-                                        tint = FireCashOutline,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Add Rule Button
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .border(
-                                    width = 1.dp,
-                                    color = FireCashOutline.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(10.dp)
-                                )
-                                .clickable { showAddRuleDialog = true }
-                                .padding(vertical = 10.dp)
-                                .testTag("add_rule_button"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = null,
-                                    tint = FireCashPrimary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Text(
-                                    text = "Add Rule",
-                                    color = FireCashPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
                         }
                     }
                 }

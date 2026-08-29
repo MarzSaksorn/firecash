@@ -459,7 +459,7 @@ private fun DualStickChart(
                 val plotWidth = size.width - axisPad
                 val columnWidth = plotWidth / count
                 val gapPx = 3.dp.toPx()
-                val stickPx = ((columnWidth - 2 * gapPx) / 2f).coerceAtLeast(4.dp.toPx())
+                val stickPx = ((columnWidth - 2 * gapPx) / 2f).coerceIn(4.dp.toPx(), 10.dp.toPx())
                 val chartBottom = size.height - 4.dp.toPx()
                 val chartTop = 22.dp.toPx()
                 val chartHeight = chartBottom - chartTop

@@ -1,11 +1,14 @@
 package com.example.ui.screens
 
+import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalanceWallet
@@ -22,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,8 +43,14 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.WeekFields
 import java.util.Locale
+import kotlin.math.min
 
-private data class TimeEntry(val label: String, val total: Double)
+private data class MoneyEntry(
+    val sortKey: String,
+    val label: String,
+    val inTotal: Double,
+    val outTotal: Double
+)
 
 private enum class TimeBucket { DAY, WEEK, MONTH }
 
@@ -100,7 +110,7 @@ fun AnalyticsScreen(
 
     var selectedBucket by remember { mutableStateOf(TimeBucket.DAY) }
     val timeEntries = remember(expenses, selectedBucket, knownNames) {
-        computeEntries(expenses.filter { it.date.isNotBlank() }, selectedBucket)
+        computeMoneyEntries(expenses.filter { it.date.isNotBlank() }, selectedBucket)
     }
 
     Column(
@@ -162,7 +172,7 @@ fun AnalyticsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Spending Over Time",
+                    text = "Income vs Spending",
                     color = FireCashOnSurfaceVariant,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
@@ -182,8 +192,28 @@ fun AnalyticsScreen(
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF66BB6A))
+                )
+                Spacer(modifier = Modifier.width(5.dp))
+                Text(text = "Money In", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
+                Spacer(modifier = Modifier.width(14.dp))
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFF6B00))
+                )
+                Spacer(modifier = Modifier.width(5.dp))
+                Text(text = "Money Out", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
             if (timeEntries.isNotEmpty()) {
-                StickChart(
+                DualStickChart(
                     data = timeEntries,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -289,8 +319,8 @@ private fun StatCard(
 }
 
 @Composable
-private fun StickChart(
-    data: List<TimeEntry>,
+private fun DualStickChart(
+    data: List<MoneyEntry>,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -299,16 +329,21 @@ private fun StickChart(
                 .weight(1f)
                 .fillMaxWidth()
         ) {
-            val maxAmount = data.maxOfOrNull { it.total } ?: 0.0
+            val maxIn = data.maxOfOrNull { it.inTotal } ?: 0.0
+            val maxOut = data.maxOfOrNull { it.outTotal } ?: 0.0
+            val maxAmount = maxOf(maxIn, maxOut)
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val count = data.size
-                if (count == 0) return@Canvas
-                val stickWidth = 6.dp.toPx()
+                if (count == 0 || maxAmount <= 0) return@Canvas
                 val columnWidth = size.width / count
+                val gapPx = 2.dp.toPx()
+                val stickPx = min(6.dp.toPx(), (columnWidth - gapPx) / 2f).coerceAtLeast(1.5f)
                 val chartBottom = size.height - 4.dp.toPx()
-                val chartHeight = chartBottom - 18.dp.toPx()
+                val chartTop = 22.dp.toPx()
+                val chartHeight = chartBottom - chartTop
                 val baselineColor = Color(0xFF2C3036)
-                val stickColor = Color(0xFFFF6B00)
+                val inColor = Color(0xFF66BB6A)
+                val outColor = Color(0xFFFF6B00)
 
                 drawLine(
                     color = baselineColor,
@@ -317,25 +352,86 @@ private fun StickChart(
                     strokeWidth = 2.dp.toPx()
                 )
 
-                data.forEachIndexed { index, entry ->
-                    val stickHeight = if (maxAmount > 0) {
-                        (entry.total / maxAmount * chartHeight).toFloat()
-                    } else 0f
-                    val centerX = columnWidth * index + columnWidth / 2f
-                    val topY = chartBottom - stickHeight
-
+                val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = android.graphics.Color.rgb(0x8B, 0x91, 0x99)
+                    textSize = 9.dp.toPx()
+                }
+                val gridSteps = 4
+                for (i in 0..gridSteps) {
+                    val y = chartBottom - chartHeight * i / gridSteps
                     drawLine(
-                        color = stickColor,
-                        start = Offset(centerX, chartBottom),
-                        end = Offset(centerX, topY),
-                        strokeWidth = stickWidth,
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                        color = Color(0xFF2A2E35),
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = 1.dp.toPx()
                     )
+                    drawContext.canvas.nativeCanvas.drawText(
+                        compactAmount(maxAmount * i / gridSteps),
+                        6.dp.toPx(),
+                        y - 3.dp.toPx(),
+                        gridPaint
+                    )
+                }
 
-                    drawCircle(
-                        color = stickColor,
-                        radius = stickWidth / 2f,
-                        center = Offset(centerX, topY)
+                data.forEachIndexed { index, entry ->
+                    val centerX = columnWidth * index + columnWidth / 2f
+                    val inH = (entry.inTotal / maxAmount * chartHeight).toFloat()
+                    val outH = (entry.outTotal / maxAmount * chartHeight).toFloat()
+                    val inX = centerX - gapPx / 2f - stickPx
+                    val outX = centerX + gapPx / 2f
+
+                    if (inH > 0) {
+                        drawLine(
+                            color = inColor,
+                            start = Offset(inX, chartBottom),
+                            end = Offset(inX, chartBottom - inH),
+                            strokeWidth = stickPx,
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round
+                        )
+                        drawCircle(color = inColor, radius = stickPx / 2f, center = Offset(inX, chartBottom - inH))
+                    }
+                    if (outH > 0) {
+                        drawLine(
+                            color = outColor,
+                            start = Offset(outX, chartBottom),
+                            end = Offset(outX, chartBottom - outH),
+                            strokeWidth = stickPx,
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round
+                        )
+                        drawCircle(color = outColor, radius = stickPx / 2f, center = Offset(outX, chartBottom - outH))
+                    }
+                }
+
+                val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    textSize = 9.dp.toPx()
+                    isFakeBoldText = true
+                }
+                val maxInEntry = data.maxByOrNull { it.inTotal }?.takeIf { it.inTotal > 0 }
+                if (maxInEntry != null) {
+                    val idx = data.indexOf(maxInEntry)
+                    val centerX = columnWidth * idx + columnWidth / 2f
+                    val x = centerX - gapPx / 2f - stickPx
+                    val h = (maxInEntry.inTotal / maxAmount * chartHeight).toFloat()
+                    valuePaint.color = android.graphics.Color.rgb(0x66, 0xBB, 0x6A)
+                    drawContext.canvas.nativeCanvas.drawText(
+                        compactAmount(maxInEntry.inTotal),
+                        x - 22.dp.toPx(),
+                        chartBottom - h - 3.dp.toPx(),
+                        valuePaint
+                    )
+                }
+                val maxOutEntry = data.maxByOrNull { it.outTotal }?.takeIf { it.outTotal > 0 }
+                if (maxOutEntry != null) {
+                    val idx = data.indexOf(maxOutEntry)
+                    val centerX = columnWidth * idx + columnWidth / 2f
+                    val x = centerX + gapPx / 2f
+                    val h = (maxOutEntry.outTotal / maxAmount * chartHeight).toFloat()
+                    valuePaint.color = android.graphics.Color.rgb(0xFF, 0x6B, 0x00)
+                    drawContext.canvas.nativeCanvas.drawText(
+                        compactAmount(maxOutEntry.outTotal),
+                        x + 2.dp.toPx(),
+                        chartBottom - h - 3.dp.toPx(),
+                        valuePaint
                     )
                 }
             }
@@ -354,6 +450,12 @@ private fun StickChart(
             }
         }
     }
+}
+
+private fun compactAmount(v: Double): String = when {
+    v >= 1_000_000 -> "%.1fM".format(Locale.US, v / 1_000_000)
+    v >= 1_000 -> "%.1fk".format(Locale.US, v / 1_000)
+    else -> "%.0f".format(Locale.US, v)
 }
 
 @Composable
@@ -399,10 +501,10 @@ private fun InsightRow(insight: SpendingInsight) {
     }
 }
 
-private fun computeEntries(
+private fun computeMoneyEntries(
     expenses: List<Expense>,
     bucket: TimeBucket
-): List<TimeEntry> {
+): List<MoneyEntry> {
     if (expenses.isEmpty()) return emptyList()
     val df = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US)
     val grouped = when (bucket) {
@@ -418,14 +520,19 @@ private fun computeEntries(
         }
     }
     return grouped.map { (key, list) ->
-        val label = when (bucket) {
-            TimeBucket.DAY -> key.takeLast(5)
-            TimeBucket.WEEK -> "W${key.takeLast(2)}"
+        val (sortKey, label) = when (bucket) {
+            TimeBucket.DAY -> key to key.takeLast(5)
+            TimeBucket.WEEK -> key to "W${key.takeLast(2)}"
             TimeBucket.MONTH -> {
-                val d = LocalDate.parse("${key}-01", df)
-                d.month.getDisplayName(TextStyle.SHORT, Locale.US)
+                val d = LocalDate.parse("$key-01", df)
+                key to d.month.getDisplayName(TextStyle.SHORT, Locale.US)
             }
         }
-        TimeEntry(label = label, total = list.sumOf { e -> e.amount })
-    }.sortedBy { it.label }
+        MoneyEntry(
+            sortKey = sortKey,
+            label = label,
+            inTotal = list.filter { it.category == "Income" }.sumOf { e -> e.amount },
+            outTotal = list.filter { it.category != "Income" }.sumOf { e -> e.amount }
+        )
+    }.sortedBy { it.sortKey }
 }

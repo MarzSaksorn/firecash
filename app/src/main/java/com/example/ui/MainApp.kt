@@ -362,6 +362,50 @@ fun MainApp(modifier: Modifier = Modifier) {
         }
     }
 
+    // Full resync: clear processed-file cache (re-detect every photo) and re-verify ALL slips on server
+    fun fullResync() {
+        if (isLoading || isBackgroundSyncing) return
+        processedFiles.clear()
+        saveProcessedFiles(prefs, processedFiles)
+        isLoading = true
+        scope.launch {
+            try {
+                for (uriStr in trackedFolderUris) {
+                    scanFolder(uriStr)
+                }
+                val verifyable = savedSlips.filter {
+                    !it.payload.startsWith("manual:") && !it.payload.startsWith("notif:")
+                }
+                for (old in verifyable.toList()) {
+                    val result = runCatching { verifyWithEasySlip(old.payload) }.getOrNull() ?: continue
+                    val resolvedIsMoneyIn = when {
+                        isKnownName(result.senderName, knownNames) && isKnownName(result.receiverName, knownNames) -> false
+                        isKnownName(result.receiverName, knownNames) -> true
+                        isKnownName(result.senderName, knownNames) -> false
+                        else -> old.isMoneyIn
+                    }
+                    val idx = savedSlips.indexOfFirst { it.payload == old.payload }
+                    if (idx >= 0) {
+                        savedSlips[idx] = old.copy(
+                            amount = result.amount ?: old.amount,
+                            transRef = result.transRef ?: old.transRef,
+                            senderName = result.senderName ?: old.senderName,
+                            receiverName = result.receiverName ?: old.receiverName,
+                            date = result.transDate ?: old.date,
+                            time = result.transTime ?: old.time,
+                            verificationStatus = result.verificationStatus,
+                            slipData = result,
+                            isMoneyIn = resolvedIsMoneyIn
+                        )
+                    }
+                }
+                saveSlips(prefs, savedSlips)
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
     fun resyncUnverifiedSlips() {
         if (!easySlipEnabled || apiKey.isBlank()) return
         if (isLoading || isBackgroundSyncing) return
@@ -535,7 +579,9 @@ fun MainApp(modifier: Modifier = Modifier) {
                 onAddManual = { amount, isMoneyIn, note ->
                     addManualSlip(amount, isMoneyIn, note)
                 },
-                onAutoSync = { syncTrackedFolderInBackground() }
+                onAutoSync = { syncTrackedFolderInBackground() },
+                onSyncNow = { syncTrackedFolderInBackground() },
+                onFullResync = { fullResync() }
             )
         } else if (showAnalytics) {
             AnalyticsScreen(

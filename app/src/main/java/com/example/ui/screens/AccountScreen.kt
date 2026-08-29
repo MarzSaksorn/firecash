@@ -16,6 +16,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -24,6 +27,9 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -107,6 +113,8 @@ fun AccountScreen(
     onOpenCamera: () -> Unit = {},
     onAddManual: (amount: Double, isMoneyIn: Boolean, note: String) -> Unit = { _, _, _ -> },
     onAutoSync: () -> Unit,
+    onSyncNow: () -> Unit = {},
+    onFullResync: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Background sync when the page opens — non-blocking
@@ -396,6 +404,31 @@ fun AccountScreen(
                         contentDescription = "Add income/expense manually",
                         tint = FireCashPrimary,
                         modifier = Modifier.size(22.dp)
+                    )
+                }
+                // Sync: tap = new photos only, hold 10s = full resync (re-detect all + re-verify on server)
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .pointerInput(Unit) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown()
+                                val startMs = down.uptimeMillis
+                                val up = withTimeoutOrNull(10_000L) { waitForUpOrCancellation() }
+                                when {
+                                    up != null -> onSyncNow()
+                                    android.os.SystemClock.uptimeMillis() - startMs >= 10_000L -> onFullResync()
+                                    else -> Unit // cancelled early (scroll) — ignore
+                                }
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Sync,
+                        contentDescription = "Sync (tap = new slips, hold 10s = full resync)",
+                        tint = FireCashPrimary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

@@ -12,6 +12,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
@@ -27,6 +29,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.analytics.AnalyticsEngine
@@ -39,6 +42,7 @@ import com.example.ui.theme.FireCashOnSurfaceVariant
 import com.example.ui.theme.FireCashPrimary
 import com.example.ui.theme.FireCashSurfaceContainerLow
 import java.time.LocalDate
+import java.time.Period
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.WeekFields
@@ -53,6 +57,42 @@ private data class MoneyEntry(
 )
 
 private enum class TimeBucket { DAY, WEEK, MONTH }
+
+private val DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US)
+
+private data class ChartState(
+    val entries: List<MoneyEntry>,
+    val label: String,
+    val atLatest: Boolean
+)
+
+private fun latestWindowStart(bucket: TimeBucket, maxDate: LocalDate): LocalDate = when (bucket) {
+    TimeBucket.DAY -> maxDate
+    TimeBucket.WEEK -> {
+        val wf = WeekFields.of(Locale.US)
+        val diff = maxDate.dayOfWeek.value - wf.firstDayOfWeek.value
+        maxDate.minusDays(if (diff < 0) (diff + 7).toLong() else diff.toLong())
+    }
+    TimeBucket.MONTH -> maxDate.withDayOfMonth(1)
+}
+
+private fun windowLength(bucket: TimeBucket): Period = when (bucket) {
+    TimeBucket.DAY -> Period.ofDays(7)
+    TimeBucket.WEEK -> Period.ofDays(42)
+    TimeBucket.MONTH -> Period.ofMonths(12)
+}
+
+private fun windowLabel(bucket: TimeBucket, start: LocalDate): String {
+    val short = DateTimeFormatter.ofPattern("MMM d", Locale.US)
+    val end = start.plus(windowLength(bucket)).minusDays(1)
+    return when (bucket) {
+        TimeBucket.DAY, TimeBucket.WEEK -> "${start.format(short)} – ${end.format(short)}"
+        TimeBucket.MONTH -> {
+            val ym = DateTimeFormatter.ofPattern("MMM yyyy", Locale.US)
+            "${start.format(ym)} – ${end.format(ym)}"
+        }
+    }
+}
 
 private fun isSelfTransfer(slip: SavedSlip, knownNames: List<String> = emptyList()): Boolean {
     val s = slip.senderName?.trim()?.lowercase(Locale.ROOT)
@@ -109,8 +149,28 @@ fun AnalyticsScreen(
     val insights = analytics.insights
 
     var selectedBucket by remember { mutableStateOf(TimeBucket.DAY) }
-    val timeEntries = remember(expenses, selectedBucket, knownNames) {
-        computeMoneyEntries(expenses.filter { it.date.isNotBlank() }, selectedBucket)
+    var windowStart by remember { mutableStateOf<LocalDate?>(null) }
+    val maxDate = remember(expenses) {
+        expenses.mapNotNull { runCatching { LocalDate.parse(it.date, DATE_FORMATTER) }.getOrNull() }.maxOrNull()
+    }
+    val chartState = remember(expenses, selectedBucket, windowStart) {
+        val dated = expenses.filter { it.date.isNotBlank() }
+        val max = dated.mapNotNull { runCatching { LocalDate.parse(it.date, DATE_FORMATTER) }.getOrNull() }.maxOrNull()
+        if (max == null) null
+        else {
+            val latest = latestWindowStart(selectedBucket, max)
+            val start = windowStart ?: latest
+            val endExclusive = start.plus(windowLength(selectedBucket))
+            val inWindow = dated.filter {
+                val d = runCatching { LocalDate.parse(it.date, DATE_FORMATTER) }.getOrNull() ?: return@filter false
+                !d.isBefore(start) && d.isBefore(endExclusive)
+            }
+            ChartState(
+                entries = computeMoneyEntries(inWindow, selectedBucket),
+                label = windowLabel(selectedBucket, start),
+                atLatest = start == latest
+            )
+        }
     }
 
     Column(
@@ -180,18 +240,79 @@ fun AnalyticsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TimeFilterChip(label = "Day", selected = selectedBucket == TimeBucket.DAY) {
                         selectedBucket = TimeBucket.DAY
+                        windowStart = null
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                     TimeFilterChip(label = "Week", selected = selectedBucket == TimeBucket.WEEK) {
                         selectedBucket = TimeBucket.WEEK
+                        windowStart = null
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                     TimeFilterChip(label = "Month", selected = selectedBucket == TimeBucket.MONTH) {
                         selectedBucket = TimeBucket.MONTH
+                        windowStart = null
                     }
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
+            if (chartState != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            val m = maxDate ?: return@IconButton
+                            val latest = latestWindowStart(selectedBucket, m)
+                            val current = windowStart ?: latest
+                            windowStart = when (selectedBucket) {
+                                TimeBucket.DAY -> current.minusDays(7)
+                                TimeBucket.WEEK -> current.minusDays(42)
+                                TimeBucket.MONTH -> current.minusMonths(12)
+                            }
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ChevronLeft,
+                            contentDescription = "Earlier period",
+                            tint = FireCashPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Text(
+                        text = chartState.label,
+                        color = FireCashOnSurfaceVariant,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = {
+                            val m = maxDate ?: return@IconButton
+                            val latest = latestWindowStart(selectedBucket, m)
+                            val current = windowStart ?: latest
+                            val next = when (selectedBucket) {
+                                TimeBucket.DAY -> current.plusDays(7)
+                                TimeBucket.WEEK -> current.plusDays(42)
+                                TimeBucket.MONTH -> current.plusMonths(12)
+                            }
+                            windowStart = if (!next.isBefore(latest)) null else next
+                        },
+                        enabled = !chartState.atLatest,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = "Later period",
+                            tint = if (chartState.atLatest) FireCashOnSurfaceVariant.copy(alpha = 0.3f) else FireCashPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
@@ -212,9 +333,9 @@ fun AnalyticsScreen(
                 Text(text = "Money Out", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
             }
             Spacer(modifier = Modifier.height(8.dp))
-            if (timeEntries.isNotEmpty()) {
+            if (chartState != null && chartState.entries.isNotEmpty()) {
                 DualStickChart(
-                    data = timeEntries,
+                    data = chartState.entries,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(220.dp)
@@ -227,7 +348,7 @@ fun AnalyticsScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "No dated transactions yet",
+                        text = if (chartState == null) "No dated transactions yet" else "No transactions in this period",
                         color = FireCashOnSurfaceVariant,
                         fontSize = 12.sp
                     )

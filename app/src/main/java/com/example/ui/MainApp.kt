@@ -86,6 +86,10 @@ fun MainApp(modifier: Modifier = Modifier) {
     val seenPayloads = remember {
         mutableSetOf<String>().apply { addAll(loadSeenPayloads(prefs)) }
     }
+    // Cache of already-processed tracked-folder files (by content:// uri) — only new files get OCR'd/synced
+    val processedFiles = remember {
+        mutableSetOf<String>().apply { addAll(loadProcessedFiles(prefs)) }
+    }
 
     // System back handling — mirrors in-app navigation, returns to previous state
     BackHandler(enabled = showPayload) {
@@ -268,6 +272,10 @@ fun MainApp(modifier: Modifier = Modifier) {
             .orEmpty()
 
         for (file in files) {
+            val fileKey = file.uri.toString()
+            // Cache hit — already processed on a previous open, skip entirely
+            if (fileKey in processedFiles) continue
+
             val tempFile = File(
                 context.cacheDir,
                 "tracked_${System.currentTimeMillis()}_${Math.random() * 10000}".replace(".", "")
@@ -287,6 +295,9 @@ fun MainApp(modifier: Modifier = Modifier) {
                 seenPayloads.add(payload)
                 addSlip(payload)
             }
+            // Mark processed (even blank OCR) so future opens only handle genuinely new files
+            processedFiles.add(fileKey)
+            saveProcessedFiles(prefs, processedFiles)
         }
     }
 
@@ -614,6 +625,19 @@ private const val PREFS_SLIPS = "saved_slips"
 private const val PREFS_SEEN = "seen_payloads"
 private const val PREFS_FOLDERS = "tracked_folders"
 private const val PREFS_KNOWN_NAMES = "known_names"
+private const val PREFS_PROCESSED_FILES = "processed_files"
+
+private fun loadProcessedFiles(prefs: SharedPreferences): Set<String> {
+    val raw = prefs.getString(PREFS_PROCESSED_FILES, null) ?: return emptySet()
+    return runCatching {
+        val arr = JSONArray(raw)
+        (0 until arr.length()).mapTo(mutableSetOf()) { arr.getString(it) }
+    }.getOrDefault(emptySet())
+}
+
+private fun saveProcessedFiles(prefs: SharedPreferences, files: Set<String>) {
+    prefs.edit().putString(PREFS_PROCESSED_FILES, JSONArray(files.toList()).toString()).apply()
+}
 
 private fun loadTrackedFolders(prefs: SharedPreferences): List<String> {
     val raw = prefs.getString(PREFS_FOLDERS, null) ?: return emptyList()

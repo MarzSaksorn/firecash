@@ -56,9 +56,14 @@ class BackgroundListenerService : Service() {
             .setContentTitle("FireCash listening")
             .setContentText("Detecting income/expense in background — tap to open")
             .setOngoing(true)
+            .setAutoCancel(false)
             .setContentIntent(openPi)
             .addAction(0, "Stop", stopPi)
             .build()
+            .apply {
+                // Explicitly non-dismissible: cannot be swiped away or cleared while the service runs
+                flags = flags or Notification.FLAG_NO_CLEAR or Notification.FLAG_ONGOING_EVENT
+            }
     }
 
     companion object {

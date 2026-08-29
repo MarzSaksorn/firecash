@@ -151,8 +151,10 @@ fun SettingsScreen(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
         if (uris.isNotEmpty()) {
+            val photoDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES)
+                ?: context.filesDir
             val paths = uris.mapIndexedNotNull { index, uri ->
-                val tempFile = File(context.cacheDir, "sync_${System.currentTimeMillis()}_$index.jpg")
+                val tempFile = File(photoDir, "sync_${System.currentTimeMillis()}_$index.jpg")
                 val ok = runCatching {
                     context.contentResolver.openInputStream(uri)?.use { input ->
                         FileOutputStream(tempFile).use { output -> input.copyTo(output) }

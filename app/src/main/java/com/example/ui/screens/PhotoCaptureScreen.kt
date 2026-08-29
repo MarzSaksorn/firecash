@@ -81,11 +81,14 @@ fun PhotoCaptureScreen(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            val tempFile = File(context.cacheDir, "picked_${System.currentTimeMillis()}.jpg")
+            // Keep the photo in persistent app storage so it survives and links on the details page
+            val photoDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES)
+                ?: context.filesDir
+            val photoFile = File(photoDir, "picked_${System.currentTimeMillis()}.jpg")
             context.contentResolver.openInputStream(uri)?.use { input ->
-                FileOutputStream(tempFile).use { output -> input.copyTo(output) }
+                FileOutputStream(photoFile).use { output -> input.copyTo(output) }
             }
-            onImageSelected(tempFile.absolutePath)
+            onImageSelected(photoFile.absolutePath)
         }
     }
 
@@ -279,7 +282,10 @@ fun PhotoCaptureScreen(
             // Capture (shutter) button
             IconButton(
                 onClick = {
-                    val photoFile = File(context.cacheDir, "capture_${System.currentTimeMillis()}.jpg")
+                    // Save into persistent app pictures dir so the slip keeps a lasting photo link
+                    val photoDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES)
+                        ?: context.filesDir
+                    val photoFile = File(photoDir, "capture_${System.currentTimeMillis()}.jpg")
                     val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
                     imageCapture?.takePicture(
                         outputOptions,

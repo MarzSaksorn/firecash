@@ -668,6 +668,13 @@ fun SettingsScreen(
             }
 
 
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFFEF5350).copy(alpha = 0.10f))
+                    .padding(12.dp)
+            ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1285,6 +1292,7 @@ fun SettingsScreen(
                 }
             }
                 }
+            }
             }
 
             Spacer(modifier = Modifier.height(30.dp))

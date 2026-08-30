@@ -214,18 +214,17 @@ fun AnalyticsScreen(
                         .height(240.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                pieMonths.forEachIndexed { depth, m ->
-                    if (m.income + m.expense <= 0) return@forEachIndexed
-                    val alpha = (1f - 0.22f * depth).coerceAtLeast(0.35f)
+                pieMonths.forEach { m ->
+                    if (m.income + m.expense <= 0) return@forEach
                     LegendRow(
-                        color = Color(0xFF66BB6A).copy(alpha = alpha),
+                        color = Color(0xFF66BB6A),
                         label = if (pieMonths.size == 1) "Money In" else "${m.label.substringBefore(' ')} · In",
                         amount = m.income,
                         total = m.income + m.expense
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     LegendRow(
-                        color = Color(0xFFFF6B00).copy(alpha = alpha),
+                        color = Color(0xFFFF6B00),
                         label = if (pieMonths.size == 1) "Money Out" else "${m.label.substringBefore(' ')} · Out",
                         amount = m.expense,
                         total = m.income + m.expense
@@ -307,7 +306,7 @@ fun AnalyticsScreen(
                         .verticalScroll(rememberScrollState())
                         .heightIn(max = 360.dp)
                 ) {
-                    monthTotals.forEach { mt ->
+                    monthTotals.take(3).forEach { mt ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -328,6 +327,12 @@ fun AnalyticsScreen(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Up to 3 months can be compared at once",
+                        color = FireCashOnSurfaceVariant,
+                        fontSize = 11.sp
+                    )
                 }
             },
             confirmButton = {
@@ -359,41 +364,77 @@ private fun PieChart(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val d = minOf(size.width, size.height)
             val center = Offset(size.width / 2f, size.height / 2f)
-            val hole = 28.dp.toPx()
-            val w = ((d / 2f) - hole) / months.size
-            val ringWidth = (w * 0.86f).coerceAtLeast(8.dp.toPx())
-            months.forEachIndexed { depth, m ->
+            if (months.size == 1) {
+                val m = months.first()
                 val total = m.income + m.expense
-                if (total <= 0) return@forEachIndexed
-                val alpha = (1f - 0.22f * depth).coerceAtLeast(0.35f)
-                val inColor = Color(0xFF66BB6A).copy(alpha = alpha)
-                val outColor = Color(0xFFFF6B00).copy(alpha = alpha)
-                val centerR = hole + depth * w + w / 2f
-                val r = centerR + ringWidth / 2f
+                if (total > 0) {
+                    val ringWidth = 36.dp.toPx()
+                    val r = d / 2f - ringWidth / 2f - 2.dp.toPx()
+                    val topLeft = Offset(center.x - r, center.y - r)
+                    val arcSize = Size(r * 2f, r * 2f)
+                    val inSweep = ((m.income / total).coerceIn(0.0, 1.0) * 360f).toFloat()
+                    if (inSweep > 0f) {
+                        drawArc(
+                            color = Color(0xFF66BB6A),
+                            startAngle = -90f,
+                            sweepAngle = inSweep,
+                            useCenter = false,
+                            topLeft = topLeft,
+                            size = arcSize,
+                            style = Stroke(width = ringWidth)
+                        )
+                    }
+                    if (inSweep < 360f) {
+                        drawArc(
+                            color = Color(0xFFFF6B00),
+                            startAngle = -90f + inSweep,
+                            sweepAngle = 360f - inSweep,
+                            useCenter = false,
+                            topLeft = topLeft,
+                            size = arcSize,
+                            style = Stroke(width = ringWidth)
+                        )
+                    }
+                }
+            } else {
+                val innerR = 28.dp.toPx()
+                val outerR = d / 2f - 2.dp.toPx()
+                val ringWidth = outerR - innerR
+                val r = outerR
                 val topLeft = Offset(center.x - r, center.y - r)
                 val arcSize = Size(r * 2f, r * 2f)
-                val inSweep = ((m.income / total).coerceIn(0.0, 1.0) * 360f).toFloat()
-                if (inSweep > 0f) {
-                    drawArc(
-                        color = inColor,
-                        startAngle = -90f,
-                        sweepAngle = inSweep,
-                        useCenter = false,
-                        topLeft = topLeft,
-                        size = arcSize,
-                        style = Stroke(width = ringWidth)
-                    )
-                }
-                if (inSweep < 360f) {
-                    drawArc(
-                        color = outColor,
-                        startAngle = -90f + inSweep,
-                        sweepAngle = 360f - inSweep,
-                        useCenter = false,
-                        topLeft = topLeft,
-                        size = arcSize,
-                        style = Stroke(width = ringWidth)
-                    )
+                val n = months.size
+                val sector = 360f / n
+                val gap = 2f
+                months.forEachIndexed { index, m ->
+                    val total = m.income + m.expense
+                    if (total <= 0) return@forEachIndexed
+                    val start = -90f + index * sector + gap / 2f
+                    val sweep = sector - gap
+                    val inFrac = (m.income / total).coerceIn(0.0, 1.0)
+                    val inSweep = sweep * inFrac.toFloat()
+                    if (inSweep > 0f) {
+                        drawArc(
+                            color = Color(0xFF66BB6A),
+                            startAngle = start,
+                            sweepAngle = inSweep,
+                            useCenter = false,
+                            topLeft = topLeft,
+                            size = arcSize,
+                            style = Stroke(width = ringWidth)
+                        )
+                    }
+                    if (inSweep < sweep) {
+                        drawArc(
+                            color = Color(0xFFFF6B00),
+                            startAngle = start + inSweep,
+                            sweepAngle = sweep - inSweep,
+                            useCenter = false,
+                            topLeft = topLeft,
+                            size = arcSize,
+                            style = Stroke(width = ringWidth)
+                        )
+                    }
                 }
             }
         }

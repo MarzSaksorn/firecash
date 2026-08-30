@@ -80,7 +80,9 @@ fun AnalyticsScreen(
     onBack: () -> Unit,
     onRefresh: () -> Unit
 ) {
-    val expenses = remember(slips, knownNames) {
+    val now = LocalDate.now()
+    val expenses = remember(slips, knownNames, now) {
+        val today = now.toString()
         slips.mapNotNull { slip ->
             if (isSelfTransfer(slip, knownNames)) return@mapNotNull null
             val amt = slip.amount ?: return@mapNotNull null
@@ -88,7 +90,7 @@ fun AnalyticsScreen(
             Expense(
                 merchant = slip.senderName ?: slip.receiverName ?: "Unknown",
                 amount = amt,
-                date = slip.date ?: "",
+                date = slip.date?.takeIf { it.isNotBlank() } ?: today,
                 time = slip.time ?: "",
                 category = if (effective) "Income" else "Other"
             )
@@ -100,7 +102,6 @@ fun AnalyticsScreen(
     val avgPerDay = analytics.averagePerDay
     val insights = analytics.insights
 
-    val now = LocalDate.now()
     val monthKey = remember(now) { now.format(DateTimeFormatter.ofPattern("yyyy-MM", Locale.US)) }
     val monthLabel = remember(now) {
         "${now.month.getDisplayName(TextStyle.SHORT, Locale.US)} ${now.year}"

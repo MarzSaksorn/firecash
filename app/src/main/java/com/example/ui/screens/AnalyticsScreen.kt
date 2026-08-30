@@ -42,6 +42,7 @@ import com.example.ui.theme.FireCashOnSurfaceVariant
 import com.example.ui.theme.FireCashPrimary
 import com.example.ui.theme.FireCashSurfaceContainerLow
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
@@ -114,10 +115,10 @@ fun AnalyticsScreen(
             .sortedDescending()
             .take(3)
             .mapNotNull { key ->
-                val m = runCatching { LocalDate.parse("$key-01", fmt) }.getOrNull() ?: return@mapNotNull null
+                val ym = runCatching { YearMonth.parse(key, fmt) }.getOrNull() ?: return@mapNotNull null
                 MonthTotals(
                     key = key,
-                    label = "${m.month.getDisplayName(TextStyle.SHORT, Locale.US)} ${m.year}",
+                    label = "${ym.month.getDisplayName(TextStyle.SHORT, Locale.US)} ${ym.year}",
                     income = expenses.filter { it.date.startsWith(key) && it.category == "Income" }.sumOf { e -> e.amount },
                     expense = expenses.filter { it.date.startsWith(key) && it.category != "Income" }.sumOf { e -> e.amount },
                     isCurrent = key == monthKey

@@ -1,6 +1,5 @@
 package com.example.ui.screens
 
-import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -26,7 +25,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -109,17 +107,6 @@ fun AnalyticsScreen(
     }
     val monthExpense = remember(expenses, monthKey) {
         expenses.filter { it.date.startsWith(monthKey) && it.category != "Income" }.sumOf { e -> e.amount }
-    }
-    val monthlyBars = remember(expenses, now) {
-        val fmt = DateTimeFormatter.ofPattern("yyyy-MM", Locale.US)
-        (5L downTo 0L).map { i ->
-            val m = now.minusMonths(i)
-            val key = m.format(fmt)
-            MonthlyBar(
-                label = m.month.getDisplayName(TextStyle.SHORT, Locale.US),
-                total = expenses.filter { it.date.startsWith(key) && it.category != "Income" }.sumOf { e -> e.amount }
-            )
-        }
     }
 
     Column(
@@ -225,41 +212,6 @@ fun AnalyticsScreen(
                 ) {
                     Text(
                         text = "No transactions this month yet",
-                        color = FireCashOnSurfaceVariant,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(20.dp))
-            Text(
-                text = "Monthly Expenses",
-                color = FireCashOnSurfaceVariant,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Last 6 months",
-                color = FireCashOnSurfaceVariant,
-                fontSize = 11.sp
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            if (monthlyBars.any { it.total > 0 }) {
-                MonthlyStickChart(
-                    data = monthlyBars,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No expense data yet",
                         color = FireCashOnSurfaceVariant,
                         fontSize = 12.sp
                     )
@@ -474,120 +426,5 @@ private fun InsightRow(insight: SpendingInsight) {
             )
         }
     }
-}
-
-private data class MonthlyBar(val label: String, val total: Double)
-
-@Composable
-private fun MonthlyStickChart(
-    data: List<MonthlyBar>,
-    modifier: Modifier = Modifier
-) {
-    Column(modifier = modifier) {
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-        ) {
-            val maxAmount = data.maxOfOrNull { it.total } ?: 0.0
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val count = data.size
-                if (count == 0 || maxAmount <= 0) return@Canvas
-                val axisPad = 30.dp.toPx()
-                val plotWidth = size.width - axisPad
-                val columnWidth = plotWidth / count
-                val gapPx = 3.dp.toPx()
-                val stickPx = ((columnWidth - 2 * gapPx) / 2f).coerceIn(4.dp.toPx(), 10.dp.toPx())
-                val chartBottom = size.height - 4.dp.toPx()
-                val chartTop = 20.dp.toPx()
-                val chartHeight = chartBottom - chartTop
-                val baselineColor = Color(0xFF2C3036)
-                val barColor = Color(0xFFFF6B00)
-                val currentColor = Color(0xFFFF8A3D)
-
-                drawLine(
-                    color = baselineColor,
-                    start = Offset(axisPad, chartBottom),
-                    end = Offset(size.width, chartBottom),
-                    strokeWidth = 2.dp.toPx()
-                )
-
-                val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = android.graphics.Color.rgb(0x8B, 0x91, 0x99)
-                    textSize = 9.dp.toPx()
-                }
-                val gridSteps = 4
-                for (i in 0..gridSteps) {
-                    val y = chartBottom - chartHeight * i / gridSteps
-                    drawLine(
-                        color = Color(0xFF2A2E35),
-                        start = Offset(axisPad, y),
-                        end = Offset(size.width, y),
-                        strokeWidth = 1.dp.toPx()
-                    )
-                    drawContext.canvas.nativeCanvas.drawText(
-                        compactAmount(maxAmount * i / gridSteps),
-                        2.dp.toPx(),
-                        y - 3.dp.toPx(),
-                        gridPaint
-                    )
-                }
-
-                data.forEachIndexed { index, bar ->
-                    if (bar.total <= 0) return@forEachIndexed
-                    val x = axisPad + columnWidth * index + columnWidth / 2f
-                    val h = (bar.total / maxAmount * chartHeight).toFloat()
-                    val color = if (index == data.lastIndex) currentColor else barColor
-                    drawLine(
-                        color = color,
-                        start = Offset(x, chartBottom),
-                        end = Offset(x, chartBottom - h),
-                        strokeWidth = stickPx,
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round
-                    )
-                    drawCircle(color = color, radius = stickPx / 2f, center = Offset(x, chartBottom - h))
-                }
-
-                val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    textSize = 9.dp.toPx()
-                    isFakeBoldText = true
-                }
-                val maxBar = data.maxByOrNull { it.total }?.takeIf { it.total > 0 }
-                if (maxBar != null) {
-                    val idx = data.indexOf(maxBar)
-                    val x = axisPad + columnWidth * idx + columnWidth / 2f
-                    val h = (maxBar.total / maxAmount * chartHeight).toFloat()
-                    val text = compactAmount(maxBar.total)
-                    val textW = valuePaint.measureText(text)
-                    var tx = x - textW / 2f
-                    if (tx < axisPad) tx = axisPad
-                    val maxX = size.width - textW - 2.dp.toPx()
-                    if (tx > maxX) tx = maxX.coerceAtLeast(axisPad)
-                    valuePaint.color = android.graphics.Color.rgb(0xFF, 0x8A, 0x3D)
-                    drawContext.canvas.nativeCanvas.drawText(text, tx, chartBottom - h - 3.dp.toPx(), valuePaint)
-                }
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Spacer(modifier = Modifier.width(30.dp))
-            data.forEach { bar ->
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.TopCenter) {
-                    Text(
-                        text = bar.label,
-                        color = FireCashOnSurfaceVariant,
-                        fontSize = 10.sp,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun compactAmount(v: Double): String = when {
-    v >= 1_000_000 -> "%.1fM".format(Locale.US, v / 1_000_000)
-    v >= 1_000 -> "%.1fk".format(Locale.US, v / 1_000)
-    else -> "%.0f".format(Locale.US, v)
 }
 

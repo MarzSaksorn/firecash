@@ -123,7 +123,9 @@ fun AnalyticsScreen(
                 )
             }
     }
-    var comparedKeys by remember(monthKey) { mutableStateOf(setOf(monthKey)) }
+    var comparedKeys by remember(monthKey, availableMonths) {
+        mutableStateOf(setOf(availableMonths.firstOrNull()?.key ?: monthKey))
+    }
     var showCompareDialog by remember { mutableStateOf(false) }
     val pieMonths = remember(comparedKeys, availableMonths) {
         availableMonths.filter { it.key in comparedKeys }.sortedByDescending { it.key }
@@ -243,7 +245,7 @@ fun AnalyticsScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "No transactions this month yet",
+                        text = if (availableMonths.isEmpty()) "No dated transactions yet" else "No transactions in this month",
                         color = FireCashOnSurfaceVariant,
                         fontSize = 12.sp
                     )
@@ -304,13 +306,20 @@ fun AnalyticsScreen(
                 )
             },
             text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .heightIn(max = 360.dp)
-                ) {
-                    availableMonths.forEach { mt ->
+                if (availableMonths.isEmpty()) {
+                    Text(
+                        text = "No dated transactions yet",
+                        color = FireCashOnSurfaceVariant,
+                        fontSize = 13.sp
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .heightIn(max = 360.dp)
+                    ) {
+                        availableMonths.forEach { mt ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -337,6 +346,7 @@ fun AnalyticsScreen(
                         color = FireCashOnSurfaceVariant,
                         fontSize = 11.sp
                     )
+                    }
                 }
             },
             confirmButton = {

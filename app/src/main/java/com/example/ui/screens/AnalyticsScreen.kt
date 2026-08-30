@@ -105,14 +105,15 @@ fun AnalyticsScreen(
     val monthLabel = remember(now) {
         "${now.month.getDisplayName(TextStyle.SHORT, Locale.US)} ${now.year}"
     }
-    val availableMonths = remember(expenses, now) {
+    val availableMonths = remember(expenses) {
         val fmt = DateTimeFormatter.ofPattern("yyyy-MM", Locale.US)
         expenses.map { it.date.take(7) }
+            .filter { it.length == 7 }
             .distinct()
             .sortedDescending()
             .take(3)
-            .map { key ->
-                val m = LocalDate.parse("$key-01", fmt)
+            .mapNotNull { key ->
+                val m = runCatching { LocalDate.parse("$key-01", fmt) }.getOrNull() ?: return@mapNotNull null
                 MonthTotals(
                     key = key,
                     label = "${m.month.getDisplayName(TextStyle.SHORT, Locale.US)} ${m.year}",

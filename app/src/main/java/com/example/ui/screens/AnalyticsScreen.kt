@@ -90,7 +90,7 @@ fun AnalyticsScreen(
             Expense(
                 merchant = slip.senderName ?: slip.receiverName ?: "Unknown",
                 amount = amt,
-                date = slip.date?.takeIf { it.isNotBlank() } ?: today,
+                date = normalizeDate(slip.date, today),
                 time = slip.time ?: "",
                 category = if (effective) "Income" else "Other"
             )
@@ -357,6 +357,24 @@ fun AnalyticsScreen(
             }
         )
     }
+}
+
+private val SLIP_DATE_FORMATS = listOf(
+    "yyyy-MM-dd",
+    "dd/MM/yyyy",
+    "dd-MM-yyyy",
+    "yyyy/MM/dd",
+    "MM/dd/yyyy"
+)
+
+private fun normalizeDate(raw: String?, today: String): String {
+    val s = raw?.trim().orEmpty()
+    if (s.isBlank()) return today
+    for (f in SLIP_DATE_FORMATS) {
+        val d = runCatching { LocalDate.parse(s, DateTimeFormatter.ofPattern(f, Locale.US)) }.getOrNull()
+        if (d != null) return d.toString()
+    }
+    return today
 }
 
 private data class MonthTotals(

@@ -163,9 +163,18 @@ class EasySlipClient(
     private fun splitDate(isoDate: String): Pair<String?, String?> {
         if (isoDate.isBlank()) return null to null
         return runCatching {
-            val datePart = isoDate.take(10)
-            val timePart = isoDate.substringAfter("T").take(8)
-            val time = timePart.split(":").let { "${it[0]}:${it[1]}" }
+            var datePart = isoDate.take(10)
+            val timePartRaw = isoDate.substringAfterLast("T").substringAfterLast(" ").take(8)
+            val time = if (timePartRaw.contains(":")) {
+                val parts = timePartRaw.split(":")
+                if (parts.size >= 2) "${parts[0]}:${parts[1]}" else null
+            } else null
+            if (datePart.contains("/")) {
+                val dp = datePart.split("/")
+                if (dp.size == 3 && dp[2].length == 4) {
+                    datePart = "${dp[2]}-${dp[1].padStart(2, '0')}-${dp[0].padStart(2, '0')}"
+                }
+            }
             datePart to time
         }.getOrDefault(null to null)
     }

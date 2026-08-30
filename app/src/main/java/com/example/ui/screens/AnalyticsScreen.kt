@@ -105,24 +105,27 @@ fun AnalyticsScreen(
     val monthLabel = remember(now) {
         "${now.month.getDisplayName(TextStyle.SHORT, Locale.US)} ${now.year}"
     }
-    val monthTotals = remember(expenses, now) {
+    val availableMonths = remember(expenses, now) {
         val fmt = DateTimeFormatter.ofPattern("yyyy-MM", Locale.US)
-        (0L..11L).map { i ->
-            val m = now.minusMonths(i)
-            val key = m.format(fmt)
-            MonthTotals(
-                key = key,
-                label = "${m.month.getDisplayName(TextStyle.SHORT, Locale.US)} ${m.year}",
-                income = expenses.filter { it.date.startsWith(key) && it.category == "Income" }.sumOf { e -> e.amount },
-                expense = expenses.filter { it.date.startsWith(key) && it.category != "Income" }.sumOf { e -> e.amount },
-                isCurrent = i == 0L
-            )
-        }
+        expenses.map { it.date.take(7) }
+            .distinct()
+            .sortedDescending()
+            .take(3)
+            .map { key ->
+                val m = LocalDate.parse("$key-01", fmt)
+                MonthTotals(
+                    key = key,
+                    label = "${m.month.getDisplayName(TextStyle.SHORT, Locale.US)} ${m.year}",
+                    income = expenses.filter { it.date.startsWith(key) && it.category == "Income" }.sumOf { e -> e.amount },
+                    expense = expenses.filter { it.date.startsWith(key) && it.category != "Income" }.sumOf { e -> e.amount },
+                    isCurrent = key == monthKey
+                )
+            }
     }
     var comparedKeys by remember(monthKey) { mutableStateOf(setOf(monthKey)) }
     var showCompareDialog by remember { mutableStateOf(false) }
-    val pieMonths = remember(comparedKeys, monthTotals) {
-        monthTotals.filter { it.key in comparedKeys }.sortedByDescending { it.key }
+    val pieMonths = remember(comparedKeys, availableMonths) {
+        availableMonths.filter { it.key in comparedKeys }.sortedByDescending { it.key }
     }
 
     Column(
@@ -306,7 +309,7 @@ fun AnalyticsScreen(
                         .verticalScroll(rememberScrollState())
                         .heightIn(max = 360.dp)
                 ) {
-                    monthTotals.take(3).forEach { mt ->
+                    availableMonths.forEach { mt ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -364,14 +367,14 @@ private fun PieChart(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val d = minOf(size.width, size.height)
             val center = Offset(size.width / 2f, size.height / 2f)
+            val ringWidth = 36.dp.toPx()
+            val r = d / 2f - ringWidth / 2f - 2.dp.toPx()
+            val topLeft = Offset(center.x - r, center.y - r)
+            val arcSize = Size(r * 2f, r * 2f)
             if (months.size == 1) {
                 val m = months.first()
                 val total = m.income + m.expense
                 if (total > 0) {
-                    val ringWidth = 36.dp.toPx()
-                    val r = d / 2f - ringWidth / 2f - 2.dp.toPx()
-                    val topLeft = Offset(center.x - r, center.y - r)
-                    val arcSize = Size(r * 2f, r * 2f)
                     val inSweep = ((m.income / total).coerceIn(0.0, 1.0) * 360f).toFloat()
                     if (inSweep > 0f) {
                         drawArc(
@@ -397,12 +400,6 @@ private fun PieChart(
                     }
                 }
             } else {
-                val innerR = 28.dp.toPx()
-                val outerR = d / 2f - 2.dp.toPx()
-                val ringWidth = outerR - innerR
-                val r = outerR
-                val topLeft = Offset(center.x - r, center.y - r)
-                val arcSize = Size(r * 2f, r * 2f)
                 val n = months.size
                 val sector = 360f / n
                 val gap = 2f
@@ -411,8 +408,7 @@ private fun PieChart(
                     if (total <= 0) return@forEachIndexed
                     val start = -90f + index * sector + gap / 2f
                     val sweep = sector - gap
-                    val inFrac = (m.income / total).coerceIn(0.0, 1.0)
-                    val inSweep = sweep * inFrac.toFloat()
+                    val inSweep = sweep * (m.income / total).coerceIn(0.0, 1.0).toFloat()
                     if (inSweep > 0f) {
                         drawArc(
                             color = Color(0xFF66BB6A),

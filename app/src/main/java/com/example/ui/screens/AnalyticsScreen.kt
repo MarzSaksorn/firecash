@@ -5,8 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -17,6 +19,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -102,11 +105,24 @@ fun AnalyticsScreen(
     val monthLabel = remember(now) {
         "${now.month.getDisplayName(TextStyle.SHORT, Locale.US)} ${now.year}"
     }
-    val monthIncome = remember(expenses, monthKey) {
-        expenses.filter { it.date.startsWith(monthKey) && it.category == "Income" }.sumOf { e -> e.amount }
+    val monthTotals = remember(expenses, now) {
+        val fmt = DateTimeFormatter.ofPattern("yyyy-MM", Locale.US)
+        (0L..11L).map { i ->
+            val m = now.minusMonths(i)
+            val key = m.format(fmt)
+            MonthTotals(
+                key = key,
+                label = "${m.month.getDisplayName(TextStyle.SHORT, Locale.US)} ${m.year}",
+                income = expenses.filter { it.date.startsWith(key) && it.category == "Income" }.sumOf { e -> e.amount },
+                expense = expenses.filter { it.date.startsWith(key) && it.category != "Income" }.sumOf { e -> e.amount },
+                isCurrent = i == 0L
+            )
+        }
     }
-    val monthExpense = remember(expenses, monthKey) {
-        expenses.filter { it.date.startsWith(monthKey) && it.category != "Income" }.sumOf { e -> e.amount }
+    var comparedKeys by remember(monthKey) { mutableStateOf(setOf(monthKey)) }
+    var showCompareDialog by remember { mutableStateOf(false) }
+    val pieMonths = remember(comparedKeys, monthTotals) {
+        monthTotals.filter { it.key in comparedKeys }.sortedByDescending { it.key }
     }
 
     Column(
@@ -173,36 +189,49 @@ fun AnalyticsScreen(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
                 )
-                Text(
-                    text = monthLabel,
-                    color = FireCashPrimary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = monthLabel,
+                        color = FireCashPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    TextButton(
+                        onClick = { showCompareDialog = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Text("Compare", color = FireCashPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(12.dp))
-            if (monthIncome + monthExpense > 0) {
+            if (pieMonths.any { it.income + it.expense > 0 }) {
                 PieChart(
-                    income = monthIncome,
-                    expense = monthExpense,
+                    months = pieMonths,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(240.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                LegendRow(
-                    color = Color(0xFF66BB6A),
-                    label = "Money In",
-                    amount = monthIncome,
-                    total = monthIncome + monthExpense
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                LegendRow(
-                    color = Color(0xFFFF6B00),
-                    label = "Money Out",
-                    amount = monthExpense,
-                    total = monthIncome + monthExpense
-                )
+                pieMonths.forEachIndexed { depth, m ->
+                    if (m.income + m.expense <= 0) return@forEachIndexed
+                    val alpha = (1f - 0.22f * depth).coerceAtLeast(0.35f)
+                    LegendRow(
+                        color = Color(0xFF66BB6A).copy(alpha = alpha),
+                        label = if (pieMonths.size == 1) "Money In" else "${m.label.substringBefore(' ')} · In",
+                        amount = m.income,
+                        total = m.income + m.expense
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LegendRow(
+                        color = Color(0xFFFF6B00).copy(alpha = alpha),
+                        label = if (pieMonths.size == 1) "Money Out" else "${m.label.substringBefore(' ')} · Out",
+                        amount = m.expense,
+                        total = m.income + m.expense
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
             } else {
                 Box(
                     modifier = Modifier
@@ -258,58 +287,125 @@ fun AnalyticsScreen(
             }
         }
     }
+
+    if (showCompareDialog) {
+        AlertDialog(
+            onDismissRequest = { showCompareDialog = false },
+            containerColor = FireCashSurfaceContainerLow,
+            title = {
+                Text(
+                    text = "Compare Months",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .heightIn(max = 360.dp)
+                ) {
+                    monthTotals.forEach { mt ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = mt.key in comparedKeys,
+                                onCheckedChange = { checked ->
+                                    if (mt.isCurrent) return@Checkbox
+                                    comparedKeys = if (checked) comparedKeys + mt.key else comparedKeys - mt.key
+                                },
+                                enabled = !mt.isCurrent,
+                                colors = CheckboxDefaults.colors(checkedColor = FireCashPrimary)
+                            )
+                            Text(
+                                text = if (mt.isCurrent) "${mt.label} (current)" else mt.label,
+                                color = if (mt.isCurrent) FireCashOnSurfaceVariant else Color.White,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showCompareDialog = false }) {
+                    Text("Done", color = FireCashPrimary)
+                }
+            }
+        )
+    }
 }
+
+private data class MonthTotals(
+    val key: String,
+    val label: String,
+    val income: Double,
+    val expense: Double,
+    val isCurrent: Boolean
+)
 
 @Composable
 private fun PieChart(
-    income: Double,
-    expense: Double,
+    months: List<MonthTotals>,
     modifier: Modifier = Modifier
 ) {
-    val total = income + expense
-    if (total <= 0) return
-    val inFraction = (income / total).coerceIn(0.0, 1.0)
+    if (months.isEmpty()) return
+    val current = months.first()
+    val net = current.income - current.expense
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val strokeWidth = 36.dp.toPx()
-            val inset = strokeWidth / 2f + 2.dp.toPx()
-            val side = minOf(size.width, size.height) - inset * 2
-            val arcSize = Size(side, side)
-            val topLeft = Offset((size.width - side) / 2f, (size.height - side) / 2f)
-            val startAngle = -90f
-            val inSweep = (inFraction * 360f).toFloat()
-            if (inSweep > 0f) {
-                drawArc(
-                    color = Color(0xFF66BB6A),
-                    startAngle = startAngle,
-                    sweepAngle = inSweep,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidth)
-                )
-            }
-            if (inSweep < 360f) {
-                drawArc(
-                    color = Color(0xFFFF6B00),
-                    startAngle = startAngle + inSweep,
-                    sweepAngle = 360f - inSweep,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidth)
-                )
+            val d = minOf(size.width, size.height)
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val hole = 28.dp.toPx()
+            val w = ((d / 2f) - hole) / months.size
+            val ringWidth = (w * 0.86f).coerceAtLeast(8.dp.toPx())
+            months.forEachIndexed { depth, m ->
+                val total = m.income + m.expense
+                if (total <= 0) return@forEachIndexed
+                val alpha = (1f - 0.22f * depth).coerceAtLeast(0.35f)
+                val inColor = Color(0xFF66BB6A).copy(alpha = alpha)
+                val outColor = Color(0xFFFF6B00).copy(alpha = alpha)
+                val centerR = hole + depth * w + w / 2f
+                val r = centerR + ringWidth / 2f
+                val topLeft = Offset(center.x - r, center.y - r)
+                val arcSize = Size(r * 2f, r * 2f)
+                val inSweep = ((m.income / total).coerceIn(0.0, 1.0) * 360f).toFloat()
+                if (inSweep > 0f) {
+                    drawArc(
+                        color = inColor,
+                        startAngle = -90f,
+                        sweepAngle = inSweep,
+                        useCenter = false,
+                        topLeft = topLeft,
+                        size = arcSize,
+                        style = Stroke(width = ringWidth)
+                    )
+                }
+                if (inSweep < 360f) {
+                    drawArc(
+                        color = outColor,
+                        startAngle = -90f + inSweep,
+                        sweepAngle = 360f - inSweep,
+                        useCenter = false,
+                        topLeft = topLeft,
+                        size = arcSize,
+                        style = Stroke(width = ringWidth)
+                    )
+                }
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "Net",
+                text = "Net · ${current.label.substringBefore(' ')}",
                 color = FireCashOnSurfaceVariant,
                 fontSize = 11.sp
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "THB %.2f".format(Locale.US, income - expense),
+                text = "THB %.2f".format(Locale.US, net),
                 color = Color.White,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold

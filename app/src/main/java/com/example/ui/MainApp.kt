@@ -127,11 +127,17 @@ fun MainApp(modifier: Modifier = Modifier) {
     var notificationExpenseEnabled by remember {
         mutableStateOf(prefs.getBoolean("notification_expense_enabled", false))
     }
+    var disabledIncomePresets by remember {
+        mutableStateOf(com.example.service.NotificationPresets.loadDisabledIncome(prefs))
+    }
+    var disabledExpensePresets by remember {
+        mutableStateOf(com.example.service.NotificationPresets.loadDisabledExpense(prefs))
+    }
     var notificationWhitelist by remember {
-        mutableStateOf(com.example.service.NotificationPresets.mergeIncome(loadNotificationWhitelist(prefs)))
+        mutableStateOf(com.example.service.NotificationPresets.mergeIncome(loadNotificationWhitelist(prefs), disabledIncomePresets))
     }
     var notificationExpenseWhitelist by remember {
-        mutableStateOf(com.example.service.NotificationPresets.mergeExpense(loadNotificationWhitelistExpense(prefs)))
+        mutableStateOf(com.example.service.NotificationPresets.mergeExpense(loadNotificationWhitelistExpense(prefs), disabledExpensePresets))
     }
     val seenPayloads = remember {
         mutableSetOf<String>().apply { addAll(loadSeenPayloads(prefs)) }
@@ -420,11 +426,11 @@ fun MainApp(modifier: Modifier = Modifier) {
                 } ?: emptyList()
 
             if (root.has("notificationWhitelist")) {
-                notificationWhitelist = com.example.service.NotificationPresets.mergeIncome(readWl("notificationWhitelist"))
+                notificationWhitelist = com.example.service.NotificationPresets.mergeIncome(readWl("notificationWhitelist"), disabledIncomePresets)
                 saveNotificationWhitelist(prefs, notificationWhitelist)
             }
             if (root.has("notificationExpenseWhitelist")) {
-                notificationExpenseWhitelist = com.example.service.NotificationPresets.mergeExpense(readWl("notificationExpenseWhitelist"))
+                notificationExpenseWhitelist = com.example.service.NotificationPresets.mergeExpense(readWl("notificationExpenseWhitelist"), disabledExpensePresets)
                 saveNotificationWhitelistExpense(prefs, notificationExpenseWhitelist)
             }
 
@@ -832,6 +838,8 @@ fun MainApp(modifier: Modifier = Modifier) {
                     notificationExpenseWhitelist = notificationExpenseWhitelist,
                     permanentIncomeApps = com.example.service.NotificationPresets.incomePresets,
                     permanentExpenseApps = com.example.service.NotificationPresets.expensePresets,
+                    disabledIncomePresets = disabledIncomePresets,
+                    disabledExpensePresets = disabledExpensePresets,
                     notificationAccessGranted = notificationAccessGranted,
                     batteryOptIgnored = batteryOptIgnored,
                     backgroundListening = backgroundListening,
@@ -891,6 +899,13 @@ fun MainApp(modifier: Modifier = Modifier) {
                         notificationWhitelist = notificationWhitelist.filterNot { it.packageName == pkg && it.prefix == pref }
                         saveNotificationWhitelist(prefs, notificationWhitelist)
                     },
+                    onToggleIncomePreset = { entry, enabled ->
+                        com.example.service.NotificationPresets.setDisabledIncome(prefs, entry, !enabled)
+                        disabledIncomePresets = com.example.service.NotificationPresets.loadDisabledIncome(prefs)
+                        notificationWhitelist = com.example.service.NotificationPresets.mergeIncome(
+                            loadNotificationWhitelist(prefs), disabledIncomePresets
+                        )
+                    },
                     onAddExpenseWhitelistedApp = { pkg, prefix ->
                         val t = pkg.trim()
                         val p = prefix.trim()
@@ -907,6 +922,13 @@ fun MainApp(modifier: Modifier = Modifier) {
                         if (com.example.service.NotificationPresets.isExpensePermanent(entry)) return@SettingsScreen
                         notificationExpenseWhitelist = notificationExpenseWhitelist.filterNot { it.packageName == pkg && it.prefix == pref }
                         saveNotificationWhitelistExpense(prefs, notificationExpenseWhitelist)
+                    },
+                    onToggleExpensePreset = { entry, enabled ->
+                        com.example.service.NotificationPresets.setDisabledExpense(prefs, entry, !enabled)
+                        disabledExpensePresets = com.example.service.NotificationPresets.loadDisabledExpense(prefs)
+                        notificationExpenseWhitelist = com.example.service.NotificationPresets.mergeExpense(
+                            loadNotificationWhitelistExpense(prefs), disabledExpensePresets
+                        )
                     },
                     onRequestNotificationPermission = {
                         try {

@@ -28,7 +28,7 @@ class IncomeNotificationService : NotificationListenerService() {
 
         // Try income whitelist first
         if (prefs.getBoolean(PREFS_NOTIFICATION_INCOME, false)) {
-            val wl = NotificationPresets.mergeIncome(loadWhitelist(prefs))
+            val wl = NotificationPresets.mergeIncome(loadWhitelist(prefs), NotificationPresets.loadDisabledIncome(prefs))
             val entries = wl.filter { it.packageName == sbn.packageName }
             if (wl.isEmpty() || entries.isNotEmpty()) {
                 val amount = extractForEntries(combined, entries) ?: if (wl.isEmpty()) extractFirstNumber(combined) else null
@@ -40,7 +40,7 @@ class IncomeNotificationService : NotificationListenerService() {
         }
         // Then expense (money out)
         if (prefs.getBoolean(PREFS_NOTIFICATION_EXPENSE, false)) {
-            val wl = NotificationPresets.mergeExpense(loadWhitelistExpense(prefs))
+            val wl = NotificationPresets.mergeExpense(loadWhitelistExpense(prefs), NotificationPresets.loadDisabledExpense(prefs))
             val entries = wl.filter { it.packageName == sbn.packageName }
             if (wl.isEmpty() || entries.isNotEmpty()) {
                 val amount = extractForEntries(combined, entries) ?: if (wl.isEmpty()) extractFirstNumber(combined) else null

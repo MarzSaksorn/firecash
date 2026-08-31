@@ -71,6 +71,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -116,6 +117,10 @@ fun SettingsScreen(
     notificationExpenseWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
     permanentIncomeApps: List<com.example.service.WhitelistedApp> = emptyList(),
     permanentExpenseApps: List<com.example.service.WhitelistedApp> = emptyList(),
+    disabledIncomePresets: Set<String> = emptySet(),
+    disabledExpensePresets: Set<String> = emptySet(),
+    onToggleIncomePreset: (com.example.service.WhitelistedApp, Boolean) -> Unit = { _, _ -> },
+    onToggleExpensePreset: (com.example.service.WhitelistedApp, Boolean) -> Unit = { _, _ -> },
     notificationAccessGranted: Boolean = false,
     batteryOptIgnored: Boolean = false,
     onRequestDisableBatteryOptimization: () -> Unit = {},
@@ -947,12 +952,25 @@ fun SettingsScreen(
                                             )
                                             val isPermanent = permanentIncomeApps.any { it.packageName == entry.packageName && it.prefix == entry.prefix }
                                             if (isPermanent) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Lock,
-                                                    contentDescription = "Permanent preset",
-                                                    tint = FireCashSecondary,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Lock,
+                                                        contentDescription = "Permanent preset",
+                                                        tint = FireCashSecondary,
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                    Switch(
+                                                        checked = com.example.service.NotificationPresets.presetKey(entry) !in disabledIncomePresets,
+                                                        onCheckedChange = { onToggleIncomePreset(entry, it) },
+                                                        colors = SwitchDefaults.colors(
+                                                            checkedThumbColor = FireCashOnPrimary,
+                                                            checkedTrackColor = FireCashPrimary,
+                                                            uncheckedThumbColor = FireCashOutline,
+                                                            uncheckedTrackColor = FireCashSurfaceVariant
+                                                        ),
+                                                        modifier = Modifier.scale(0.7f)
+                                                    )
+                                                }
                                             } else {
                                                 IconButton(
                                                     onClick = { onRemoveWhitelistedApp(entry.packageName + "|" + entry.prefix) },
@@ -1158,12 +1176,25 @@ fun SettingsScreen(
                                             )
                                             val isPermanent = permanentExpenseApps.any { it.packageName == entry.packageName && it.prefix == entry.prefix }
                                             if (isPermanent) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Lock,
-                                                    contentDescription = "Permanent preset",
-                                                    tint = FireCashSecondary,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Lock,
+                                                        contentDescription = "Permanent preset",
+                                                        tint = FireCashSecondary,
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                    Switch(
+                                                        checked = com.example.service.NotificationPresets.presetKey(entry) !in disabledExpensePresets,
+                                                        onCheckedChange = { onToggleExpensePreset(entry, it) },
+                                                        colors = SwitchDefaults.colors(
+                                                            checkedThumbColor = FireCashOnPrimary,
+                                                            checkedTrackColor = FireCashPrimary,
+                                                            uncheckedThumbColor = FireCashOutline,
+                                                            uncheckedTrackColor = FireCashSurfaceVariant
+                                                        ),
+                                                        modifier = Modifier.scale(0.7f)
+                                                    )
+                                                }
                                             } else {
                                                 IconButton(
                                                     onClick = { onRemoveExpenseWhitelistedApp(entry.packageName + "|" + entry.prefix) },

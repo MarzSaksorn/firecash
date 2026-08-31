@@ -754,7 +754,9 @@ fun MainApp(modifier: Modifier = Modifier) {
                     scope.launch {
                         if (appMode == "personal") {
                             // Personal mode: read the slip text from the photo, no verification API
+                            isLoading = true
                             val ocrText = OcrProcessor(context).recognizeText(path)
+                            isLoading = false
                             if (ocrText.isBlank()) {
                                 Toast.makeText(context, "Couldn't read text from the slip photo", Toast.LENGTH_SHORT).show()
                             } else {
@@ -772,7 +774,9 @@ fun MainApp(modifier: Modifier = Modifier) {
                 onImageSelected = { path ->
                     scope.launch {
                         if (appMode == "personal") {
+                            isLoading = true
                             val ocrText = OcrProcessor(context).recognizeText(path, scanCenterOnly = false)
+                            isLoading = false
                             if (ocrText.isBlank()) {
                                 Toast.makeText(context, "Couldn't read text from the slip photo", Toast.LENGTH_SHORT).show()
                             } else {

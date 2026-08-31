@@ -722,6 +722,79 @@ fun MainApp(modifier: Modifier = Modifier) {
         syncTrackedFolder()
     }
 
+    // Verify a batch of slips. Guards against sandbox/test API keys that return the SAME
+    // transRef (and amount) for every payload: if two or more different slips come back with
+    // one shared transRef, the responses are canned and nothing is applied, so real amounts
+    // extracted from slip photos are never overwritten with fake 178.00-style data.
+    suspend fun verifyBatch(old: List<SavedSlip>): List<Pair<SavedSlip, VerifySlipResponse>> {
+        val results = old.mapNotNull { s ->
+            runCatching { verifyWithEasySlip(s.payload) }.getOrNull()?.let { s to it }
+        }
+        val ok = results.filter { it.second.success && it.second.transRef != null }
+        val canned = ok.size >= 2 && ok.map { it.second.transRef }.distinct().size == 1
+        if (canned) {
+            android.util.Log.w("FireCashOCR", "verification returned one shared transRef for ${ok.size} slips — canned/test response, skipping")
+            return emptyList()
+        }
+        return results
+    }
+
+    // Apply a verified response to a slip. The slip's own amount (from the photo / OCR or the
+    // QR) is never overwritten — a sandbox/test API key returns arbitrary amounts (e.g. 178.00
+    // or 0.00), so a verified amount only fills a missing one, and any disagreement with the
+    // stored amount is surfaced as the amountMismatch fraud flag instead.
+    fun applyVerifiedUpdate(old: SavedSlip, result: VerifySlipResponse): SavedSlip {
+        val resolvedIsMoneyIn = when {
+            isKnownName(result.senderName, knownNames) && isKnownName(result.receiverName, knownNames) -> false
+            isKnownName(result.receiverName, knownNames) -> true
+            isKnownName(result.senderName, knownNames) -> false
+            else -> old.isMoneyIn
+        }
+        val verifiedAmount = result.amount
+        val amount = old.amount ?: verifiedAmount
+        val mismatch = old.amount != null && verifiedAmount != null && kotlin.math.abs(old.amount - verifiedAmount) > 0.005
+        return old.copy(
+            amount = amount,
+            transRef = result.transRef ?: old.transRef,
+            senderName = result.senderName ?: old.senderName,
+            receiverName = result.receiverName ?: old.receiverName,
+            date = result.transDate ?: old.date,
+            time = result.transTime ?: old.time,
+            verificationStatus = result.verificationStatus,
+            slipData = result.copy(amount = amount),
+            isMoneyIn = resolvedIsMoneyIn,
+            amountMismatch = old.amountMismatch || mismatch
+        )
+    }
+
+    // Verify every non-manual/non-notification slip against the API (used when entering
+    // shop mode so the whole account reflects bank-verified data).
+    fun verifyAllSlips() {
+        if (appMode == "personal") return
+        if (!easySlipEnabled || apiKey.isBlank()) return
+        if (isLoading || isBackgroundSyncing) return
+        val verifyable = savedSlips.filter {
+            !it.payload.startsWith("manual:") && !it.payload.startsWith("notif:")
+        }
+        if (verifyable.isEmpty()) return
+        isLoading = true
+        isUserSyncing = true
+        scope.launch {
+            try {
+                val results = verifyBatch(verifyable.toList())
+                for ((old, result) in results) {
+                    val idx = savedSlips.indexOfFirst { it.payload == old.payload || (old.transRef != null && it.transRef == old.transRef) }
+                    if (idx >= 0) savedSlips[idx] = applyVerifiedUpdate(old, result)
+                }
+                saveSlips(prefs, savedSlips)
+                android.util.Log.d("FireCashOCR", "verifyAllSlips: ${results.size} slips verified (amounts preserved)")
+            } finally {
+                isLoading = false
+                isUserSyncing = false
+            }
+        }
+    }
+
     // Full resync: clear processed-file cache (re-detect every photo) and re-verify ALL slips on server
     fun fullResync() {
         if (isLoading || isBackgroundSyncing) return
@@ -737,28 +810,9 @@ fun MainApp(modifier: Modifier = Modifier) {
                 val verifyable = savedSlips.filter {
                     !it.payload.startsWith("manual:") && !it.payload.startsWith("notif:")
                 }
-                for (old in verifyable.toList()) {
-                    val result = runCatching { verifyWithEasySlip(old.payload) }.getOrNull() ?: continue
-                    val resolvedIsMoneyIn = when {
-                        isKnownName(result.senderName, knownNames) && isKnownName(result.receiverName, knownNames) -> false
-                        isKnownName(result.receiverName, knownNames) -> true
-                        isKnownName(result.senderName, knownNames) -> false
-                        else -> old.isMoneyIn
-                    }
+                for ((old, result) in verifyBatch(verifyable.toList())) {
                     val idx = savedSlips.indexOfFirst { it.payload == old.payload }
-                    if (idx >= 0) {
-                        savedSlips[idx] = old.copy(
-                            amount = result.amount ?: old.amount,
-                            transRef = result.transRef ?: old.transRef,
-                            senderName = result.senderName ?: old.senderName,
-                            receiverName = result.receiverName ?: old.receiverName,
-                            date = result.transDate ?: old.date,
-                            time = result.transTime ?: old.time,
-                            verificationStatus = result.verificationStatus,
-                            slipData = result,
-                            isMoneyIn = resolvedIsMoneyIn
-                        )
-                    }
+                    if (idx >= 0) savedSlips[idx] = applyVerifiedUpdate(old, result)
                 }
                 saveSlips(prefs, savedSlips)
             } finally {
@@ -779,26 +833,8 @@ fun MainApp(modifier: Modifier = Modifier) {
         isLoading = true
         scope.launch {
             try {
-                for (old in unverified.toList()) {
-                    val result = runCatching { verifyWithEasySlip(old.payload) }.getOrNull() ?: continue
-                    // Preserve amount/date fallback and re-evaluate income via known names
-                    val resolvedIsMoneyIn = when {
-                        isKnownName(result.senderName, knownNames) && isKnownName(result.receiverName, knownNames) -> false
-                        isKnownName(result.receiverName, knownNames) -> true
-                        isKnownName(result.senderName, knownNames) -> false
-                        else -> old.isMoneyIn
-                    }
-                    val updated = old.copy(
-                        amount = result.amount ?: old.amount,
-                        transRef = result.transRef ?: old.transRef,
-                        senderName = result.senderName ?: old.senderName,
-                        receiverName = result.receiverName ?: old.receiverName,
-                        date = result.transDate ?: old.date,
-                        time = result.transTime ?: old.time,
-                        verificationStatus = result.verificationStatus,
-                        slipData = result,
-                        isMoneyIn = resolvedIsMoneyIn
-                    )
+                for ((old, result) in verifyBatch(unverified.toList())) {
+                    val updated = applyVerifiedUpdate(old, result)
                     val idx = savedSlips.indexOfFirst { it.payload == old.payload || (old.transRef != null && it.transRef == old.transRef) }
                     if (idx >= 0) savedSlips[idx] = updated
                 }
@@ -1004,8 +1040,12 @@ fun MainApp(modifier: Modifier = Modifier) {
     rules = emptyList(),
     appMode = appMode,
     onSetAppMode = { mode ->
+        val wasShop = appMode == "shop"
         appMode = mode
         prefs.edit().putString("app_mode", mode).apply()
+        // Entering shop mode re-verifies the whole account against the bank API
+        // (guarded against canned sandbox responses by verifyBatch).
+        if (mode == "shop" && !wasShop) verifyAllSlips()
     },
     easySlipEnabled = easySlipEnabled,
     apiKey = apiKey,

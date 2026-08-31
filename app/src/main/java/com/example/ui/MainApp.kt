@@ -745,14 +745,12 @@ fun MainApp(modifier: Modifier = Modifier) {
             )
         } else {
             SettingsScreen(
-    currentCurrency = "THB",
     rules = emptyList(),
     easySlipEnabled = easySlipEnabled,
     apiKey = apiKey,
     checkDuplicates = checkDuplicates,
     knownNames = knownNames,
     unverifiedCount = savedSlips.count { it.verificationStatus == VerificationStatus.UNVERIFIED },
-    onCurrencyChange = {},
     onToggleEasySlip = { enabled ->
         easySlipEnabled = enabled
         prefs.edit().putBoolean("easy_slip_enabled", enabled).apply()

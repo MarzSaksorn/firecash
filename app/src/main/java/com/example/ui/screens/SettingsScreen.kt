@@ -31,7 +31,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -43,6 +42,7 @@ import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
@@ -100,7 +100,6 @@ import com.example.ui.theme.FireCashSurfaceVariant
 
 @Composable
 fun SettingsScreen(
-    currentCurrency: String,
     rules: List<KeywordRule>,
     easySlipEnabled: Boolean,
     apiKey: String,
@@ -118,7 +117,6 @@ fun SettingsScreen(
     onToggleBackgroundListening: (Boolean) -> Unit = {},
     isLoading: Boolean = false,
     trackedFolders: List<String> = emptyList(),
-    onCurrencyChange: (String) -> Unit,
     onToggleEasySlip: (Boolean) -> Unit,
     onUpdateApiKey: (String) -> Unit,
     onToggleCheckDuplicates: (Boolean) -> Unit,
@@ -143,7 +141,6 @@ fun SettingsScreen(
     onBack: () -> Unit, onNavigateToCapture: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var currencyMenuExpanded by remember { mutableStateOf(false) }
     var dangerousExpanded by remember { mutableStateOf(false) }
     var showAddRuleDialog by remember { mutableStateOf(false) }
     var newKeyword by remember { mutableStateOf("") }
@@ -192,10 +189,8 @@ fun SettingsScreen(
         }
     }
 
-    val currencies = listOf("USD", "THB", "EUR", "GBP", "JPY")
 
-    Column(
-        modifier = modifier
+    Column(        modifier = modifier
             .fillMaxSize()
             .statusBarsPadding()
             .background(FireCashBackground)
@@ -221,116 +216,6 @@ fun SettingsScreen(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(start = 4.dp)
             )
-            // Card 1: Base Currency
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(FireCashSurfaceContainerLow)
-                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                    .padding(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(FireCashSurfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Payments,
-                                contentDescription = null,
-                                tint = FireCashPrimary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-
-                        Column {
-                            Text(
-                                text = "Base Currency",
-                                color = FireCashOnSurface,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Set default currency for analytics",
-                                color = FireCashOnSurfaceVariant,
-                                fontSize = 13.sp
-                            )
-                        }
-                    }
-
-                    // Currency Dropdown
-                    Box {
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(FireCashSurfaceContainerHigh)
-                                .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                .clickable { currencyMenuExpanded = true }
-                                .padding(horizontal = 10.dp, vertical = 8.dp)
-                                .testTag("currency_selector_dropdown"),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = when (currentCurrency) {
-                                    "THB" -> "THB (฿)"
-                                    "EUR" -> "EUR (€)"
-                                    "GBP" -> "GBP (£)"
-                                    "JPY" -> "JPY (¥)"
-                                    else -> "USD ($)"
-                                },
-                                color = FireCashOnSurface,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Icon(
-                                imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = null,
-                                tint = FireCashOnSurfaceVariant
-                            )
-                        }
-
-                        DropdownMenu(
-                            expanded = currencyMenuExpanded,
-                            onDismissRequest = { currencyMenuExpanded = false },
-                            modifier = Modifier.background(FireCashSurfaceContainerHighest)
-                        ) {
-                            currencies.forEach { curr ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = when (curr) {
-                                                "THB" -> "THB (฿)"
-                                                "EUR" -> "EUR (€)"
-                                                "GBP" -> "GBP (£)"
-                                                "JPY" -> "JPY (¥)"
-                                                else -> "USD ($)"
-                                            },
-                                            color = FireCashOnSurface
-                                        )
-                                    },
-                                    onClick = {
-                                        onCurrencyChange(curr)
-                                        currencyMenuExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
             // Card: My Names (auto income / transfer detection)
             Box(
                 modifier = Modifier

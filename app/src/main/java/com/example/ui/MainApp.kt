@@ -362,6 +362,30 @@ fun MainApp(modifier: Modifier = Modifier) {
         return null
     }
 
+    // Fallback date from the slip photo's file timestamp. Slip images are saved at
+    // transaction time (KBank MAKE etc.), so when the OCR date is unreadable (Thai
+    // glyphs garbled by the Latin recognizer) the photo's mtime is the slip's date.
+    fun photoModifiedDate(photoPath: String?): String? {
+        if (photoPath.isNullOrBlank()) return null
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        return try {
+            val millis = runCatching { java.io.File(photoPath).lastModified() }.getOrDefault(0L).takeIf { it > 0 }
+                ?: runCatching {
+                    val uri = Uri.parse(photoPath)
+                    if (uri.scheme != "content") return@runCatching null
+                    context.contentResolver.query(
+                        uri,
+                        arrayOf(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED),
+                        null, null, null
+                    )?.use { c -> if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null }
+                }.getOrNull()
+            millis?.let { sdf.format(java.util.Date(it)) }
+                .also { android.util.Log.d("FireCashOCR", "photoModifiedDate path=${photoPath.takeLast(40)} millis=$millis -> $it") }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     // Personal mode: log a slip from the recognized text of a slip photo, without calling
     // any verification API. Amount/date/merchant come from SlipDataParser; from/to lines
     // (จาก/ถึง or FROM/TO) decide money in/out via the known-names logic.
@@ -374,6 +398,10 @@ fun MainApp(modifier: Modifier = Modifier) {
         val now = System.currentTimeMillis()
         val sdfDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
         val sdfTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
+        // When the OCR date fell back to today (unreadable Thai date), use the photo's
+        // file timestamp — slip images are saved at transaction time.
+        val fallbackDate = sdfDate.format(java.util.Date(now))
+        val date = if (parsed.date == fallbackDate) photoModifiedDate(photoPath) ?: parsed.date else parsed.date
         // Prefer a baht-marked amount; else trust the parsed amount only when the text really
         // contains a decimal (avoids SlipDataParser's 45.20 fallback fabricating amounts).
         val hasDecimal = Regex("""\d+\.\d+""").containsMatchIn(rawText)
@@ -418,10 +446,10 @@ fun MainApp(modifier: Modifier = Modifier) {
             transRef = result.transRef,
             senderName = result.senderName,
             receiverName = result.receiverName,
-            date = result.transDate ?: sdfDate.format(java.util.Date(now)),
+            date = date,
             time = result.transTime ?: sdfTime.format(java.util.Date(now)),
             verificationStatus = result.verificationStatus,
-            slipData = result,
+            slipData = result.copy(transDate = date),
             isMoneyIn = resolvedIsMoneyIn,
             photoPath = photoPath
         )

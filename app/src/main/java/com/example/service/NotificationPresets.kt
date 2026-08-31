@@ -17,11 +17,13 @@ object NotificationPresets {
     /** Money-in notification apps: <packageName, prefix> — filled in by user later. */
     val incomePresets: List<WhitelistedApp> = listOf(
         // example: WhitelistedApp("com.kasikornbank.kplus", "โอนเงินเข้า")
+        WhitelistedApp("com.kasikornbank.makebykbank", "โอนเงินให้คุณ ฿")
     )
 
     /** Money-out notification apps: <packageName, prefix> — filled in by user later. */
     val expensePresets: List<WhitelistedApp> = listOf(
         // example: WhitelistedApp("com.kasikornbank.kplus", "โอนเงินสำเร็จ")
+        WhitelistedApp("com.kasikornbank.makebykbank", "โอนเงินสำเร็จ ฿")
     )
 
     private const val PREFS_PRESETS_SEEDED = "notification_presets_seeded"

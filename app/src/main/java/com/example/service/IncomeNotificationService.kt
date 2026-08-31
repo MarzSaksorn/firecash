@@ -66,8 +66,6 @@ class IncomeNotificationService : NotificationListenerService() {
         const val PREFS_NOTIFICATION_WHITELIST = "notification_whitelist"
         const val PREFS_NOTIFICATION_EXPENSE = "notification_expense_enabled"
         const val PREFS_NOTIFICATION_WHITELIST_EXPENSE = "notification_whitelist_expense"
-        private const val PREFS_SLIPS = "saved_slips"
-        private const val PREFS_SEEN = "seen_payloads"
 
         // Regex: first number with optional commas/decimals, handles 1,234.56, ฿ 1,200 etc.
         private val AMOUNT_REGEX = Regex("""[-+]?\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?""")
@@ -164,8 +162,15 @@ class IncomeNotificationService : NotificationListenerService() {
             }
         }
 
+        // Notifications are recorded into the ACTIVE mode's dataset so shop and personal
+        // slips stay separate (keys mirror MainApp's modePrefKey scheme).
+        private fun slipsKey(prefs: SharedPreferences): String =
+            if (prefs.getString("app_mode", "personal") == "shop") "saved_slips_shop" else "saved_slips"
+        private fun seenKey(prefs: SharedPreferences): String =
+            if (prefs.getString("app_mode", "personal") == "shop") "seen_payloads_shop" else "seen_payloads"
+
         private fun loadSlips(prefs: SharedPreferences): List<SavedSlip> {
-            val raw = prefs.getString(PREFS_SLIPS, null) ?: return emptyList()
+            val raw = prefs.getString(slipsKey(prefs), null) ?: return emptyList()
             return runCatching {
                 val arr = JSONArray(raw)
                 (0 until arr.length()).mapNotNull { i -> slipFromJson(arr.getJSONObject(i)) }
@@ -175,11 +180,11 @@ class IncomeNotificationService : NotificationListenerService() {
         private fun saveSlips(prefs: SharedPreferences, slips: List<SavedSlip>) {
             val arr = JSONArray()
             slips.forEach { arr.put(slipToJson(it)) }
-            prefs.edit().putString(PREFS_SLIPS, arr.toString()).apply()
+            prefs.edit().putString(slipsKey(prefs), arr.toString()).apply()
         }
 
         private fun loadSeenPayloads(prefs: SharedPreferences): MutableSet<String> {
-            val raw = prefs.getString(PREFS_SEEN, null) ?: return mutableSetOf()
+            val raw = prefs.getString(seenKey(prefs), null) ?: return mutableSetOf()
             return runCatching {
                 val arr = JSONArray(raw)
                 (0 until arr.length()).mapTo(mutableSetOf()) { arr.getString(it) }
@@ -188,7 +193,7 @@ class IncomeNotificationService : NotificationListenerService() {
 
         private fun saveSeenPayloads(prefs: SharedPreferences, seen: Set<String>) {
             val arr = JSONArray(seen.toList())
-            prefs.edit().putString(PREFS_SEEN, arr.toString()).apply()
+            prefs.edit().putString(seenKey(prefs), arr.toString()).apply()
         }
 
         private fun slipToJson(slip: SavedSlip): JSONObject {

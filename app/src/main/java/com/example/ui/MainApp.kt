@@ -176,7 +176,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     // Keep Account list live when IncomeNotificationService writes to prefs in background
     androidx.compose.runtime.DisposableEffect(prefs) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == PREFS_SLIPS) {
+            if (key == modePrefKey(prefs, null, PREFS_SLIPS)) {
                 val fresh = loadSlips(prefs)
                 // Simple diff check — replace if differs
                 if (fresh.size != savedSlips.size || fresh.toSet() != savedSlips.toSet()) {
@@ -496,6 +496,13 @@ fun MainApp(modifier: Modifier = Modifier) {
 
             root.put("seenPayloads", JSONArray(seenPayloads.toList()))
             root.put("processedFiles", JSONArray(processedFiles.toList()))
+            // Also export the other mode's dataset so a backup never loses either side
+            val otherMode = if (appMode == "shop") "personal" else "shop"
+            val otherArr = JSONArray()
+            loadSlips(prefs, otherMode).forEach { otherArr.put(slipToJson(it)) }
+            root.put("slips_" + otherMode, otherArr)
+            root.put("seenPayloads_" + otherMode, JSONArray(loadSeenPayloads(prefs, otherMode)))
+            root.put("processedFiles_" + otherMode, JSONArray(loadProcessedFiles(prefs, otherMode)))
             root.put("trackedFolders", JSONArray(trackedFolderUris))
             root.put("knownNames", JSONArray(knownNames))
 
@@ -542,21 +549,44 @@ fun MainApp(modifier: Modifier = Modifier) {
             val text = java.io.File(path).readText()
             val root = JSONObject(text)
 
-            root.optJSONArray("slips")?.let { arr ->
-                val newSlips = mutableListOf<SavedSlip>()
-                for (i in 0 until arr.length()) {
-                    slipFromJson(arr.getJSONObject(i))?.let { newSlips.add(it) }
+            // Restore BOTH mode datasets ("slips" legacy key = personal); the mode declared
+            // in the backup's settings also lands in memory so the screen refreshes correctly.
+            val importedAppMode = root.optJSONObject("settings")?.optString("app_mode", appMode) ?: appMode
+            fun restoreDataset(mode: String) {
+                val suffix = if (mode == "shop") "_shop" else ""
+                val legacy = suffix.isEmpty()
+                root.optJSONArray("slips" + suffix)?.let { arr ->
+                    val list = mutableListOf<SavedSlip>()
+                    for (i in 0 until arr.length()) {
+                        slipFromJson(arr.getJSONObject(i))?.let { list.add(it) }
+                    }
+                    if (mode == importedAppMode) {
+                        savedSlips.clear()
+                        savedSlips.addAll(list)
+                    }
+                    saveSlips(prefs, list, mode)
                 }
-                savedSlips.clear()
-                savedSlips.addAll(newSlips)
-                saveSlips(prefs, savedSlips)
+                val seen = (root.optJSONArray("seenPayloads" + suffix) ?: if (legacy) root.optJSONArray("seenPayloads") else null)
+                    ?.let { arr -> (0 until arr.length()).map { arr.getString(it) }.toSet() } ?: emptySet()
+                if (mode == importedAppMode) {
+                    seenPayloads.clear()
+                    seenPayloads.addAll(seen)
+                }
+                saveSeenPayloads(prefs, seen, mode)
+                val processed = (root.optJSONArray("processedFiles" + suffix) ?: if (legacy) root.optJSONArray("processedFiles") else null)
+                    ?.let { arr -> (0 until arr.length()).map { arr.getString(it) }.toSet() } ?: emptySet()
+                if (mode == importedAppMode) {
+                    processedFiles.clear()
+                    processedFiles.addAll(processed)
+                }
+                saveProcessedFiles(prefs, processed, mode)
             }
+            restoreDataset("personal")
+            restoreDataset("shop")
 
             fun readStrArr(name: String): List<String> =
                 root.optJSONArray(name)?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList()
 
-            seenPayloads.clear(); seenPayloads.addAll(readStrArr("seenPayloads")); saveSeenPayloads(prefs, seenPayloads)
-            processedFiles.clear(); processedFiles.addAll(readStrArr("processedFiles")); saveProcessedFiles(prefs, processedFiles)
             trackedFolderUris = readStrArr("trackedFolders"); saveTrackedFolders(prefs, trackedFolderUris)
             knownNames = readStrArr("knownNames"); saveKnownNames(prefs, knownNames)
 
@@ -765,34 +795,6 @@ fun MainApp(modifier: Modifier = Modifier) {
             isMoneyIn = resolvedIsMoneyIn,
             amountMismatch = old.amountMismatch || mismatch
         )
-    }
-
-    // Verify every non-manual/non-notification slip against the API (used when entering
-    // shop mode so the whole account reflects bank-verified data).
-    fun verifyAllSlips() {
-        if (appMode == "personal") return
-        if (!easySlipEnabled || apiKey.isBlank()) return
-        if (isLoading || isBackgroundSyncing) return
-        val verifyable = savedSlips.filter {
-            !it.payload.startsWith("manual:") && !it.payload.startsWith("notif:")
-        }
-        if (verifyable.isEmpty()) return
-        isLoading = true
-        isUserSyncing = true
-        scope.launch {
-            try {
-                val results = verifyBatch(verifyable.toList())
-                for ((old, result) in results) {
-                    val idx = savedSlips.indexOfFirst { it.payload == old.payload || (old.transRef != null && it.transRef == old.transRef) }
-                    if (idx >= 0) savedSlips[idx] = applyVerifiedUpdate(old, result)
-                }
-                saveSlips(prefs, savedSlips)
-                android.util.Log.d("FireCashOCR", "verifyAllSlips: ${results.size} slips verified (amounts preserved)")
-            } finally {
-                isLoading = false
-                isUserSyncing = false
-            }
-        }
     }
 
     // Full resync: clear processed-file cache (re-detect every photo) and re-verify ALL slips on server
@@ -1040,12 +1042,21 @@ fun MainApp(modifier: Modifier = Modifier) {
     rules = emptyList(),
     appMode = appMode,
     onSetAppMode = { mode ->
-        val wasShop = appMode == "shop"
-        appMode = mode
-        prefs.edit().putString("app_mode", mode).apply()
-        // Entering shop mode re-verifies the whole account against the bank API
-        // (guarded against canned sandbox responses by verifyBatch).
-        if (mode == "shop" && !wasShop) verifyAllSlips()
+        if (mode != appMode) {
+            // Personal and shop keep separate datasets — persist the current mode's slips,
+            // then load the other mode's own data so the two never interfere.
+            saveSlips(prefs, savedSlips)
+            saveSeenPayloads(prefs, seenPayloads)
+            saveProcessedFiles(prefs, processedFiles)
+            appMode = mode
+            prefs.edit().putString("app_mode", mode).apply()
+            savedSlips.clear()
+            savedSlips.addAll(loadSlips(prefs))
+            seenPayloads.clear()
+            seenPayloads.addAll(loadSeenPayloads(prefs))
+            processedFiles.clear()
+            processedFiles.addAll(loadProcessedFiles(prefs))
+        }
     },
     easySlipEnabled = easySlipEnabled,
     apiKey = apiKey,
@@ -1236,16 +1247,24 @@ private const val PREFS_FOLDERS = "tracked_folders"
 private const val PREFS_KNOWN_NAMES = "known_names"
 private const val PREFS_PROCESSED_FILES = "processed_files"
 
-private fun loadProcessedFiles(prefs: SharedPreferences): Set<String> {
-    val raw = prefs.getString(PREFS_PROCESSED_FILES, null) ?: return emptySet()
+// Personal and shop modes keep SEPARATE datasets so switching modes never touches the
+// other mode's slips. Personal uses the legacy keys; shop gets "_shop" suffixed keys.
+// A null mode resolves to the currently active app mode.
+private fun modePrefKey(prefs: SharedPreferences, mode: String?, base: String): String {
+    val m = mode ?: prefs.getString("app_mode", "personal")
+    return if (m == "shop") base + "_shop" else base
+}
+
+private fun loadProcessedFiles(prefs: SharedPreferences, mode: String? = null): Set<String> {
+    val raw = prefs.getString(modePrefKey(prefs, mode, PREFS_PROCESSED_FILES), null) ?: return emptySet()
     return runCatching {
         val arr = JSONArray(raw)
         (0 until arr.length()).mapTo(mutableSetOf()) { arr.getString(it) }
     }.getOrDefault(emptySet())
 }
 
-private fun saveProcessedFiles(prefs: SharedPreferences, files: Set<String>) {
-    prefs.edit().putString(PREFS_PROCESSED_FILES, JSONArray(files.toList()).toString()).apply()
+private fun saveProcessedFiles(prefs: SharedPreferences, files: Set<String>, mode: String? = null) {
+    prefs.edit().putString(modePrefKey(prefs, mode, PREFS_PROCESSED_FILES), JSONArray(files.toList()).toString()).apply()
 }
 
 private fun loadTrackedFolders(prefs: SharedPreferences): List<String> {
@@ -1335,8 +1354,8 @@ private fun saveNotificationWhitelistExpense(prefs: SharedPreferences, list: Lis
     prefs.edit().putString(PREFS_NOTIFICATION_WHITELIST_EXPENSE, arr.toString()).apply()
 }
 
-private fun loadSlips(prefs: SharedPreferences): List<SavedSlip> {
-    val raw = prefs.getString(PREFS_SLIPS, null) ?: return emptyList()
+private fun loadSlips(prefs: SharedPreferences, mode: String? = null): List<SavedSlip> {
+    val raw = prefs.getString(modePrefKey(prefs, mode, PREFS_SLIPS), null) ?: return emptyList()
     return runCatching {
         val arr = JSONArray(raw)
         (0 until arr.length()).mapNotNull { i ->
@@ -1345,23 +1364,23 @@ private fun loadSlips(prefs: SharedPreferences): List<SavedSlip> {
     }.getOrDefault(emptyList())
 }
 
-private fun saveSlips(prefs: SharedPreferences, slips: List<SavedSlip>) {
+private fun saveSlips(prefs: SharedPreferences, slips: List<SavedSlip>, mode: String? = null) {
     val arr = JSONArray()
     slips.forEach { slip -> arr.put(slipToJson(slip)) }
-    prefs.edit().putString(PREFS_SLIPS, arr.toString()).apply()
+    prefs.edit().putString(modePrefKey(prefs, mode, PREFS_SLIPS), arr.toString()).apply()
 }
 
-private fun loadSeenPayloads(prefs: SharedPreferences): Set<String> {
-    val raw = prefs.getString(PREFS_SEEN, null) ?: return emptySet()
+private fun loadSeenPayloads(prefs: SharedPreferences, mode: String? = null): Set<String> {
+    val raw = prefs.getString(modePrefKey(prefs, mode, PREFS_SEEN), null) ?: return emptySet()
     return runCatching {
         val arr = JSONArray(raw)
         (0 until arr.length()).mapTo(mutableSetOf()) { arr.getString(it) }
     }.getOrDefault(emptySet())
 }
 
-private fun saveSeenPayloads(prefs: SharedPreferences, seen: Set<String>) {
+private fun saveSeenPayloads(prefs: SharedPreferences, seen: Set<String>, mode: String? = null) {
     val arr = JSONArray(seen.toList())
-    prefs.edit().putString(PREFS_SEEN, arr.toString()).apply()
+    prefs.edit().putString(modePrefKey(prefs, mode, PREFS_SEEN), arr.toString()).apply()
 }
 
 private fun slipToJson(slip: SavedSlip): JSONObject {

@@ -89,6 +89,7 @@ class SlipVerificationManager {
 
         return when {
             response.code == 429 -> rateLimitedResponse("EasySlip API quota limit reached. Please wait.")
+            response.code == 401 -> authFailedResponse()
             response.code == 404 -> {
                 val errJson = runCatching { JSONObject(responseBody) }.getOrNull()
                 VerifySlipResponse(
@@ -166,6 +167,7 @@ class SlipVerificationManager {
 
         return when {
             response.code == 429 -> rateLimitedResponse("ThunderAPI quota limit reached. Please wait.")
+            response.code == 401 -> authFailedResponse()
             response.code == 404 -> notFoundResponse()
             !response.isSuccessful -> simulateSlipVerification(payload)
             else -> parseThunderResponse(JSONObject(responseBody))
@@ -226,7 +228,7 @@ class SlipVerificationManager {
             )
         }
         val request = Request.Builder()
-            .url("https://api.slip2go.com/api/verify-slip/qr-code/info")
+            .url("https://connect.slip2go.com/api/verify-slip/qr-code/info")
             // Slip2Go expects the secret raw in Authorization (no Bearer prefix)
             .addHeader("Authorization", apiKey)
             .post(jsonObject.toJsonBody())
@@ -238,6 +240,7 @@ class SlipVerificationManager {
 
         return when {
             response.code == 429 -> rateLimitedResponse("Slip2Go quota limit reached. Please wait.")
+            response.code == 401 -> authFailedResponse()
             !response.isSuccessful -> simulateSlipVerification(payload)
             else -> parseSlip2GoResponse(JSONObject(responseBody))
         }
@@ -246,18 +249,22 @@ class SlipVerificationManager {
     private fun parseSlip2GoResponse(json: JSONObject): VerifySlipResponse {
         val code = json.optString("code")
         val message = json.optString("message")
-        val success = code == "200000"
         val data = json.optJSONObject("data")
+        val isDup = code == "200501" || (data?.optBoolean("isDuplicate") == true)
+        val success = code in setOf("200000", "200001", "200200")
+
         if (data == null) {
             return VerifySlipResponse(
                 success = false,
+                isDuplicate = isDup,
                 errorCode = code.ifEmpty { "INVALID_RESPONSE" },
                 errorMessage = message.ifEmpty { "Malformed response from Slip2Go." },
-                verificationStatus = if (success) VerificationStatus.UNVERIFIED else VerificationStatus.SLIP_NOT_FOUND
+                verificationStatus = when {
+                    code == "429000" -> VerificationStatus.RATE_LIMITED
+                    else -> VerificationStatus.SLIP_NOT_FOUND
+                }
             )
         }
-
-        val isDup = message.contains("duplicate", ignoreCase = true) || data.optBoolean("isDuplicate", false)
 
         val sender = data.optJSONObject("sender")
         val senderBank = sender?.optJSONObject("bank")
@@ -269,23 +276,26 @@ class SlipVerificationManager {
         return VerifySlipResponse(
             success = success,
             isDuplicate = isDup,
-            isAmountMatched = true,
+            isAmountMatched = success,
             transRef = data.optString("transRef").ifEmpty { null },
             sendingBank = senderBank?.optString("id")?.ifBlank { null },
             sendingBankName = senderBank?.optString("name")?.ifBlank { null },
             receivingBank = receiverBank?.optString("id")?.ifBlank { null },
             receivingBankName = receiverBank?.optString("name")?.ifBlank { null },
+            receiverName = receiver?.optJSONObject("account")?.optString("name")?.ifBlank { null },
+            senderName = sender?.optJSONObject("account")?.optString("name")?.ifBlank { null },
             amount = if (data.has("amount") && !data.isNull("amount")) data.optDouble("amount") else null,
             transDate = date,
             transTime = time,
+            errorCode = if (success) null else code.ifEmpty { null },
+            errorMessage = if (success) null else message.ifEmpty { null },
             verificationStatus = when {
                 isDup -> VerificationStatus.DUPLICATE_DETECTED
+                code == "200404" || code == "200500" -> VerificationStatus.SLIP_NOT_FOUND
+                code == "429000" -> VerificationStatus.RATE_LIMITED
                 success -> VerificationStatus.VERIFIED
-                else -> VerificationStatus.SLIP_NOT_FOUND
+                else -> VerificationStatus.UNVERIFIED
             }
-        ).copy(
-            receiverName = receiver?.optJSONObject("account")?.optString("name")?.ifBlank { null },
-            senderName = sender?.optJSONObject("account")?.optString("name")?.ifBlank { null }
         )
     }
 
@@ -324,6 +334,13 @@ class SlipVerificationManager {
             verificationStatus = VerificationStatus.RATE_LIMITED
         )
     }
+
+    private fun authFailedResponse(): VerifySlipResponse = VerifySlipResponse(
+        success = false,
+        errorCode = "AUTH_FAILED",
+        errorMessage = "${provider.label} authentication failed — check your API key.",
+        verificationStatus = VerificationStatus.UNVERIFIED
+    )
 
     private fun notFoundResponse(): VerifySlipResponse = VerifySlipResponse(
         success = false,

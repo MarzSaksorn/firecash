@@ -74,7 +74,7 @@ Helper functions for slips/whitelists/seen/processed live as top-level `private 
 - AccountScreen list: `LazyColumn(reverseLayout = true)`, slips appended in arrival order, grouped by the `date` string with a daily-net-total header. Newest is at the visual bottom.
 - **App mode** (`app_mode` pref, default `"personal"`, chosen in Settings → "App Mode"): the balance card's top-right 44dp action button differs — **Personal** shows `+` (opens the manual income/expense entry dialog), **Shop** shows the camera icon (opens the scan flow). The mode is carried through JSON export/import.
 - Deletion safety: only slips with `UNVERIFIED` status, blank `transRef`, or `null` amount can be deleted (long-press multi-select in AccountScreen, `onDeleteSlip` in MainApp).
-- `fullResync()` (hold Sync 10s): clears `processed_files`, re-OCR's every tracked folder, then re-verifies all slips **except** `manual:`/`notif:` payloads.
+- `fullResync()` (hold Sync 10s): clears `processed_files`, re-OCR's every tracked folder, then re-verifies all slips **except** `manual:`/`notif:` payloads. Settings → Tracked Folders also has **Force Sync All (re-scan every photo)** (`forceSyncTrackedFolders()`): same cache clear + re-scan but WITHOUT the re-verify loop; re-reading a photo updates the existing slip (dedupe by `photoPath`) instead of duplicating.
 - Import/export (`exportAllData`/`importAllData`): full JSON clone including API keys, whitelists, and app mode. Import preserves permanent presets (merges with `mergeIncome`/`mergeExpense`) and a JSON missing a whitelist key does NOT wipe the device list.
 
 ## Gotchas

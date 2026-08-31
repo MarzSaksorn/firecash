@@ -44,6 +44,7 @@ There are **two parallel architectures**. The live app is NOT the one using Room
 | `notification_income_enabled`, `notification_expense_enabled` | master toggles |
 | `easy_slip_enabled`, `verification_provider` (easyslip/thunder/slip2go), `api_key_easyslip`, `api_key_thunder`, `api_key_slip2go`, `check_duplicates` | verification settings |
 | `background_listening` | foreground keepalive toggle |
+| `app_mode` | `"personal"` (default) or `"shop"` — controls the home card's primary action |
 
 Helper functions for slips/whitelists/seen/processed live as top-level `private fun`s at the bottom of `MainApp.kt` (e.g. `loadSlips`/`saveSlips`/`slipToJson`, `loadNotificationWhitelist`, `saveProcessedFiles`).
 
@@ -57,6 +58,7 @@ Helper functions for slips/whitelists/seen/processed live as top-level `private 
 ## OCR / parsing
 
 - `OcrProcessor.processReceipt(imageUri, samplePreset, scanCenterOnly=true)`: uses ML Kit **barcode scanning only** (QR). With `scanCenterOnly=true` it crops the image to the center 60% square to match the on-screen frame overlay. It does NOT run text recognition — the `mlkit:text-recognition` dependency is present but unused. `samplePreset != null` bypasses the image entirely and parses a canned OCR string (used for demo/testing).
+- **Personal mode OCR** (`OcrProcessor.recognizeText(imageUri, scanCenterOnly=false)` + `MainApp.addOcrSlip`): in Personal app mode the camera/gallery photo path skips verification entirely — ML Kit Latin text recognition extracts the slip text, `SlipDataParser.parse` + `extractParties` (จาก/ถึง or `FROM`/`TO` lines) build a `SavedSlip` (payload `ocr:<ts>`, UNVERIFIED, counterparty = from/to lines else merchant, money in/out resolved via known names, unknown → expense). Live QR auto-detect is a no-op in Personal mode. Note: ML Kit on-device text recognition has **no Thai script support** (Latin/digits only), so Thai-only glyphs are not extracted.
 - `SlipDataParser.parse(rawText)`: regex-based extraction — amounts (`TOTAL`, `ยอดรวม`, etc.), dates (`2023-10-24`, `dd/MM/yyyy`, `24 Oct 2023`), merchant (first plausible line, truncated to 32 chars), Tag 91 CRC (`9104XXXX`), EMVCo QR CRC (`6304XXXX`). Bank slip detection via CRC/Tag 91 or `PromptPay`/`โอนเงินสำเร็จ`. Falls back to hardcoded values (amount `45.20`, today's date) when nothing matches.
 - Bank code mapping: KBank `004`, SCB `014`, Bangkok Bank `002`, KTB `006` (see `SlipDataParser.extractBankSlipPayload` and `SlipVerificationManager.getBankName`).
 
@@ -70,9 +72,10 @@ Helper functions for slips/whitelists/seen/processed live as top-level `private 
 
 - Balance = moneyIn − moneyOut. Each slip resolves to in/out/transfer via `effectiveIsMoneyIn` (duplicated in `MainApp.isKnownName`-based logic and `AccountScreen`): receiver is a known name ⇒ income, sender is known ⇒ expense, both known (or sender==receiver) ⇒ transfer (excluded from balance), else the stored `isMoneyIn` flag. Known names are matched case-insensitively, trimmed.
 - AccountScreen list: `LazyColumn(reverseLayout = true)`, slips appended in arrival order, grouped by the `date` string with a daily-net-total header. Newest is at the visual bottom.
+- **App mode** (`app_mode` pref, default `"personal"`, chosen in Settings → "App Mode"): the balance card's top-right 44dp action button differs — **Personal** shows `+` (opens the manual income/expense entry dialog), **Shop** shows the camera icon (opens the scan flow). The mode is carried through JSON export/import.
 - Deletion safety: only slips with `UNVERIFIED` status, blank `transRef`, or `null` amount can be deleted (long-press multi-select in AccountScreen, `onDeleteSlip` in MainApp).
 - `fullResync()` (hold Sync 10s): clears `processed_files`, re-OCR's every tracked folder, then re-verifies all slips **except** `manual:`/`notif:` payloads.
-- Import/export (`exportAllData`/`importAllData`): full JSON clone including API keys and whitelists. Import preserves permanent presets (merges with `mergeIncome`/`mergeExpense`) and a JSON missing a whitelist key does NOT wipe the device list.
+- Import/export (`exportAllData`/`importAllData`): full JSON clone including API keys, whitelists, and app mode. Import preserves permanent presets (merges with `mergeIncome`/`mergeExpense`) and a JSON missing a whitelist key does NOT wipe the device list.
 
 ## Gotchas
 
@@ -81,7 +84,7 @@ Helper functions for slips/whitelists/seen/processed live as top-level `private 
 - **Secrets plugin**: `secrets.propertiesFileName = ".env"` (`.env` is gitignored; `.env.example` has only a commented `GEMINI_API_KEY` placeholder). `FIREBASE_APPCHECK_DEBUG_TOKEN` is in the ignore list. If you add an API key for verification providers, it goes into prefs (settings), NOT `.env`.
 - **Roborazzi/Robolectric are configured** (`libs.versions.toml`, `testOptions.isIncludeAndroidResources = true`) but no test uses Roborazzi (`captureRoboImage`); `app/src/test/screenshots/greeting.png` is a leftover. Robolectric tests need `@RunWith(RobolectricTestRunner::class)` + `@Config(sdk = [36])`.
 - **Tests**: JUnit4 + `runBlocking` (coroutines), plain JVM tests for pure logic (`SlipDataParserTest`, `EasySlipClientTest` mock pipeline, `AnalyticsEngineTest`, `ExportManagerTest`). `EasySlipClientTest.testMockVerificationPipeline` relies on the no-key simulation behavior.
-- **Docs drift**: `PROJECT_STATUS.md` is stale (says OCR is broken and references `CaptureScreen.kt`, which doesn't exist — the real file is `PhotoCaptureScreen.kt`). `docs/DEVELOPMENT_LOG.md` has detailed history but also goes stale. `docs/firecash_ui_stitch_plan.md` defines the design tokens (`#121316` bg, `#FF6B00` primary, `#10B981`/`#6366F1` accents) mirrored in `ui/theme/Color.kt`.
+- **Docs drift**: `PROJECT_STATUS.md` is now maintained (snapshot of current state; last updated 2026-08-31). `docs/DEVELOPMENT_LOG.md` has detailed history but also goes stale. `docs/firecash_ui_stitch_plan.md` defines the design tokens (`#121316` bg, `#FF6B00` primary, `#10B981`/`#6366F1` accents) mirrored in `ui/theme/Color.kt`.
 - `package.json` contains only `opencode-ai` (harness used to build the app; `node_modules/` untracked). `snapui.zip` is a tracked artifact at repo root. `.github/workflows/proxy.yml` (EasySlip proxy Cloud Run deploy) is a stub — the `proxy/` directory does not exist and the gcloud command is commented out.
 - Gradle: `RepositoriesMode.FAIL_ON_PROJECT_REPOS` (declare repos only in `settings.gradle.kts`); `android.nonTransitiveRClass=true`.
 - Manual slips use payload prefix `manual:` and `MANUAL-` transRefs; the UI treats them as always-deletable. Notification slips (`notif:`) are also deletable only while unverified.

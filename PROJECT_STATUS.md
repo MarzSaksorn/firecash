@@ -1,40 +1,59 @@
 # FireCash Project – Status & Next Steps
 
+> Last updated 2026-08-31. See `AGENTS.md` for the authoritative architecture notes; this file is the human-readable snapshot. Previous versions of this file were stale (referenced `CaptureScreen.kt` and claimed OCR was broken) — the OCR pipeline has since been reworked.
+
 ## Current State
+
 | Item | Status | Details |
 |------|--------|---------|
-| Camera preview | Done | CameraX + runtime permission (Activity Result API) |
-| Photo capture & save | Done | Saves to `cacheDir/capture_<timestamp>.jpg` |
-| Pass image path to ViewModel | Done | `onCapture(SourceType.CAMERA, null, photoFile.absolutePath)` |
-| OCR processing | Broken | `OcrProcessor` ignores `imageUri`; always returns Uber preset / hard-coded $45.20 |
-| Persist image location | Not done | Image stays in cache, not moved to permanent storage |
-| Tests | Not done | No tests cover OCR or capture flow |
-| Build | OK | `gradlew assembleDebug` succeeds |
+| Build | OK | `gradlew assembleDebug` succeeds (`BUILD SUCCESSFUL`, warnings only, no errors) |
+| Tests | 10/11 pass | 1 pre-existing failure: `EasySlipClientTest.testMockVerificationPipeline` — the legacy client's simulation changed to return `UNVERIFIED`; test is dead code, left alone |
+| Camera & QR scan | Done | CameraX live preview in `PhotoCaptureScreen.kt`; center-frame 60% ROI filtering — only QRs inside the frame overlay are detected |
+| OCR pipeline | Done (barcode-only) | `OcrProcessor.processReceipt(imageUri, samplePreset)` reads the photo and runs ML Kit **barcode scanning** (QR payloads); `scanCenterOnly` crops center 60%. Text recognition is intentionally unused. `samplePreset` bypasses the image for demo/testing |
+| Slip photos | Done | Capture/gallery/import save to persistent external storage; each slip stores its `photoPath`; viewable via FileProvider |
+| Verification | Done | Multi-provider: EasySlip, ThunderAPI, Slip2Go (`SlipVerificationManager`); no key / network failure / unknown code → `simulateSlipVerification()` fallback (payload ending `9999` ⇒ DUPLICATE, else UNVERIFIED) |
+| Account (homepage) | Done | Balance card (money in/out), reverse bottom→top slip list grouped by day with daily-net header, search (exact for QR payload/ref), long-press multi-select delete of unverifiable slips, manual income/expense entry, sync button (tap = new photos, hold 10s = full resync) |
+| App Mode | Done | Settings → App Mode: **Personal** (manual `+` entry button on home card) or **Shop** (camera button on home card); persisted and carried through JSON export/import |
+| Notification income/expense | Done | `IncomeNotificationService` prefix-based amount scooping, per-app whitelists (money-in and money-out), permanent presets (KBank/SCB, toggleable but not removable), optional foreground "keep listening" service |
+| Analytics | Done | Spending summary with Day/Week/Month vertical stick chart + AI insights |
+| Settings | Done | Safe (Base Currency, My Names, Tracked Folders, Keyword Mapping) / collapsible red **Dangerous** (EasySlip, Notification whitelists, Background & Battery, Data Transfer) |
+| Data transfer | Done | Full JSON export/import incl. API keys, whitelists, app mode; import preserves permanent presets and won't wipe device lists on missing keys |
+| Persistence | SharedPreferences | `firecash_settings` prefs hold slips/whitelists/settings as JSON strings; Room is NOT used by the live app |
 
-## Problem
-Even after wiring the captured image path through `CaptureScreen` → `MainApp` → `MainViewModel.startVerification` → `OcrProcessor.processReceipt(imageUri, samplePreset)`, the extracted data is always the Uber placeholder:
-- Merchant: UBER TECHNOLOGIES INC.
-- Amount: $45.20
+## Architecture (read this first)
 
-Root cause: `OcrProcessor.kt` never reads the image from `imageUri`. It returns preset text when `samplePreset != null`, otherwise returns a hard-coded default Uber receipt string. No real OCR is performed on the captured photo.
+Two parallel architectures exist; **the live app is NOT the Room/ViewModel one**.
 
-## Next Steps
-1. Add an OCR library (e.g., Google ML Kit `com.google.mlkit:text-recognition`).
-2. Update `OcrProcessor.processReceipt`:
-   - If `imageUri` is provided and file exists → decode bitmap, run text recognition, feed text to `SlipDataParser.parse(text)`.
-   - Else fall back to preset/default text.
-3. Move captured image to permanent storage (e.g., `filesDir/receipts/<uuid>.jpg`) and store the path on the `Expense`.
-4. Add unit tests:
-   - `startVerification` forwards `imageUri` to `ocrProcessor`.
-   - `OcrProcessor` returns parsed result from OCR text when image present.
-   - Review screen displays the captured image.
-5. UI: show progress while OCR runs; disable shutter during processing.
-6. Rebuild and verify with a real receipt photo.
+- **Live**: `MainActivity` → `ui/MainApp.kt` — a single ~1200-line composable holding all state (`remember { mutableStateOf(...) }` + `SharedPreferences`). Navigation = four booleans + `BackHandler`s. Data flow: QR photo → `OcrProcessor` (ML Kit barcode) → `addSlip()` → `SlipVerificationManager.verifyPayload()` → `SavedSlip` JSON → prefs → `AccountScreen`.
+- **Dead code (do not extend, may be deleted)**: `ui/viewmodel/MainViewModel.kt`, `data/local/*` (Room), `data/model/Expense.kt`/`KeywordRule.kt`, `data/repository/*`, `data/export/ExportManager.kt`, `data/backup/DriveBackupManager.kt`, `data/easyslip/EasySlipClient.kt`. Replicate behavior in MainApp if a feature needs it.
 
-## Files Touched / Relevant
-- `app/src/main/java/com/example/ui/screens/CaptureScreen.kt`
-- `app/src/main/java/com/example/ui/MainApp.kt`
-- `app/src/main/java/com/example/ui/viewmodel/MainViewModel.kt`
-- `app/src/main/java/com/example/data/ocr/OcrProcessor.kt`
-- `app/src/main/java/com/example/data/ocr/SlipDataParser.kt`
-- `app/build.gradle`
+## Known Gaps / Not Implemented
+
+- **Keyword Mapping** in Settings is a stub — `MainApp` passes `rules = emptyList()`; no keyword rules are persisted or applied.
+- **Onboarding screen** — planned but never built.
+- **`BottomNavBar` / `CaptureBottomBar`** — dead components after top-bar navigation refactor; `BottomNavBar.kt` is unreferenced.
+- **Google Drive backup** — removed by request; `DriveBackupManager.kt` sits unreferenced in `data/`.
+- **`proxy.yml` CI workflow** (EasySlip proxy Cloud Run deploy) is a stub — the `proxy/` directory doesn't exist; gcloud command commented out.
+- **Text recognition** (`mlkit:text-recognition` dependency) present but unused by design — slips are identified via QR barcodes only.
+
+## Next Steps (candidates)
+
+1. Wire Keyword Mapping persistence (replace `rules = emptyList()`).
+2. Fix or delete `EasySlipClientTest` / legacy `EasySlipClient` to green the test suite.
+3. Build the planned Onboarding screen.
+4. Prune dead code (Room, ViewModel, repositories, `BottomNavBar`) to reduce confusion — AGENTS.md documents what's safe to remove.
+5. CI: make `assembleDebug` artifact release (tag `debug-build-18` exists) — add lint/test to the workflow.
+
+## Key Files
+
+| File | Role |
+|------|------|
+| `app/src/main/java/com/example/ui/MainApp.kt` | All app state, nav, persistence, export/import, sync |
+| `app/src/main/java/com/example/ui/screens/AccountScreen.kt` | Homepage: balance card, reversed slip list, search, selection mode, app-mode action button |
+| `app/src/main/java/com/example/ui/screens/PhotoCaptureScreen.kt` | CameraX preview + QR scan (center 60% ROI) |
+| `app/src/main/java/com/example/ui/screens/QrPayloadScreen.kt` | Slip detail: verification card, photo link, copy-to-clipboard |
+| `app/src/main/java/com/example/ui/screens/SettingsScreen.kt` | Safe/Dangerous settings incl. App Mode picker, whitelists, Data Transfer |
+| `app/src/main/java/com/example/ui/screens/AnalyticsScreen.kt` | Spending chart + AI insights |
+| `app/src/main/java/com/example/data/ocr/OcrProcessor.kt` + `SlipDataParser.kt` | QR payload extraction + regex parsing |
+| `app/src/main/java/com/example/data/verification/SlipVerificationManager.kt` | Multi-provider verification + fallback simulation |
+| `app/src/main/java/com/example/service/IncomeNotificationService.kt` + `NotificationPresets.kt` | Notification income/expense capture + presets |

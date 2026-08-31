@@ -120,4 +120,30 @@ class SlipDataParserTest {
         assertEquals("2026-08-31", result.date)
         assertEquals(49.79, result.amount, 0.01)
     }
+
+    @Test
+    fun testParseThaiMonthDateConvertsBuddhistEra() {
+        val slip = """
+            KASIKORNBANK
+            31 ส.ค. 2569 21:11
+            ยอดรวม: ฿60.00
+        """.trimIndent()
+
+        val result = SlipDataParser.parse(slip)
+        assertEquals("2026-08-31", result.date)
+    }
+
+    @Test
+    fun testParseAllThaiMonthAbbreviations() {
+        val expected = mapOf(
+            "ม.ค." to "2026-01-15", "ก.พ." to "2026-02-15", "มี.ค." to "2026-03-15",
+            "เม.ย." to "2026-04-15", "พ.ค." to "2026-05-15", "มิ.ย." to "2026-06-15",
+            "ก.ค." to "2026-07-15", "ส.ค." to "2026-08-15", "ก.ย." to "2026-09-15",
+            "ต.ค." to "2026-10-15", "พ.ย." to "2026-11-15", "ธ.ค." to "2026-12-15"
+        )
+        expected.forEach { (abbr, iso) ->
+            val result = SlipDataParser.parse("15 $abbr 2569")
+            assertEquals("$abbr should map to $iso", iso, result.date)
+        }
+    }
 }

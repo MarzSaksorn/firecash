@@ -35,6 +35,16 @@ object SlipDataParser {
         Pattern.compile("""\b([0-3]?[0-9]\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+202[0-9])\b""", Pattern.CASE_INSENSITIVE)
     )
 
+    // Thai month abbreviations (ส.ค. = August) and Buddhist Era years (2569 BE = 2026 CE, subtract 543)
+    private val THAI_MONTHS: Map<String, Int> = mapOf(
+        "ม.ค." to 1, "ก.พ." to 2, "มี.ค." to 3, "เม.ย." to 4, "พ.ค." to 5, "มิ.ย." to 6,
+        "ก.ค." to 7, "ส.ค." to 8, "ก.ย." to 9, "ต.ค." to 10, "พ.ย." to 11, "ธ.ค." to 12
+    )
+    private val THAI_DATE_PATTERN: Pattern by lazy {
+        val months = THAI_MONTHS.keys.sortedByDescending { it.length }.joinToString("|") { Pattern.quote(it) }
+        Pattern.compile("""\b([0-3]?[0-9])\s*($months)\s*(25[0-9]{2}|[0-9]{4})\b""")
+    }
+
     private val TIME_PATTERNS = listOf(
         Pattern.compile("""\b([0-1]?[0-9]|2[0-3]):([0-5][0-9])(?::([0-5][0-9]))?\s*(?:AM|PM|am|pm|น\.)?\b""")
     )
@@ -130,6 +140,15 @@ object SlipDataParser {
     }
 
     private fun extractDate(text: String): String {
+        // Thai slips: "31 ส.ค. 2569" (Buddhist Era) → 2026-08-31
+        val thaiMatcher = THAI_DATE_PATTERN.matcher(text)
+        if (thaiMatcher.find()) {
+            val day = thaiMatcher.group(1).toIntOrNull() ?: 1
+            val month = THAI_MONTHS[thaiMatcher.group(2)] ?: 1
+            val rawYear = thaiMatcher.group(3).toIntOrNull() ?: 2026
+            val year = if (rawYear > 2400) rawYear - 543 else rawYear
+            return String.format(Locale.US, "%04d-%02d-%02d", year, month, day)
+        }
         for (pattern in DATE_PATTERNS) {
             val matcher = pattern.matcher(text)
             if (matcher.find()) {

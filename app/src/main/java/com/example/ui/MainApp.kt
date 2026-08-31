@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import android.content.SharedPreferences
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -23,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.documentfile.provider.DocumentFile
 import com.example.service.BackgroundListenerService
 import com.example.data.ocr.OcrProcessor
+import com.example.data.ocr.SlipDataParser
 import com.example.data.easyslip.VerifySlipResponse
 import com.example.data.model.SavedSlip
 import com.example.data.model.VerificationStatus
@@ -335,6 +337,63 @@ fun MainApp(modifier: Modifier = Modifier) {
             slipData = null,
             isMoneyIn = isMoneyIn,
             savedAt = now
+        )
+        savedSlips.add(slip)
+        seenPayloads.add(slip.payload)
+        saveSlips(prefs, savedSlips)
+        saveSeenPayloads(prefs, seenPayloads)
+    }
+
+    // Personal mode: log a slip from the recognized text of a slip photo, without calling
+    // any verification API. Amount/date/merchant come from SlipDataParser; from/to lines
+    // (จาก/ถึง or FROM/TO) decide money in/out via the known-names logic.
+    fun addOcrSlip(rawText: String, photoPath: String? = null) {
+        if (rawText.isBlank()) return
+        val parsed = SlipDataParser.parse(rawText)
+        val (sender, receiver) = SlipDataParser.extractParties(rawText)
+        val now = System.currentTimeMillis()
+        val sdfDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        val sdfTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
+        // Trust the parsed amount only if the text actually contains a number; otherwise
+        // SlipDataParser's 45.20 fallback would fabricate an amount for unreadable slips.
+        val amount = if (parsed.amount > 0.0 && extractAmount(rawText) != null) parsed.amount else null
+        // Counterparty: use the from/to lines when recognized, else the merchant line
+        val senderName = sender ?: if (parsed.isBankSlip) null else parsed.merchant
+        val receiverName = receiver ?: parsed.merchant
+        val result = VerifySlipResponse(
+            success = false,
+            isDuplicate = false,
+            transRef = parsed.bankPayload?.transRef,
+            amount = amount,
+            transDate = parsed.date,
+            transTime = parsed.time,
+            senderName = senderName,
+            receiverName = receiverName,
+            sendingBank = parsed.bankPayload?.sendingBank,
+            isAmountMatched = false,
+            verificationStatus = VerificationStatus.UNVERIFIED,
+            errorMessage = "Personal mode — read from slip photo, not API-verified"
+        )
+        val senderKnown = isKnownName(result.senderName, knownNames)
+        val receiverKnown = isKnownName(result.receiverName, knownNames)
+        val resolvedIsMoneyIn = when {
+            senderKnown && receiverKnown -> false // transfer
+            receiverKnown -> true // money in
+            senderKnown -> false // money out
+            else -> false // unknown direction defaults to expense
+        }
+        val slip = SavedSlip(
+            payload = "ocr:$now",
+            amount = result.amount,
+            transRef = result.transRef,
+            senderName = result.senderName,
+            receiverName = result.receiverName,
+            date = result.transDate ?: sdfDate.format(java.util.Date(now)),
+            time = result.transTime ?: sdfTime.format(java.util.Date(now)),
+            verificationStatus = result.verificationStatus,
+            slipData = result,
+            isMoneyIn = resolvedIsMoneyIn,
+            photoPath = photoPath
         )
         savedSlips.add(slip)
         seenPayloads.add(slip.payload)
@@ -693,18 +752,47 @@ fun MainApp(modifier: Modifier = Modifier) {
             PhotoCaptureScreen(
                 onPhotoCaptured = { path ->
                     scope.launch {
-                        val payload = OcrProcessor(context).processReceipt(path).rawText
-                        handlePayload(payload, photoPath = path)
+                        if (appMode == "personal") {
+                            // Personal mode: read the slip text from the photo, no verification API
+                            val ocrText = OcrProcessor(context).recognizeText(path)
+                            if (ocrText.isBlank()) {
+                                Toast.makeText(context, "Couldn't read text from the slip photo", Toast.LENGTH_SHORT).show()
+                            } else {
+                                addOcrSlip(ocrText, photoPath = path)
+                            }
+                            showCapture = false
+                            showSavedSlips = true
+                        } else {
+                            val payload = OcrProcessor(context).processReceipt(path).rawText
+                            handlePayload(payload, photoPath = path)
+                        }
                     }
                 },
                 onFileSelected = { /* unused – picker handled inside PhotoCaptureScreen */ },
                 onImageSelected = { path ->
                     scope.launch {
-                        val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
-                        handlePayload(payload, photoPath = path)
+                        if (appMode == "personal") {
+                            val ocrText = OcrProcessor(context).recognizeText(path, scanCenterOnly = false)
+                            if (ocrText.isBlank()) {
+                                Toast.makeText(context, "Couldn't read text from the slip photo", Toast.LENGTH_SHORT).show()
+                            } else {
+                                addOcrSlip(ocrText, photoPath = path)
+                            }
+                            showCapture = false
+                            showSavedSlips = true
+                        } else {
+                            val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
+                            handlePayload(payload, photoPath = path)
+                        }
                     }
                 },
-                onQrDetected = { payload -> handlePayload(payload) },
+                onQrDetected = { payload ->
+                    if (appMode == "personal") {
+                        // Personal mode never verifies via API; only the photo-text path is used
+                    } else {
+                        handlePayload(payload)
+                    }
+                },
                 isLoading = isLoading,
                 onNavigateToSettings = {
                     showCapture = false

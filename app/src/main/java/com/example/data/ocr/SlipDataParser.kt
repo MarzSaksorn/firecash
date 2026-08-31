@@ -42,6 +42,22 @@ object SlipDataParser {
     private val TAG_91_PATTERN = Pattern.compile("""9104([A-Fa-f0-9]{4})""")
     private val EMVCO_QR_PATTERN = Pattern.compile("""000201010212.*?6304([A-Fa-f0-9]{4})""")
 
+    private val FROM_PATTERN = Pattern.compile("""(?:จาก|\bFROM\b)\s*[:：]?\s*(.+)""", Pattern.CASE_INSENSITIVE)
+    private val TO_PATTERN = Pattern.compile("""(?:ถึง|\bTO\b)\s*[:：]?\s*(.+)""", Pattern.CASE_INSENSITIVE)
+
+    /**
+     * Extracts the payer/sender and payee/receiver lines from a slip's recognized text
+     * (Thai `จาก` / `ถึง` or English `FROM` / `TO`). Returns (sender, receiver); either may be null.
+     * Used by Personal mode to decide money in/out via known names.
+     */
+    fun extractParties(rawText: String): Pair<String?, String?> {
+        fun capture(p: Pattern): String? {
+            val m = p.matcher(rawText)
+            return if (m.find()) m.group(1)?.trim()?.take(48)?.ifBlank { null } else null
+        }
+        return capture(FROM_PATTERN) to capture(TO_PATTERN)
+    }
+
     fun parse(rawText: String): ParsedReceiptResult {
         val lines = rawText.lines().map { it.trim() }.filter { it.isNotEmpty() }
 

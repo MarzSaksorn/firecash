@@ -8,6 +8,9 @@ import java.io.File
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.TextRecognizer
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -17,6 +20,42 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class OcrProcessor(private val context: Context? = null) {
+
+    /**
+     * Runs ML Kit text recognition over the photo and returns the raw recognized text.
+     * Used by Personal mode, which logs the slip from the photo text instead of calling a
+     * verification API. The on-device recognizer covers the Latin script (digits, dates,
+     * English bank/merchant names); Thai-only glyphs are not supported by ML Kit on-device.
+     */
+    suspend fun recognizeText(
+        imageUri: String?,
+        scanCenterOnly: Boolean = false
+    ): String = withContext(Dispatchers.Default) {
+        if (imageUri.isNullOrEmpty()) return@withContext ""
+        try {
+            val bitmap = BitmapFactory.decodeFile(imageUri) ?: return@withContext ""
+            val image = if (scanCenterOnly) InputImage.fromBitmap(cropToCenter(bitmap), 0)
+            else InputImage.fromBitmap(bitmap, 0)
+
+            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            try {
+                runRecognition(recognizer, image)
+            } catch (e: Exception) {
+                ""
+            } finally {
+                recognizer.close()
+            }
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    private suspend fun runRecognition(recognizer: TextRecognizer, image: InputImage): String =
+        suspendCancellableCoroutine { cont ->
+            recognizer.process(image)
+                .addOnSuccessListener { result -> cont.resume(result.text) }
+                .addOnFailureListener { e -> cont.resumeWithException(e) }
+        }
 
     suspend fun processReceipt(
         imageUri: String?,

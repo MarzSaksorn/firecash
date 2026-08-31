@@ -63,4 +63,46 @@ class SlipDataParserTest {
         assertNotNull(payload)
         assertEquals("89AB", payload?.crc)
     }
+
+    @Test
+    fun testExtractPartiesThaiSlip() {
+        val slip = """
+            ธนาคารกสิกรไทย KASIKORNBANK
+            โอนเงินสำเร็จ PromptPay
+            วันที่: 2023-10-24 11:30:15
+            จาก: นาย สมชาย ย. (xxx-x-x1123-x)
+            ถึง: บจก. อาร์ทิซาน โรสเตอร์
+            ยอดรวม: ฿1,250.00
+        """.trimIndent()
+
+        val (sender, receiver) = SlipDataParser.extractParties(slip)
+        assertEquals("นาย สมชาย ย. (xxx-x-x1123-x)", sender)
+        assertEquals("บจก. อาร์ทิซาน โรสเตอร์", receiver)
+    }
+
+    @Test
+    fun testExtractPartiesEnglishSlip() {
+        val slip = """
+            KASIKORNBANK
+            FROM: John Doe
+            TO: Artisan Roasters Co., Ltd.
+            Amount: ฿850.00
+        """.trimIndent()
+
+        val (sender, receiver) = SlipDataParser.extractParties(slip)
+        assertEquals("John Doe", sender)
+        assertEquals("Artisan Roasters Co., Ltd.", receiver)
+    }
+
+    @Test
+    fun testExtractPartiesMissingLines() {
+        val receipt = """
+            STARBUCKS COFFEE
+            Total: $14.50
+        """.trimIndent()
+
+        val (sender, receiver) = SlipDataParser.extractParties(receipt)
+        assertEquals(null, sender)
+        assertEquals(null, receiver)
+    }
 }

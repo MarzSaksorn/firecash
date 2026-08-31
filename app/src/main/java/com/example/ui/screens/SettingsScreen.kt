@@ -160,6 +160,12 @@ fun SettingsScreen(
 
     var apiKeyText by remember { mutableStateOf(apiKey) }
     androidx.compose.runtime.LaunchedEffect(apiKey) { apiKeyText = apiKey }
+
+    // Display lists: ALL presets (enabled or disabled, so toggles stay visible) + user entries
+    val displayIncomeWhitelist =
+        (notificationWhitelist + permanentIncomeApps).distinctBy { it.packageName to it.prefix }
+    val displayExpenseWhitelist =
+        (notificationExpenseWhitelist + permanentExpenseApps).distinctBy { it.packageName to it.prefix }
     var newKnownName by remember { mutableStateOf("") }
     var newWhitelistApp by remember { mutableStateOf("") }
     var newWhitelistPrefix by remember { mutableStateOf("โอนเงินให้คุณ ฿") }
@@ -921,7 +927,7 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.fillMaxWidth().testTag("add_whitelist_button")
                         ) { Text("Add to whitelist") }
-                        if (notificationWhitelist.isEmpty()) {
+                        if (displayIncomeWhitelist.isEmpty()) {
                             Text(
                                 text = "No whitelist — all apps will be read. Add package names to restrict.",
                                 color = FireCashOnSurfaceVariant,
@@ -929,7 +935,7 @@ fun SettingsScreen(
                             )
                         } else {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                notificationWhitelist.forEach { entry ->
+                                displayIncomeWhitelist.forEach { entry ->
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -1145,7 +1151,7 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.fillMaxWidth().testTag("add_expense_whitelist_button")
                         ) { Text("Add to whitelist") }
-                        if (notificationExpenseWhitelist.isEmpty()) {
+                        if (displayExpenseWhitelist.isEmpty()) {
                             Text(
                                 text = "No whitelist — all apps will be read. Add package names to restrict.",
                                 color = FireCashOnSurfaceVariant,
@@ -1153,7 +1159,7 @@ fun SettingsScreen(
                             )
                         } else {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                notificationExpenseWhitelist.forEach { entry ->
+                                displayExpenseWhitelist.forEach { entry ->
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()

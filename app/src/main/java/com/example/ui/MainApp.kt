@@ -51,6 +51,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     var qrPayload by remember { mutableStateOf("") }
     var slipData by remember { mutableStateOf<VerifySlipResponse?>(null) }
     var slipWarning by remember { mutableStateOf("") }
+    var slipMismatch by remember { mutableStateOf(false) }
     var qrPhotoPath by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var isBackgroundSyncing by remember { mutableStateOf(false) }
@@ -219,7 +220,29 @@ fun MainApp(modifier: Modifier = Modifier) {
         return regex.find(text)?.value?.replace(",", "")?.toDoubleOrNull()
     }
 
-    suspend fun addSlip(payload: String, isMoneyIn: Boolean = false, photoPath: String? = null) {
+    // Prefer a slip amount marked with a baht/THB/B symbol over the generic parser result,
+    // which can grab exchange-rate fragments like "(¥1= THB 4.9793541)".
+    fun extractSlipAmount(text: String): Double? {
+        val patterns = listOf(
+            Regex("""\bB\s*([\d,]+\.\d{2})\b"""),
+            Regex("""฿\s*([\d,]+(?:\.\d{2})?)"""),
+            Regex("""(?:THB|บาท)\s*([\d,]+(?:\.\d{2})?)""", RegexOption.IGNORE_CASE),
+            Regex("""([\d,]+(?:\.\d{2})?)\s*(?:THB|บาท)""", RegexOption.IGNORE_CASE)
+        )
+        for (p in patterns) {
+            p.find(text)?.let { m ->
+                m.groupValues[1].replace(",", "").toDoubleOrNull()?.let { if (it > 0.0) return it }
+            }
+        }
+        return null
+    }
+
+    suspend fun addSlip(
+        payload: String,
+        isMoneyIn: Boolean = false,
+        photoPath: String? = null,
+        ocrText: String? = null
+    ) {
         val verified = runCatching { verifyWithEasySlip(payload) }.getOrNull()
         // Fallback when EasySlip disabled/offline: keep amount from raw payload so details page still shows data
         val fallbackAmount = extractAmount(payload)
@@ -243,6 +266,17 @@ fun MainApp(modifier: Modifier = Modifier) {
             verificationStatus = VerificationStatus.UNVERIFIED,
             errorMessage = slipWarning
         )
+        // Fraud cross-check (shop mode): the amount printed on the slip photo must match the
+        // QR payload amount and/or the bank-verified amount. A mismatch means a doctored slip.
+        val textAmount = if (ocrText.isNullOrBlank()) null else extractSlipAmount(ocrText)
+        val qrAmount = SlipDataParser.extractQrAmount(payload)
+        val verifiedAmount = verified?.amount
+        val candidates = listOfNotNull(textAmount, qrAmount, verifiedAmount)
+        val mismatch = candidates.size >= 2 && candidates.max() - candidates.min() > 0.005
+        slipMismatch = mismatch
+        if (mismatch) {
+            slipWarning = "Amount mismatch — photo text shows $textAmount but QR/bank shows ${qrAmount ?: verifiedAmount}. Possible tampered slip!"
+        }
         slipData = result
         // Auto-resolve isMoneyIn based on known names:
         // - if both sender & receiver are known -> transfer (neutral, stored as false, UI shows Transfer)
@@ -268,7 +302,8 @@ fun MainApp(modifier: Modifier = Modifier) {
             verificationStatus = result.verificationStatus,
             slipData = result,
             isMoneyIn = resolvedIsMoneyIn,
-            photoPath = photoPath
+            photoPath = photoPath,
+            amountMismatch = mismatch
         )
 
         // Dedupe: re-scanning the same slip updates the existing entry instead of adding a log
@@ -296,13 +331,13 @@ fun MainApp(modifier: Modifier = Modifier) {
         saveSeenPayloads(prefs, seenPayloads)
     }
 
-    fun handlePayload(payload: String, photoPath: String? = null) {
+    fun handlePayload(payload: String, photoPath: String? = null, ocrText: String? = null) {
         if (payload.isBlank()) return
         qrPayload = payload
         qrPhotoPath = photoPath
         isLoading = true
         scope.launch {
-            addSlip(payload, photoPath = photoPath)
+            addSlip(payload, photoPath = photoPath, ocrText = ocrText)
             isLoading = false
             showCapture = false
             showPayload = true
@@ -343,23 +378,6 @@ fun MainApp(modifier: Modifier = Modifier) {
         seenPayloads.add(slip.payload)
         saveSlips(prefs, savedSlips)
         saveSeenPayloads(prefs, seenPayloads)
-    }
-
-    // Prefer a slip amount marked with a baht/THB/B symbol over the generic parser result,
-    // which can grab exchange-rate fragments like "(¥1= THB 4.9793541)".
-    fun extractSlipAmount(text: String): Double? {
-        val patterns = listOf(
-            Regex("""\bB\s*([\d,]+\.\d{2})\b"""),
-            Regex("""฿\s*([\d,]+(?:\.\d{2})?)"""),
-            Regex("""(?:THB|บาท)\s*([\d,]+(?:\.\d{2})?)""", RegexOption.IGNORE_CASE),
-            Regex("""([\d,]+(?:\.\d{2})?)\s*(?:THB|บาท)""", RegexOption.IGNORE_CASE)
-        )
-        for (p in patterns) {
-            p.find(text)?.let { m ->
-                m.groupValues[1].replace(",", "").toDoubleOrNull()?.let { if (it > 0.0) return it }
-            }
-        }
-        return null
     }
 
     // Fallback date from the slip photo's file timestamp. Slip images are saved at
@@ -840,6 +858,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                 warning = slipWarning,
                 photoPath = qrPhotoPath,
                 showVerification = appMode != "personal",
+                amountMismatch = slipMismatch,
                 onBack = {
                     showPayload = false
                     showSavedSlips = true
@@ -863,8 +882,10 @@ fun MainApp(modifier: Modifier = Modifier) {
                             showCapture = false
                             showSavedSlips = true
                         } else {
+                            // Shop mode: cross-check the slip photo text against the QR/bank amount
+                            val ocrText = OcrProcessor(context).recognizeText(path)
                             val payload = OcrProcessor(context).processReceipt(path).rawText
-                            handlePayload(payload, photoPath = path)
+                            handlePayload(payload, photoPath = path, ocrText = ocrText)
                         }
                     }
                 },
@@ -883,8 +904,9 @@ fun MainApp(modifier: Modifier = Modifier) {
                             showCapture = false
                             showSavedSlips = true
                         } else {
+                            val ocrText = OcrProcessor(context).recognizeText(path, scanCenterOnly = false)
                             val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
-                            handlePayload(payload, photoPath = path)
+                            handlePayload(payload, photoPath = path, ocrText = ocrText)
                         }
                     }
                 },
@@ -942,6 +964,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                     )
                     qrPhotoPath = slip.photoPath
                     slipWarning = ""
+                    slipMismatch = slip.amountMismatch
                     showSavedSlips = false
                     showPayload = true
                 },
@@ -1314,6 +1337,7 @@ private fun slipToJson(slip: SavedSlip): JSONObject {
     slip.photoPath?.let { obj.put("photoPath", it) }
     obj.put("isMoneyIn", slip.isMoneyIn)
     obj.put("savedAt", slip.savedAt)
+    obj.put("amountMismatch", slip.amountMismatch)
     slip.slipData?.let { obj.put("slipData", responseToJson(it)) }
     return obj
 }
@@ -1332,7 +1356,8 @@ private fun slipFromJson(obj: JSONObject): SavedSlip? {
             slipData = if (obj.has("slipData")) responseFromJson(obj.getJSONObject("slipData")) else null,
             isMoneyIn = obj.optBoolean("isMoneyIn", false),
             savedAt = obj.optLong("savedAt", System.currentTimeMillis()),
-            photoPath = obj.optString("photoPath").ifEmpty { null }
+            photoPath = obj.optString("photoPath").ifEmpty { null },
+            amountMismatch = obj.optBoolean("amountMismatch", false)
         )
     }.getOrNull()
 }

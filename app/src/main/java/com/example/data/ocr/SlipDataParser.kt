@@ -54,6 +54,7 @@ object SlipDataParser {
 
     private val FROM_PATTERN = Pattern.compile("""(?:จาก|\bFROM\b)\s*[:：]?\s*(.+)""", Pattern.CASE_INSENSITIVE)
     private val TO_PATTERN = Pattern.compile("""(?:ถึง|\bTO\b)\s*[:：]?\s*(.+)""", Pattern.CASE_INSENSITIVE)
+    private val QR_AMOUNT_PATTERN = Pattern.compile("""54(\d{2})(\d+\.\d{2})""")
 
     /**
      * Extracts the payer/sender and payee/receiver lines from a slip's recognized text
@@ -66,6 +67,16 @@ object SlipDataParser {
             return if (m.find()) m.group(1)?.trim()?.take(48)?.ifBlank { null } else null
         }
         return capture(FROM_PATTERN) to capture(TO_PATTERN)
+    }
+
+    // EMVCo QR payloads carry the amount in tag 54 ("540650.00" = ฿50.00).
+    fun extractQrAmount(payload: String): Double? {
+        val m = QR_AMOUNT_PATTERN.matcher(payload)
+        if (!m.find()) return null
+        val len = m.group(1).toIntOrNull() ?: return null
+        val amt = m.group(2)
+        if (amt.length != len) return null
+        return amt.toDoubleOrNull()
     }
 
     fun parse(rawText: String): ParsedReceiptResult {

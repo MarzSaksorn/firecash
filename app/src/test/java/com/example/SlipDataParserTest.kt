@@ -3,6 +3,7 @@ package com.example
 import com.example.data.ocr.SlipDataParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -145,5 +146,13 @@ class SlipDataParserTest {
             val result = SlipDataParser.parse("15 $abbr 2569")
             assertEquals("$abbr should map to $iso", iso, result.date)
         }
+    }
+
+    @Test
+    fun testExtractQrAmount() {
+        assertEquals(50.0, SlipDataParser.extractQrAmount("000201010211540550.005802TH6304ABCD")!!, 0.01)
+        assertEquals(1250.0, SlipDataParser.extractQrAmount("00020101021254071250.005802TH6304ABCD")!!, 0.01)
+        assertNull(SlipDataParser.extractQrAmount("0041000600000101030040220046"))
+        assertNull(SlipDataParser.extractQrAmount(""))
     }
 }

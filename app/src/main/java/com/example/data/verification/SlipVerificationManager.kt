@@ -229,8 +229,8 @@ class SlipVerificationManager {
         }
         val request = Request.Builder()
             .url("https://connect.slip2go.com/api/verify-slip/qr-code/info")
-            // Slip2Go expects the secret raw in Authorization (no Bearer prefix)
-            .addHeader("Authorization", apiKey)
+            // Live API requires "Bearer <secret>" (docs show raw, but raw returns 401001)
+            .addHeader("Authorization", "Bearer $apiKey")
             .post(jsonObject.toJsonBody())
             .build()
 

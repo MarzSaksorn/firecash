@@ -59,6 +59,8 @@ fun MainApp(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     val verificationManager = remember { SlipVerificationManager() }
     val prefs = remember { context.getSharedPreferences("firecash_settings", Context.MODE_PRIVATE) }
+    // Seed default notification whitelist presets on first launch (no-op once seeded / user-customized)
+    com.example.service.NotificationPresets.seedIfNeeded(prefs)
     var backgroundListening by remember { mutableStateOf(prefs.getBoolean("background_listening", false)) }
 
     // Refresh statuses whenever the activity resumes (e.g. returning from system settings)

@@ -419,8 +419,14 @@ fun MainApp(modifier: Modifier = Modifier) {
                     }
                 } ?: emptyList()
 
-            notificationWhitelist = readWl("notificationWhitelist"); saveNotificationWhitelist(prefs, notificationWhitelist)
-            notificationExpenseWhitelist = readWl("notificationExpenseWhitelist"); saveNotificationWhitelistExpense(prefs, notificationExpenseWhitelist)
+            if (root.has("notificationWhitelist")) {
+                notificationWhitelist = com.example.service.NotificationPresets.mergeIncome(readWl("notificationWhitelist"))
+                saveNotificationWhitelist(prefs, notificationWhitelist)
+            }
+            if (root.has("notificationExpenseWhitelist")) {
+                notificationExpenseWhitelist = com.example.service.NotificationPresets.mergeExpense(readWl("notificationExpenseWhitelist"))
+                saveNotificationWhitelistExpense(prefs, notificationExpenseWhitelist)
+            }
 
             root.optJSONObject("settings")?.let { s ->
                 easySlipEnabled = s.optBoolean("easy_slip_enabled", false); prefs.edit().putBoolean("easy_slip_enabled", easySlipEnabled).apply()

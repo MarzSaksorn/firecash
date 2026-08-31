@@ -39,8 +39,11 @@ class OcrProcessor(private val context: Context? = null) {
 
             val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
             try {
-                runRecognition(recognizer, image)
+                val text = runRecognition(recognizer, image)
+                android.util.Log.d("FireCashOCR", "recognizeText(file=${imageUri.takeLast(30)}, len=${text.length})")
+                text
             } catch (e: Exception) {
+                android.util.Log.w("FireCashOCR", "text recognition failed: ${e.message}")
                 ""
             } finally {
                 recognizer.close()

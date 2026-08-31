@@ -194,6 +194,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     }
 
     suspend fun verifyWithEasySlip(payload: String): VerifySlipResponse? {
+        if (appMode == "personal") return null // personal mode never calls the verification API
         if (!easySlipEnabled || apiKey.isBlank()) {
             slipWarning = if (easySlipEnabled) {
                 "No API key set — add your ${verificationProvider.label} API key in Settings to verify this slip."
@@ -399,6 +400,7 @@ fun MainApp(modifier: Modifier = Modifier) {
         seenPayloads.add(slip.payload)
         saveSlips(prefs, savedSlips)
         saveSeenPayloads(prefs, seenPayloads)
+        android.util.Log.d("FireCashOCR", "addOcrSlip amount=$amount merchant=${receiverName ?: senderName ?: "?"} isIn=$resolvedIsMoneyIn")
     }
 
     // Export everything (slips + settings + prefs) to a JSON file and share it
@@ -531,9 +533,15 @@ fun MainApp(modifier: Modifier = Modifier) {
         isLoading = true
         scope.launch {
             for (path in paths) {
-                val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
-                if (payload.isNotBlank()) {
-                    addSlip(payload, photoPath = path)
+                if (appMode == "personal") {
+                    // Personal mode: extract text from the photo, no QR payload / no server
+                    val ocrText = OcrProcessor(context).recognizeText(path, scanCenterOnly = false)
+                    if (ocrText.isNotBlank()) addOcrSlip(ocrText, photoPath = path)
+                } else {
+                    val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
+                    if (payload.isNotBlank()) {
+                        addSlip(payload, photoPath = path)
+                    }
                 }
             }
             isLoading = false
@@ -565,13 +573,22 @@ fun MainApp(modifier: Modifier = Modifier) {
             }.getOrDefault(false)
             if (!copied) continue
 
-            val payload = OcrProcessor(context)
-                .processReceipt(tempFile.absolutePath, scanCenterOnly = false)
-                .rawText
-            if (payload.isNotBlank() && payload !in seenPayloads) {
-                seenPayloads.add(payload)
-                // store the original content:// uri so the slip links to the real photo on device
-                addSlip(payload, photoPath = file.uri.toString())
+            if (appMode == "personal") {
+                // Personal mode: extract text from the photo, no QR payload / no server
+                val ocrText = OcrProcessor(context)
+                    .recognizeText(tempFile.absolutePath, scanCenterOnly = false)
+                if (ocrText.isNotBlank()) {
+                    addOcrSlip(ocrText, photoPath = file.uri.toString())
+                }
+            } else {
+                val payload = OcrProcessor(context)
+                    .processReceipt(tempFile.absolutePath, scanCenterOnly = false)
+                    .rawText
+                if (payload.isNotBlank() && payload !in seenPayloads) {
+                    seenPayloads.add(payload)
+                    // store the original content:// uri so the slip links to the real photo on device
+                    addSlip(payload, photoPath = file.uri.toString())
+                }
             }
             // Mark processed (even blank OCR) so future opens only handle genuinely new files
             processedFiles.add(fileKey)
@@ -654,6 +671,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     }
 
     fun resyncUnverifiedSlips() {
+        if (appMode == "personal") return // personal mode never verifies via API
         if (!easySlipEnabled || apiKey.isBlank()) return
         if (isLoading || isBackgroundSyncing) return
         val unverified = savedSlips.filter {

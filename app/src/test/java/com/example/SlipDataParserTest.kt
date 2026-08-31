@@ -105,4 +105,19 @@ class SlipDataParserTest {
         assertEquals(null, sender)
         assertEquals(null, receiver)
     }
+
+    @Test
+    fun testParseNormalizesEnglishMonthDate() {
+        val slip = """
+            TrueMoney
+            B 49.79
+            Total amount
+            Wallet
+            31 Aug 2026 21:12:23
+        """.trimIndent()
+
+        val result = SlipDataParser.parse(slip)
+        assertEquals("2026-08-31", result.date)
+        assertEquals(49.79, result.amount, 0.01)
+    }
 }

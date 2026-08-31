@@ -345,6 +345,23 @@ fun MainApp(modifier: Modifier = Modifier) {
         saveSeenPayloads(prefs, seenPayloads)
     }
 
+    // Prefer a slip amount marked with a baht/THB/B symbol over the generic parser result,
+    // which can grab exchange-rate fragments like "(¥1= THB 4.9793541)".
+    fun extractSlipAmount(text: String): Double? {
+        val patterns = listOf(
+            Regex("""\bB\s*([\d,]+\.\d{2})\b"""),
+            Regex("""฿\s*([\d,]+(?:\.\d{2})?)"""),
+            Regex("""(?:THB|บาท)\s*([\d,]+(?:\.\d{2})?)""", RegexOption.IGNORE_CASE),
+            Regex("""([\d,]+(?:\.\d{2})?)\s*(?:THB|บาท)""", RegexOption.IGNORE_CASE)
+        )
+        for (p in patterns) {
+            p.find(text)?.let { m ->
+                m.groupValues[1].replace(",", "").toDoubleOrNull()?.let { if (it > 0.0) return it }
+            }
+        }
+        return null
+    }
+
     // Personal mode: log a slip from the recognized text of a slip photo, without calling
     // any verification API. Amount/date/merchant come from SlipDataParser; from/to lines
     // (จาก/ถึง or FROM/TO) decide money in/out via the known-names logic.
@@ -352,15 +369,25 @@ fun MainApp(modifier: Modifier = Modifier) {
         if (rawText.isBlank()) return
         val parsed = SlipDataParser.parse(rawText)
         val (sender, receiver) = SlipDataParser.extractParties(rawText)
+        // A QR fallback payload is compact (no spaces/newlines); real recognized text is not
+        val isQrPayload = !rawText.contains(" ") && !rawText.contains("\n")
         val now = System.currentTimeMillis()
         val sdfDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
         val sdfTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
-        // Trust the parsed amount only if the text actually contains a number; otherwise
-        // SlipDataParser's 45.20 fallback would fabricate an amount for unreadable slips.
-        val amount = if (parsed.amount > 0.0 && extractAmount(rawText) != null) parsed.amount else null
-        // Counterparty: use the from/to lines when recognized, else the merchant line
+        // Prefer a baht-marked amount; else trust the parsed amount only if the text actually
+        // contains a number (avoids SlipDataParser's 45.20 fallback fabricating amounts).
+        val amount = extractSlipAmount(rawText)
+            ?: if (parsed.amount > 0.0 && extractAmount(rawText) != null) parsed.amount else null
+        // Counterparty: from/to lines, else the slip brand, else the merchant line
+        val brand = when {
+            rawText.contains("truemoney", ignoreCase = true) -> "TrueMoney"
+            rawText.contains("make by kbank", ignoreCase = true) || rawText.contains("kbank", ignoreCase = true) -> "KBank"
+            rawText.contains("scb", ignoreCase = true) || rawText.contains("siam commercial", ignoreCase = true) -> "SCB"
+            rawText.contains("bangkok bank", ignoreCase = true) -> "Bangkok Bank"
+            else -> null
+        }
         val senderName = sender ?: if (parsed.isBankSlip) null else parsed.merchant
-        val receiverName = receiver ?: parsed.merchant
+        val receiverName = receiver ?: if (isQrPayload) "QR Payload" else brand ?: parsed.merchant
         val result = VerifySlipResponse(
             success = false,
             isDuplicate = false,
@@ -373,7 +400,8 @@ fun MainApp(modifier: Modifier = Modifier) {
             sendingBank = parsed.bankPayload?.sendingBank,
             isAmountMatched = false,
             verificationStatus = VerificationStatus.UNVERIFIED,
-            errorMessage = "Personal mode — read from slip photo, not API-verified"
+            errorMessage = if (isQrPayload) "Personal mode — read from slip QR, not API-verified"
+            else "Personal mode — read from slip photo, not API-verified"
         )
         val senderKnown = isKnownName(result.senderName, knownNames)
         val receiverKnown = isKnownName(result.receiverName, knownNames)
@@ -528,6 +556,15 @@ fun MainApp(modifier: Modifier = Modifier) {
         }
     }
 
+    // Personal mode: read a slip photo as text first; if the text is unreadable or has no
+    // amount digits (Thai-only slips — ML Kit on-device has no Thai script support), fall
+    // back to the QR payload on the same image. Never verified via any API in personal mode.
+    suspend fun readSlipText(path: String, center: Boolean = false): String {
+        val text = OcrProcessor(context).recognizeText(path, scanCenterOnly = center)
+        if (text.isNotBlank() && extractAmount(text) != null) return text
+        return OcrProcessor(context).processReceipt(path, scanCenterOnly = center).rawText
+    }
+
     fun importSlips(paths: List<String>) {
         if (paths.isEmpty()) return
         isLoading = true
@@ -535,7 +572,7 @@ fun MainApp(modifier: Modifier = Modifier) {
             for (path in paths) {
                 if (appMode == "personal") {
                     // Personal mode: extract text from the photo, no QR payload / no server
-                    val ocrText = OcrProcessor(context).recognizeText(path, scanCenterOnly = false)
+                    val ocrText = readSlipText(path)
                     if (ocrText.isNotBlank()) addOcrSlip(ocrText, photoPath = path)
                 } else {
                     val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
@@ -574,9 +611,8 @@ fun MainApp(modifier: Modifier = Modifier) {
             if (!copied) continue
 
             if (appMode == "personal") {
-                // Personal mode: extract text from the photo, no QR payload / no server
-                val ocrText = OcrProcessor(context)
-                    .recognizeText(tempFile.absolutePath, scanCenterOnly = false)
+                // Personal mode: text first, offline QR fallback for unreadable slips
+                val ocrText = readSlipText(tempFile.absolutePath)
                 if (ocrText.isNotBlank()) {
                     addOcrSlip(ocrText, photoPath = file.uri.toString())
                 }
@@ -774,7 +810,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                         if (appMode == "personal") {
                             // Personal mode: read the slip text from the photo, no verification API
                             isLoading = true
-                            val ocrText = OcrProcessor(context).recognizeText(path)
+                            val ocrText = readSlipText(path)
                             isLoading = false
                             if (ocrText.isBlank()) {
                                 Toast.makeText(context, "Couldn't read text from the slip photo", Toast.LENGTH_SHORT).show()
@@ -794,7 +830,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                     scope.launch {
                         if (appMode == "personal") {
                             isLoading = true
-                            val ocrText = OcrProcessor(context).recognizeText(path, scanCenterOnly = false)
+                            val ocrText = readSlipText(path)
                             isLoading = false
                             if (ocrText.isBlank()) {
                                 Toast.makeText(context, "Couldn't read text from the slip photo", Toast.LENGTH_SHORT).show()

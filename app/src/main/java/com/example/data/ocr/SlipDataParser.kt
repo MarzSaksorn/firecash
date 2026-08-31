@@ -135,7 +135,14 @@ object SlipDataParser {
             if (matcher.find()) {
                 val found = matcher.group(1) ?: ""
                 if (found.contains("-") && found.length == 10) return found
-                return "2023-10-24"
+                // "31 Aug 2026" style → normalize to yyyy-MM-dd instead of a hardcoded fallback
+                try {
+                    val parsed = SimpleDateFormat("d MMM yyyy", Locale.ENGLISH).parse(found)
+                    if (parsed != null) return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(parsed)
+                } catch (_: Exception) {
+                    // fall through to today's date
+                }
+                return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             }
         }
         return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())

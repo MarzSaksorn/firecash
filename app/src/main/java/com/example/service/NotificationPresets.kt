@@ -28,6 +28,22 @@ object NotificationPresets {
 
     private const val PREFS_PRESETS_SEEDED = "notification_presets_seeded"
 
+    /** True if the entry is part of the permanent income preset list (cannot be removed). */
+    fun isIncomePermanent(entry: WhitelistedApp): Boolean =
+        incomePresets.any { it.packageName == entry.packageName && it.prefix == entry.prefix }
+
+    /** True if the entry is part of the permanent expense preset list (cannot be removed). */
+    fun isExpensePermanent(entry: WhitelistedApp): Boolean =
+        expensePresets.any { it.packageName == entry.packageName && it.prefix == entry.prefix }
+
+    /** Effective income list = permanent presets + user entries (preset duplicates dropped). */
+    fun mergeIncome(stored: List<WhitelistedApp>): List<WhitelistedApp> =
+        (incomePresets + stored.filterNot { isIncomePermanent(it) }).distinct()
+
+    /** Effective expense list = permanent presets + user entries (preset duplicates dropped). */
+    fun mergeExpense(stored: List<WhitelistedApp>): List<WhitelistedApp> =
+        (expensePresets + stored.filterNot { isExpensePermanent(it) }).distinct()
+
     /**
      * Seed preset lists into prefs. Safe to call on every launch — the flag
      * prevents re-seeding, and existing (user-customized) lists are never touched.

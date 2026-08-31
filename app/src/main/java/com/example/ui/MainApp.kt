@@ -128,10 +128,10 @@ fun MainApp(modifier: Modifier = Modifier) {
         mutableStateOf(prefs.getBoolean("notification_expense_enabled", false))
     }
     var notificationWhitelist by remember {
-        mutableStateOf(loadNotificationWhitelist(prefs))
+        mutableStateOf(com.example.service.NotificationPresets.mergeIncome(loadNotificationWhitelist(prefs)))
     }
     var notificationExpenseWhitelist by remember {
-        mutableStateOf(loadNotificationWhitelistExpense(prefs))
+        mutableStateOf(com.example.service.NotificationPresets.mergeExpense(loadNotificationWhitelistExpense(prefs)))
     }
     val seenPayloads = remember {
         mutableSetOf<String>().apply { addAll(loadSeenPayloads(prefs)) }
@@ -824,6 +824,8 @@ fun MainApp(modifier: Modifier = Modifier) {
                     notificationExpenseEnabled = notificationExpenseEnabled,
                     notificationWhitelist = notificationWhitelist,
                     notificationExpenseWhitelist = notificationExpenseWhitelist,
+                    permanentIncomeApps = com.example.service.NotificationPresets.incomePresets,
+                    permanentExpenseApps = com.example.service.NotificationPresets.expensePresets,
                     notificationAccessGranted = notificationAccessGranted,
                     batteryOptIgnored = batteryOptIgnored,
                     backgroundListening = backgroundListening,
@@ -878,6 +880,8 @@ fun MainApp(modifier: Modifier = Modifier) {
                         val parts = pkgAndPrefix.split("|", limit = 2)
                         val pkg = parts.getOrNull(0) ?: pkgAndPrefix
                         val pref = parts.getOrNull(1) ?: ""
+                        val entry = com.example.service.WhitelistedApp(packageName = pkg, prefix = pref)
+                        if (com.example.service.NotificationPresets.isIncomePermanent(entry)) return@SettingsScreen
                         notificationWhitelist = notificationWhitelist.filterNot { it.packageName == pkg && it.prefix == pref }
                         saveNotificationWhitelist(prefs, notificationWhitelist)
                     },
@@ -893,6 +897,8 @@ fun MainApp(modifier: Modifier = Modifier) {
                         val parts = pkgAndPrefix.split("|", limit = 2)
                         val pkg = parts.getOrNull(0) ?: pkgAndPrefix
                         val pref = parts.getOrNull(1) ?: ""
+                        val entry = com.example.service.WhitelistedApp(packageName = pkg, prefix = pref)
+                        if (com.example.service.NotificationPresets.isExpensePermanent(entry)) return@SettingsScreen
                         notificationExpenseWhitelist = notificationExpenseWhitelist.filterNot { it.packageName == pkg && it.prefix == pref }
                         saveNotificationWhitelistExpense(prefs, notificationExpenseWhitelist)
                     },

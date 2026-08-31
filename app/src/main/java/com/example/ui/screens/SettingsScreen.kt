@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Key
@@ -113,6 +114,8 @@ fun SettingsScreen(
     notificationExpenseEnabled: Boolean = false,
     notificationWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
     notificationExpenseWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
+    permanentIncomeApps: List<com.example.service.WhitelistedApp> = emptyList(),
+    permanentExpenseApps: List<com.example.service.WhitelistedApp> = emptyList(),
     notificationAccessGranted: Boolean = false,
     batteryOptIgnored: Boolean = false,
     onRequestDisableBatteryOptimization: () -> Unit = {},
@@ -942,16 +945,26 @@ fun SettingsScreen(
                                                 fontFamily = FontFamily.Monospace,
                                                 modifier = Modifier.weight(1f)
                                             )
-                                            IconButton(
-                                                onClick = { onRemoveWhitelistedApp(entry.packageName + "|" + entry.prefix) },
-                                                modifier = Modifier.size(24.dp)
-                                            ) {
+                                            val isPermanent = permanentIncomeApps.any { it.packageName == entry.packageName && it.prefix == entry.prefix }
+                                            if (isPermanent) {
                                                 Icon(
-                                                    imageVector = Icons.Default.Close,
-                                                    contentDescription = "Remove",
-                                                    tint = FireCashOutline,
-                                                    modifier = Modifier.size(18.dp)
+                                                    imageVector = Icons.Default.Lock,
+                                                    contentDescription = "Permanent preset",
+                                                    tint = FireCashSecondary,
+                                                    modifier = Modifier.size(16.dp)
                                                 )
+                                            } else {
+                                                IconButton(
+                                                    onClick = { onRemoveWhitelistedApp(entry.packageName + "|" + entry.prefix) },
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Close,
+                                                        contentDescription = "Remove",
+                                                        tint = FireCashOutline,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
                                             }
                                         }
                                         if (entry.prefix.isNotBlank()) {
@@ -1143,16 +1156,26 @@ fun SettingsScreen(
                                                 fontFamily = FontFamily.Monospace,
                                                 modifier = Modifier.weight(1f)
                                             )
-                                            IconButton(
-                                                onClick = { onRemoveExpenseWhitelistedApp(entry.packageName + "|" + entry.prefix) },
-                                                modifier = Modifier.size(24.dp)
-                                            ) {
+                                            val isPermanent = permanentExpenseApps.any { it.packageName == entry.packageName && it.prefix == entry.prefix }
+                                            if (isPermanent) {
                                                 Icon(
-                                                    imageVector = Icons.Default.Close,
-                                                    contentDescription = "Remove",
-                                                    tint = FireCashOutline,
-                                                    modifier = Modifier.size(18.dp)
+                                                    imageVector = Icons.Default.Lock,
+                                                    contentDescription = "Permanent preset",
+                                                    tint = FireCashSecondary,
+                                                    modifier = Modifier.size(16.dp)
                                                 )
+                                            } else {
+                                                IconButton(
+                                                    onClick = { onRemoveExpenseWhitelistedApp(entry.packageName + "|" + entry.prefix) },
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Close,
+                                                        contentDescription = "Remove",
+                                                        tint = FireCashOutline,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
                                             }
                                         }
                                         if (entry.prefix.isNotBlank()) {

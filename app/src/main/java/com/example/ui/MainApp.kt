@@ -617,8 +617,10 @@ fun MainApp(modifier: Modifier = Modifier) {
     }
 
     fun onDeleteSlip(slip: SavedSlip) {
-        // Only allow delete for unknown/invalid slips (safety)
-        val isDeletable = slip.amount == null || slip.verificationStatus == VerificationStatus.UNVERIFIED
+        // Deletable when unverified or the slip has no transaction reference (safety)
+        val isDeletable = slip.verificationStatus == VerificationStatus.UNVERIFIED ||
+            slip.transRef.isNullOrBlank() ||
+            slip.amount == null
         if (!isDeletable) return
         val idx = savedSlips.indexOfFirst { it.payload == slip.payload && it.savedAt == slip.savedAt }
         if (idx >= 0) {

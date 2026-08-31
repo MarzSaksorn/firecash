@@ -95,8 +95,10 @@ private fun effectiveIsMoneyIn(slip: SavedSlip, knownNames: List<String>): Boole
 }
 
 private fun isDeletable(slip: SavedSlip): Boolean {
-    // Only allow delete for unknown/invalid slips (e.g. failed verification, no amount/data)
-    return slip.amount == null || slip.verificationStatus == VerificationStatus.UNVERIFIED
+    // Deletable when unverified or the slip has no transaction reference (no way to verify identity)
+    return slip.verificationStatus == VerificationStatus.UNVERIFIED ||
+        slip.transRef.isNullOrBlank() ||
+        slip.amount == null
 }
 
 @Composable
@@ -558,10 +560,10 @@ fun AccountScreen(
                 title = { Text("Delete ${deletableSelected.size} slip(s)?", color = Color.White) },
                 text = {
                     Text(
-                        if (deletableSelected.size < selectedKeys.size)
-                            "${deletableSelected.size} of ${selectedKeys.size} selected are unknown/invalid and will be deleted. Verified slips will be kept. Continue?"
-                        else
-                            "Delete ${deletableSelected.size} unknown/invalid slip(s)? This cannot be undone.",
+            if (deletableSelected.size < selectedKeys.size)
+                "${deletableSelected.size} of ${selectedKeys.size} selected are unverified or have no reference and will be deleted. Verified slips will be kept. Continue?"
+            else
+                "Delete ${deletableSelected.size} unverified slip(s)? This cannot be undone.",
                         color = FireCashOnSurfaceVariant
                     )
                 },

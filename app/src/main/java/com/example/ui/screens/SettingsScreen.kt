@@ -848,7 +848,7 @@ fun SettingsScreen(
                                     )
                                 )
                             }
-                            if (unverifiedCount > 0) {
+                            if (appMode != "personal" && unverifiedCount > 0) {
                                 Button(
                                     onClick = onSyncUnverified,
                                     enabled = apiKey.isNotBlank(),

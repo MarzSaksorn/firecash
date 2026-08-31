@@ -742,6 +742,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                 slipData = slipData,
                 warning = slipWarning,
                 photoPath = qrPhotoPath,
+                showVerification = appMode != "personal",
                 onBack = {
                     showPayload = false
                     showSavedSlips = true

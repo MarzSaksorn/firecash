@@ -374,10 +374,11 @@ fun MainApp(modifier: Modifier = Modifier) {
         val now = System.currentTimeMillis()
         val sdfDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
         val sdfTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
-        // Prefer a baht-marked amount; else trust the parsed amount only if the text actually
-        // contains a number (avoids SlipDataParser's 45.20 fallback fabricating amounts).
+        // Prefer a baht-marked amount; else trust the parsed amount only when the text really
+        // contains a decimal (avoids SlipDataParser's 45.20 fallback fabricating amounts).
+        val hasDecimal = Regex("""\d+\.\d+""").containsMatchIn(rawText)
         val amount = extractSlipAmount(rawText)
-            ?: if (parsed.amount > 0.0 && extractAmount(rawText) != null) parsed.amount else null
+            ?: if (parsed.amount > 0.0 && hasDecimal) parsed.amount else null
         // Counterparty: from/to lines, else the slip brand, else the merchant line
         val brand = when {
             rawText.contains("truemoney", ignoreCase = true) -> "TrueMoney"
@@ -424,7 +425,11 @@ fun MainApp(modifier: Modifier = Modifier) {
             isMoneyIn = resolvedIsMoneyIn,
             photoPath = photoPath
         )
-        savedSlips.add(slip)
+        // Re-scanning the same photo (forced sync) updates the existing slip instead of duplicating
+        val existingIndex = if (photoPath != null) {
+            savedSlips.indexOfFirst { it.photoPath != null && it.photoPath == photoPath }
+        } else -1
+        if (existingIndex >= 0) savedSlips[existingIndex] = slip else savedSlips.add(slip)
         seenPayloads.add(slip.payload)
         saveSlips(prefs, savedSlips)
         saveSeenPayloads(prefs, seenPayloads)
@@ -659,6 +664,16 @@ fun MainApp(modifier: Modifier = Modifier) {
                 isUserSyncing = false
             }
         }
+    }
+
+    // Forced sync: clear the processed-file cache so every photo in the tracked folders
+    // is re-read (text or QR) and re-added/updated, even ones already scanned before.
+    fun forceSyncTrackedFolders() {
+        if (trackedFolderUris.isEmpty()) return
+        if (isLoading || isBackgroundSyncing) return
+        processedFiles.clear()
+        saveProcessedFiles(prefs, processedFiles)
+        syncTrackedFolder()
     }
 
     // Full resync: clear processed-file cache (re-detect every photo) and re-verify ALL slips on server
@@ -986,6 +1001,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                     onFolderSelected = { uri -> onFolderSelected(uri) },
                     onRemoveFolder = { uriStr -> onRemoveFolder(uriStr) },
                     onSyncNow = { syncTrackedFolder() },
+                    onForceSyncAll = { forceSyncTrackedFolders() },
                     onImportSlips = { paths -> importSlips(paths) },
                     onExportData = { exportAllData() },
                     onImportData = { path -> importAllData(path) },

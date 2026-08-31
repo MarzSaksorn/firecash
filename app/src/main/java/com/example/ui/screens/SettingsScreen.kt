@@ -148,6 +148,7 @@ fun SettingsScreen(
     onFolderSelected: (Uri) -> Unit = {},
     onRemoveFolder: (String) -> Unit = {},
     onSyncNow: () -> Unit = {},
+    onForceSyncAll: () -> Unit = {},
     onImportSlips: (List<String>) -> Unit = {},
     onExportData: () -> Unit = {},
     onImportData: (String) -> Unit = {},
@@ -495,6 +496,11 @@ fun SettingsScreen(
                         Icon(imageVector = Icons.Default.Sync, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(text = "Sync Tracked Folders Now", color = FireCashPrimary)
+                    }
+                    OutlinedButton(onClick = onForceSyncAll, enabled = trackedFolders.isNotEmpty() && !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                        Icon(imageVector = Icons.Default.Sync, contentDescription = null, tint = FireCashSecondary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Force Sync All (re-scan every photo)", color = FireCashSecondary)
                     }
                     OutlinedButton(onClick = { photoPickerLauncher.launch(arrayOf("image/*")) }, enabled = !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
                         Icon(imageVector = Icons.Default.Sync, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))

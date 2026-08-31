@@ -52,6 +52,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -103,6 +105,7 @@ fun SettingsScreen(
     rules: List<KeywordRule>,
     easySlipEnabled: Boolean,
     apiKey: String,
+    verificationProvider: com.example.data.verification.VerificationProvider = com.example.data.verification.VerificationProvider.EASYSLIP,
     checkDuplicates: Boolean,
     knownNames: List<String> = emptyList(),
     unverifiedCount: Int = 0,
@@ -118,6 +121,7 @@ fun SettingsScreen(
     isLoading: Boolean = false,
     trackedFolders: List<String> = emptyList(),
     onToggleEasySlip: (Boolean) -> Unit,
+    onProviderChange: (com.example.data.verification.VerificationProvider) -> Unit = {},
     onUpdateApiKey: (String) -> Unit,
     onToggleCheckDuplicates: (Boolean) -> Unit,
     onAddKnownName: (String) -> Unit = {},
@@ -147,6 +151,7 @@ fun SettingsScreen(
     var newCategory by remember { mutableStateOf("Travel") }
 
     var apiKeyText by remember { mutableStateOf(apiKey) }
+    androidx.compose.runtime.LaunchedEffect(apiKey) { apiKeyText = apiKey }
     var newKnownName by remember { mutableStateOf("") }
     var newWhitelistApp by remember { mutableStateOf("") }
     var newWhitelistPrefix by remember { mutableStateOf("โอนเงินให้คุณ ฿") }
@@ -608,9 +613,9 @@ fun SettingsScreen(
                 exit = shrinkVertically() + fadeOut()
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            // EasySlip Verification Configuration
+            // Slip Verification Configuration
             Text(
-                text = "Bank Slip Verification (EasySlip Proxy)",
+                text = "Bank Slip Verification",
                 color = FireCashOnSurface,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -652,7 +657,7 @@ fun SettingsScreen(
 
                             Column {
                                 Text(
-                                    text = "EasySlip Verification",
+                                    text = "Slip Verification",
                                     color = FireCashOnSurface,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -679,6 +684,22 @@ fun SettingsScreen(
 
                     if (easySlipEnabled) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            // Provider selector
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                com.example.data.verification.VerificationProvider.entries.forEach { p ->
+                                    FilterChip(
+                                        selected = verificationProvider == p,
+                                        onClick = { onProviderChange(p) },
+                                        label = { Text(p.label, fontSize = 12.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = FireCashPrimary,
+                                            containerColor = FireCashSurfaceContainerHigh
+                                        ),
+                                        modifier = Modifier.height(32.dp)
+                                    )
+                                }
+                            }
+
                             // API Key Field
                             OutlinedTextField(
                                 value = apiKeyText,
@@ -686,7 +707,7 @@ fun SettingsScreen(
                                     apiKeyText = it
                                     onUpdateApiKey(it)
                                 },
-                                label = { Text("EasySlip API Key") },
+                                label = { Text("${verificationProvider.label} API Key") },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Default.Key,

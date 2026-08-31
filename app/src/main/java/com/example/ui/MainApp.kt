@@ -23,10 +23,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.documentfile.provider.DocumentFile
 import com.example.service.BackgroundListenerService
 import com.example.data.ocr.OcrProcessor
-import com.example.data.easyslip.EasySlipClient
 import com.example.data.easyslip.VerifySlipResponse
 import com.example.data.model.SavedSlip
 import com.example.data.model.VerificationStatus
+import com.example.data.verification.SlipVerificationManager
+import com.example.data.verification.VerificationProvider
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -56,7 +57,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     var notificationAccessGranted by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val easySlipClient = remember { EasySlipClient() }
+    val verificationManager = remember { SlipVerificationManager() }
     val prefs = remember { context.getSharedPreferences("firecash_settings", Context.MODE_PRIVATE) }
     var backgroundListening by remember { mutableStateOf(prefs.getBoolean("background_listening", false)) }
 
@@ -99,8 +100,15 @@ fun MainApp(modifier: Modifier = Modifier) {
     var easySlipEnabled by remember {
         mutableStateOf(prefs.getBoolean("easy_slip_enabled", false))
     }
+    var verificationProvider by remember {
+        mutableStateOf(VerificationProvider.fromId(prefs.getString("verification_provider", null)))
+    }
     var apiKey by remember {
-        mutableStateOf(prefs.getString("api_key", "") ?: "")
+        mutableStateOf(
+            prefs.getString(providerKeyPref(verificationProvider), null)
+                ?: prefs.getString("api_key", null)
+                ?: ""
+        )
     }
     var checkDuplicates by remember {
         mutableStateOf(prefs.getBoolean("check_duplicates", false))
@@ -176,15 +184,15 @@ fun MainApp(modifier: Modifier = Modifier) {
     suspend fun verifyWithEasySlip(payload: String): VerifySlipResponse? {
         if (!easySlipEnabled || apiKey.isBlank()) {
             slipWarning = if (easySlipEnabled) {
-                "No API key set — add your EasySlip API key in Settings to verify this slip."
+                "No API key set — add your ${verificationProvider.label} API key in Settings to verify this slip."
             } else {
-                "EasySlip verification is disabled — enable it in Settings and add your API key to verify slips."
+                "Slip verification is disabled — enable it in Settings and add your API key to verify slips."
             }
             return null
         }
         slipWarning = ""
-        easySlipClient.updateConfig("", apiKey)
-        return easySlipClient.verifyPayload(payload, checkDuplicate = checkDuplicates)
+        verificationManager.updateConfig(verificationProvider, apiKey)
+        return verificationManager.verifyPayload(payload, checkDuplicate = checkDuplicates)
     }
 
     fun isKnownName(name: String?, known: List<String>): Boolean {
@@ -351,7 +359,10 @@ fun MainApp(modifier: Modifier = Modifier) {
 
             val settings = JSONObject()
             settings.put("easy_slip_enabled", easySlipEnabled)
-            settings.put("api_key", apiKey)
+            settings.put("verification_provider", verificationProvider.id)
+            settings.put("api_key_easyslip", prefs.getString("api_key_easyslip", null) ?: prefs.getString("api_key", null) ?: "")
+            settings.put("api_key_thunder", prefs.getString("api_key_thunder", "") ?: "")
+            settings.put("api_key_slip2go", prefs.getString("api_key_slip2go", "") ?: "")
             settings.put("check_duplicates", checkDuplicates)
             settings.put("notification_income_enabled", notificationIncomeEnabled)
             settings.put("notification_expense_enabled", notificationExpenseEnabled)
@@ -411,7 +422,18 @@ fun MainApp(modifier: Modifier = Modifier) {
 
             root.optJSONObject("settings")?.let { s ->
                 easySlipEnabled = s.optBoolean("easy_slip_enabled", false); prefs.edit().putBoolean("easy_slip_enabled", easySlipEnabled).apply()
-                apiKey = s.optString("api_key", ""); prefs.edit().putString("api_key", apiKey).apply()
+                val importedProvider = VerificationProvider.fromId(s.optString("verification_provider", null).ifEmpty { null })
+                if (s.has("api_key_easyslip") || s.has("verification_provider")) {
+                    prefs.edit().putString("api_key_easyslip", s.optString("api_key_easyslip", "")).apply()
+                    prefs.edit().putString("api_key_thunder", s.optString("api_key_thunder", "")).apply()
+                    prefs.edit().putString("api_key_slip2go", s.optString("api_key_slip2go", "")).apply()
+                    verificationProvider = importedProvider
+                    prefs.edit().putString("verification_provider", importedProvider.id).apply()
+                    apiKey = prefs.getString(providerKeyPref(importedProvider), "") ?: ""
+                } else {
+                    // legacy export: single api_key
+                    apiKey = s.optString("api_key", ""); prefs.edit().putString("api_key_easyslip", apiKey).apply()
+                }
                 checkDuplicates = s.optBoolean("check_duplicates", false); prefs.edit().putBoolean("check_duplicates", checkDuplicates).apply()
                 notificationIncomeEnabled = s.optBoolean("notification_income_enabled", false); prefs.edit().putBoolean("notification_income_enabled", notificationIncomeEnabled).apply()
                 notificationExpenseEnabled = s.optBoolean("notification_expense_enabled", false); prefs.edit().putBoolean("notification_expense_enabled", notificationExpenseEnabled).apply()
@@ -750,6 +772,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     rules = emptyList(),
     easySlipEnabled = easySlipEnabled,
     apiKey = apiKey,
+    verificationProvider = verificationProvider,
     checkDuplicates = checkDuplicates,
     knownNames = knownNames,
     unverifiedCount = savedSlips.count { it.verificationStatus == VerificationStatus.UNVERIFIED },
@@ -758,9 +781,17 @@ fun MainApp(modifier: Modifier = Modifier) {
         prefs.edit().putBoolean("easy_slip_enabled", enabled).apply()
         if (enabled && apiKey.isNotBlank()) resyncUnverifiedSlips()
     },
+    onProviderChange = { p ->
+        prefs.edit().putString(providerKeyPref(verificationProvider), apiKey).apply()
+        verificationProvider = p
+        prefs.edit().putString("verification_provider", p.id).apply()
+        apiKey = prefs.getString(providerKeyPref(p), "") ?: ""
+        verificationManager.updateConfig(p, apiKey)
+        if (easySlipEnabled && apiKey.isNotBlank()) resyncUnverifiedSlips()
+    },
     onUpdateApiKey = { key ->
         apiKey = key
-        prefs.edit().putString("api_key", key).apply()
+        prefs.edit().putString(providerKeyPref(verificationProvider), key).apply()
         if (easySlipEnabled && key.isNotBlank()) resyncUnverifiedSlips()
     },
     onToggleCheckDuplicates = { enabled ->
@@ -1113,4 +1144,10 @@ private fun responseFromJson(obj: JSONObject): VerifySlipResponse {
 
 private fun parseStatus(name: String): VerificationStatus {
     return runCatching { VerificationStatus.valueOf(name) }.getOrDefault(VerificationStatus.UNVERIFIED)
+}
+
+private fun providerKeyPref(p: VerificationProvider): String = when (p) {
+    VerificationProvider.EASYSLIP -> "api_key_easyslip"
+    VerificationProvider.THUNDER -> "api_key_thunder"
+    VerificationProvider.SLIP2GO -> "api_key_slip2go"
 }

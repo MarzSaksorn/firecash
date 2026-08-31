@@ -7,7 +7,7 @@ FireCash is an offline-first Android app (Jetpack Compose, Material 3 dark theme
 **Capture & OCR**
 - Live CameraX preview with center-frame QR scanning (60% ROI — only QRs inside the frame are detected)
 - Gallery picker and photo import; scanned slips auto-save to your Account
-- EasySlip verification (`api.easyslip.com/v2/verify/bank`) with offline fallback: unverified slips show unknown data and a **Sync unverified** button once an API key is set
+- Slip verification with **multiple providers** — EasySlip, ThunderAPI, or Slip2Go (choose in Settings, per-provider API key, offline fallback): unverified slips show unknown data and a **Sync unverified** button once a key is set
 
 **Account (homepage)**
 - Balance card: Money In / Money Out, camera shortcut at top-right, in-app logo + FireCash title

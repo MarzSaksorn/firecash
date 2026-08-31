@@ -152,15 +152,19 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 
 ---
 
-### Current State (End of 2026-08-28)
+### Current State (2026-08-31)
 
-**Build:** `BUILD SUCCESSFUL` (last two `assembleDebug` 17-18s, warnings only: `EasySlipClient.kt:254 String?`, `FireCashDatabase.kt:27 fallbackToDestructiveMigration`, `BottomNavBar` deprecated `ReceiptLong`, `AnalyticsScreen` `TrendingUp`, `PhotoCaptureScreen` `LocalLifecycleOwner/setTargetResolution`, `SettingsScreen` `Label`).
+**Build:** `BUILD SUCCESSFUL`. CI (`.github/workflows/ci.yml`) builds `assembleDebug` on the runner (auto-generated `debug.keystore`, `setup-android@v3`), uploads the APK artifact and auto-creates a **GitHub release** on every `main` push.
 
-**Homepage:** `AccountScreen` (balance card with 56dp cat + `FireCash 26sp`, `Money In/Out` + camera at top-right, `View Spending Summary`, searchable `Transactions` (`reverseLayout` bottom→top, `DateHeader` with net total), long-press multi-select, time above amount, `SwapHoriz` grey `Transfer`).
+**Homepage:** `AccountScreen` — balance card (56dp cat + `FireCash 26sp`, Money In/Out + camera shortcut, Personal/Shop mode dependent action), `View Spending Summary`, searchable Transactions (reversed daily groups with net totals), long-press multi-select delete (unverified/no-ref slips), time above amount, `Transfer` chips.
 
-**Settings:** Safe (Base Currency, My Names, Tracked Folders, Keyword Mapping) / **Dangerous** collapsible red section (EasySlip, Notification Income/Expense whitelists, Background & Battery, Data Transfer).
+**Analytics:** stat cards + monthly **donut pie** (income/spending, Net in center, legend with %) + **Compare** mode splitting the pie into equal sectors per month (up to 3 months from actual slip data).
 
-**Not yet implemented (vs `firecash_full_plan.md`):** `Screen.Onboarding`, `Screen.Export`/`BackupRestore` routes, keyword `rules` persistence (`MainApp` `emptyList()`), `BottomNavBar` dead code after `7c364a9`. Google Drive removed by request (`19eb207`).
+**Verification:** **SlipVerificationManager** with three providers — EasySlip / ThunderAPI / Slip2Go — selected via chips in Settings, per-provider API key, offline fallback, 401/404/429 mapped to statuses. Slip2Go uses `connect.slip2go.com` + `Bearer <secret>`.
+
+**Settings:** Safe (My Names, Tracked Folders, Keyword Mapping, Personal/Shop mode) / **Dangerous** collapsible red section (Slip Verification, Notification Income/Expense whitelists with **permanent toggleable presets**, Background & Battery, Data Transfer).
+
+**Not yet implemented (vs `firecash_full_plan.md`):** `Screen.Onboarding`, `Screen.Export`/`BackupRestore` routes, keyword `rules` persistence (`MainApp` `emptyList()`), `BottomNavBar` dead code after `7c364a9`. Google Drive removed by request (`19eb207`). Unit tests skipped in CI by request.
 
 **Next steps you mentioned:** keep launcher untouched, potentially revisit `Onboarding`, `Export` unlimited, verification rate-limit UX.
 
@@ -202,4 +206,65 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 
 ---
 
-*Generated from `git log --reverse --date=short` + `docs/*.md` + `app/src/main/java` on `2026-08-28`. Run `git log --oneline` to replay.*
+## Day 5 — Analytics Chart Wars, Multi-Provider Verification, Notification Presets & CI
+
+> 2026-08-29 → 2026-08-31. Analytics debugging was done **live against the connected device** (`adb` + `uiautomator` + `logcat`); the Slip2Go fix was found by mining their dashboard JS bundle. All commits below, newest last.
+
+### Analytics charts (bar → pie → compare)
+
+- **feat: dual income/expense stick chart with gridlines, value labels, legend** (`fad3bb1`) — every bucket now plots Money In (green `#66BB6A`) + Money Out (orange `#FF6B00`) side by side; 4 gridlines with compact amounts (`1.2k`), max-bar value labels, legend dots; fixed Month sorting bug (was alphabetical).
+- **feat: limit week chart to 6 weeks per window** (`7144a32`); **style: make chart bars thick** (`c2c5932`) — sticks fill half the column; **style: cap bar width at 10dp** (`0c7318c`).
+- **feat: replace bar chart with monthly income/expense donut pie chart** (`79e4a73`) — single month donut (green in / orange out), Net in the center, legend with amounts + %, month label in header; deleted all windowed bar-chart code (~240 lines).
+- **fix: render pie chart as a true circle** (`15b1afd`) — arc sized to `min(w,h)` and centered.
+- **feat: monthly expense comparison stick chart** (`31caac9`) then **reverted** (`f9c941f`) — user didn't want it.
+- **feat: pie chart month comparison via concentric rings** (`e43e2c8`) — Compare button + dialog listing last 12 calendar months; rings dimmed by depth.
+- **feat: split pie into equal sectors per month, limit comparison to 3 months** (`fb0e449`) — 2 months = halves, 3 = thirds; each sector = that month's in/out ratio; dialog limited to 3 months.
+- **fix: unify pie ring size, offer only months present in slip data** (`eef2a43`) — compare mode now uses the same 36dp ring geometry as default; dialog months now derived from actual slip dates (max 3).
+- **fix: crash when slips have blank dates** (`22c7a5e`) — filter + `runCatching` around month-key parsing.
+- **fix: default pie to newest month with data, empty-state fallbacks** (`ca1e17c`).
+- **fix: stamp scan date on unverified slips, treat undated slips as today in analytics** (`e7beabf`) — `addSlip` falls back to now when `transDate` null; analytics treats blank dates as today.
+- **fix: parse slips in any date format** (`9ac5f5e`) — `normalizeDate()` tries `yyyy-MM-dd`/`dd/MM/yyyy`/etc.; `splitDate` hardened for space-separated datetimes.
+- **fix: analytics month parsing used LocalDate with yyyy-MM formatter, silently dropping every month** (`27242b5`) — **the real root cause** of "no chart": `LocalDate.parse("2026-08-01", "yyyy-MM")` throws on the trailing `-01`; every month key was dropped by `mapNotNull`. Fixed with `YearMonth.parse(key, "yyyy-MM")`. Verified live on device (pie: `140.0/754.0` matching the balance card).
+- **docs: create feature summary chart** (`88f3927`).
+
+### Settings & deletion
+
+- **refactor: remove Base Currency option from settings** (`8b2f33c`) — card, dropdown, `currentCurrency`/`onCurrencyChange` params deleted.
+- **feat: allow deleting slips that are unverified or have no transaction reference** (`03b4139`) — `isDeletable` = `UNVERIFIED || transRef.isBlank() || amount == null`; dialog copy updated.
+
+### CI / GitHub Actions
+
+- **ci: generate debug keystore on CI, build debug APK with Android SDK setup** (`009f668`) — `debug.keystore` is gitignored but `assembleDebug` requires it → `keytool` step creates it on the runner; added `android-actions/setup-android@v3`.
+- **test: remove stale GreetingScreenshotTest referencing removed ExpenseItemCard** (`8d85ae4`) — this was breaking `testDebugUnitTest` compilation on CI.
+- **ci: skip unit tests, build and upload debug APK only** (`9fb1101`) — user request.
+- **ci: auto-create GitHub release with debug APK on main pushes** (`1f8ff1e`) → **ci: publish releases as full releases, not prereleases** (`19319f3`) — `softprops/action-gh-release@v2`, tag `debug-build-<run_number>`, `contents: write`.
+
+### Multi-provider slip verification (NEW FILES)
+
+- **feat: multi-provider slip verification (EasySlip, ThunderAPI, Slip2Go)** (`23164f7`) — new `data/verification/VerificationProvider.kt` (enum: `easyslip`/`thunder`/`slip2go`) and `data/verification/SlipVerificationManager.kt` (one `verifyPayload(payload, checkDuplicate, matchAmount)` dispatching per provider; 429/401/404 → `RATE_LIMITED`/`AUTH_FAILED`/`SLIP_NOT_FOUND`, offline → simulate fallback). Thunder: `api.thunder.in.th/v2/verify/bank`, `Bearer` key, `bank.short` codes mapped to names. Slip2Go: `connect.slip2go.com/api/verify-slip/qr-code/info` (initially wrong host, see below), `Authorization: Bearer <secret>`, nested `payload.qrCode` body, `code 200000` = success, `200501` dup / `200404` not found / `429000` rate-limit. Settings now has **provider chips** (EasySlip | ThunderAPI | Slip2Go) + per-provider API key; storage `verification_provider` + `api_key_easyslip/thunder/slip2go` (legacy `api_key` migrated); export/import carries provider + keys.
+- **fix: Slip2Go API host is connect.slip2go.com** (`8ce7a68`) — docs only show relative paths; `api.slip2go.com` 404s every documented route. Found by extracting endpoint strings from `app.slip2go.com/assets/index-*.js` (`https://connect.slip2go.com${endpoint}`). Confirmed live: correct host returns `401 401001` for a bad key.
+- **fix: Slip2Go requires Bearer prefix on secret** (`ce635a4`) — docs say raw `Authorization: <secret>`, but the live API rejects raw with `401001` and accepts `Bearer <secret>` (verified by replaying the user's key from the dev machine). Debugged end-to-end through the phone (temp logcat diagnostics: request URL/authLen/response), after which "Sync 33 unverified" succeeded live: `code 200000 Slip found` with real bank data, slips flipping UNVERIFIED → VERIFIED.
+
+### Notification whitelist presets (NEW FILE)
+
+- **feat: notification whitelist presets system** (`dd86a10`) — new `service/NotificationPresets.kt`: `incomePresets`/`expensePresets` lists of `WhitelistedApp(package, prefix)`; `seedIfNeeded(prefs)` seeds once on first launch and only when the whitelist pref doesn't exist (never overwrites user data); wired into MainApp startup.
+- **feat: preset notification whitelists from existing device config** (`7cd99a4`) — the user's real device lists pulled via adb UI dump and added as the example presets: MAKE by KBank income `โอนเงินให้คุณ ฿`, expense `โอนเงินสำเร็จ ฿`; later expanded by the user with KPlus/wap/SCB entries.
+- **feat: permanent notification whitelist presets (locked, cannot be removed)** (`a46ea80`) — `mergeIncome/mergeExpense` always re-inject presets; remove handlers guard permanent entries; Settings shows a lock icon instead of ✕; the background `IncomeNotificationService` merges presets at match time.
+- **fix: JSON import preserves permanent presets; missing whitelist in JSON no longer wipes device list** (`ee1a1ad`) — import only touches whitelist keys when present in the JSON, and merges presets into imported lists.
+- **feat: preset whitelist entries are toggleable (persisted), still not removable** (`5fb1bfe`) — per-entry enabled state in `preset_disabled_income`/`preset_disabled_expense` StringSets; Settings shows lock + Switch for presets; `merge*` filters disabled ones everywhere (UI state, service matching, import).
+- **fix: disabled preset toggles stay visible in the whitelist list** (`9b18984`) — Settings now displays ALL presets (enabled + disabled) via `displayIncomeWhitelist`/`displayExpenseWhitelist` (`(effective + permanent).distinctBy { pkg to prefix }`); toggling off no longer makes the row disappear.
+
+### App modes (other session)
+
+- **feat: add Personal and Shop app modes with different home card actions** (`0294bbf`, generated with Crush) — `app_mode` pref (`personal`/`shop`); Personal shows manual-entry button on the home balance card, Shop keeps the camera button; chosen in Settings, carried through JSON export/import; also added root `AGENTS.md` + `.gitignore` entries.
+
+### New files this session
+
+- `app/src/main/java/com/example/data/verification/VerificationProvider.kt`
+- `app/src/main/java/com/example/data/verification/SlipVerificationManager.kt`
+- `app/src/main/java/com/example/service/NotificationPresets.kt`
+- `docs/SUMMARY_CHART.md` (feature summary table)
+
+---
+
+*Generated from `git log --reverse --date=short` + `docs/*.md` + `app/src/main/java` on `2026-08-31`. Run `git log --oneline` to replay.*

@@ -17,3 +17,6 @@ local.properties
 .env
 debug.keystore
 gradle-*.zip
+
+# Node/opencode harness artifacts
+node_modules/

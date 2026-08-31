@@ -62,6 +62,8 @@ fun MainApp(modifier: Modifier = Modifier) {
     // Seed default notification whitelist presets on first launch (no-op once seeded / user-customized)
     com.example.service.NotificationPresets.seedIfNeeded(prefs)
     var backgroundListening by remember { mutableStateOf(prefs.getBoolean("background_listening", false)) }
+    // App mode: "personal" (manual entry button on home card) or "shop" (camera button on home card)
+    var appMode by remember { mutableStateOf(prefs.getString("app_mode", "personal") ?: "personal") }
 
     // Refresh statuses whenever the activity resumes (e.g. returning from system settings)
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
@@ -375,6 +377,7 @@ fun MainApp(modifier: Modifier = Modifier) {
             settings.put("notification_income_enabled", notificationIncomeEnabled)
             settings.put("notification_expense_enabled", notificationExpenseEnabled)
             settings.put("background_listening", backgroundListening)
+            settings.put("app_mode", appMode)
             root.put("settings", settings)
 
             val dir = context.getExternalFilesDir(null) ?: context.filesDir
@@ -452,6 +455,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                 notificationIncomeEnabled = s.optBoolean("notification_income_enabled", false); prefs.edit().putBoolean("notification_income_enabled", notificationIncomeEnabled).apply()
                 notificationExpenseEnabled = s.optBoolean("notification_expense_enabled", false); prefs.edit().putBoolean("notification_expense_enabled", notificationExpenseEnabled).apply()
                 backgroundListening = s.optBoolean("background_listening", false); prefs.edit().putBoolean("background_listening", backgroundListening).apply()
+                appMode = s.optString("app_mode", appMode); prefs.edit().putString("app_mode", appMode).apply()
             }
 
             if (backgroundListening) {
@@ -764,6 +768,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                     showSavedSlips = false
                     showCapture = true
                 },
+                appMode = appMode,
                 onAddManual = { amount, isMoneyIn, note ->
                     addManualSlip(amount, isMoneyIn, note)
                 },
@@ -784,6 +789,11 @@ fun MainApp(modifier: Modifier = Modifier) {
         } else {
             SettingsScreen(
     rules = emptyList(),
+    appMode = appMode,
+    onSetAppMode = { mode ->
+        appMode = mode
+        prefs.edit().putString("app_mode", mode).apply()
+    },
     easySlipEnabled = easySlipEnabled,
     apiKey = apiKey,
     verificationProvider = verificationProvider,

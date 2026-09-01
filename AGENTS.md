@@ -1,6 +1,6 @@
 # AGENTS.md — FireCash
 
-Offline-first Android app (Kotlin, Jetpack Compose, Material 3 dark theme) for logging Thai PromptPay/bank-slip transfers and tracking income/expense. Scans QR from slips via camera/gallery, verifies with EasySlip/ThunderAPI/Slip2Go (when an API key is set), captures income/expense from other apps' notifications, and stores everything locally.
+Offline-first Android app (Kotlin, Jetpack Compose, Material 3 dark theme) for **shop operators** logging customer PromptPay/bank-slip transfers and tracking income/expense. Scans QR from slips via camera/gallery, verifies with EasySlip/ThunderAPI/Slip2Go (when an API key is set), cross-checks the slip photo text against the QR/bank amount for fraud, captures income/expense from other apps' notifications, and stores everything locally. There is **no personal/shop mode switch** — the app is shop-operator only (single dataset).
 
 ## Commands
 
@@ -33,7 +33,7 @@ There are **two parallel architectures**. The live app is NOT the one using Room
 
 | Key | Content |
 |---|---|
-| `saved_slips` | JSON array of `SavedSlip` for **personal** mode (the whole account list, incl. notification-caught slips). Shop mode uses `saved_slips_shop` — the two modes keep **separate datasets** (`seen_payloads(_shop)`, `processed_files(_shop)` too) so switching modes never touches the other mode's data. `modePrefKey` resolves the key from the `app_mode` pref; the notification service writes to the active mode's key. Export/import carry both datasets (`slips`/`slips_shop` etc.). |
+| `saved_slips` | JSON array of `SavedSlip` (the whole account list, incl. notification-caught slips) |
 | `seen_payloads` | JSON array of already-processed QR payloads (dedupe) |
 | `processed_files` | content:// URIs of tracked-folder files already OCR'd (dedupe) |
 | `tracked_folders` | JSON array of folder tree URIs (persisted read permission) |
@@ -57,8 +57,7 @@ Helper functions for slips/whitelists/seen/processed live as top-level `private 
 
 ## OCR / parsing
 
-- `OcrProcessor.processReceipt(imageUri, samplePreset, scanCenterOnly=true)`: uses ML Kit **barcode scanning only** (QR). With `scanCenterOnly=true` it crops the image to the center 60% square to match the on-screen frame overlay. It does NOT run text recognition — the `mlkit:text-recognition` dependency is present but unused. `samplePreset != null` bypasses the image entirely and parses a canned OCR string (used for demo/testing).
-- **Personal mode OCR** (`OcrProcessor.recognizeText(imageUri, scanCenterOnly=false)` + `MainApp.addOcrSlip`): in Personal app mode **every** photo-ingestion path skips verification entirely — camera, gallery, Settings photo import (`importSlips`), tracked-folder sync (`scanFolder`) — ML Kit Latin text recognition extracts the slip text, `SlipDataParser.parse` + `extractParties` (จาก/ถึง or `FROM`/`TO` lines) build a `SavedSlip` (payload `ocr:<ts>`, UNVERIFIED, counterparty = from/to lines else merchant, money in/out resolved via known names, unknown → expense). `verifyWithEasySlip` early-returns `null` in personal mode so no path (incl. `fullResync`/`resyncUnverifiedSlips`) can call a verification API. Live QR auto-detect is a no-op in Personal mode. Note: ML Kit on-device text recognition has **no Thai script support** (Latin/digits only), so Thai-only glyphs are not extracted.
+- `OcrProcessor.processReceipt(imageUri, samplePreset, scanCenterOnly=true)`: uses ML Kit **barcode scanning only** (QR). With `scanCenterOnly=true` it crops the image to the center 60% square to match the on-screen frame overlay. `samplePreset != null` bypasses the image entirely and parses a canned OCR string (used for demo/testing). `OcrProcessor.recognizeText` runs ML Kit Latin text recognition over the photo — used ONLY for the shop-mode fraud cross-check (extract the baht amount printed on the slip). Note: ML Kit on-device text recognition has **no Thai script support** (Latin/digits only), so Thai-only glyphs are not extracted.
 - `SlipDataParser.parse(rawText)`: regex-based extraction — amounts (`TOTAL`, `ยอดรวม`, etc.), dates (`2023-10-24`, `dd/MM/yyyy`, `24 Oct 2023`), merchant (first plausible line, truncated to 32 chars), Tag 91 CRC (`9104XXXX`), EMVCo QR CRC (`6304XXXX`). Bank slip detection via CRC/Tag 91 or `PromptPay`/`โอนเงินสำเร็จ`. Falls back to hardcoded values (amount `45.20`, today's date) when nothing matches.
 - Bank code mapping: KBank `004`, SCB `014`, Bangkok Bank `002`, KTB `006` (see `SlipDataParser.extractBankSlipPayload` and `SlipVerificationManager.getBankName`).
 
@@ -72,7 +71,7 @@ Helper functions for slips/whitelists/seen/processed live as top-level `private 
 
 - Balance = moneyIn − moneyOut. Each slip resolves to in/out/transfer via `effectiveIsMoneyIn` (duplicated in `MainApp.isKnownName`-based logic and `AccountScreen`): receiver is a known name ⇒ income, sender is known ⇒ expense, both known (or sender==receiver) ⇒ transfer (excluded from balance), else the stored `isMoneyIn` flag. Known names are matched case-insensitively, trimmed.
 - AccountScreen list: `LazyColumn(reverseLayout = true)`, slips appended in arrival order, grouped by the `date` string with a daily-net-total header. Newest is at the visual bottom.
-- **App mode** (`app_mode` pref, default `"personal"`, chosen in Settings → "App Mode"): the balance card's top-right 44dp action button differs — **Personal** shows `+` (opens the manual income/expense entry dialog), **Shop** shows the camera icon (opens the scan flow). The mode is carried through JSON export/import. Switching mode swaps the in-memory list to that mode's own dataset (no re-verification, no cross-contamination).
+- **App mode** — removed: the app is **shop-operator only**. The balance card's top-right 44dp action button always opens the camera.
 - Deletion safety: only slips with `UNVERIFIED` status, blank `transRef`, or `null` amount can be deleted (long-press multi-select in AccountScreen, `onDeleteSlip` in MainApp).
 - `fullResync()` (hold Sync 10s): clears `processed_files`, re-OCR's every tracked folder, then re-verifies all slips **except** `manual:`/`notif:` payloads. Settings → Tracked Folders also has **Force Sync All (re-scan every photo)** (`forceSyncTrackedFolders()`): same cache clear + re-scan but WITHOUT the re-verify loop; re-reading a photo updates the existing slip (dedupe by `photoPath`) instead of duplicating.
 - Import/export (`exportAllData`/`importAllData`): full JSON clone including API keys, whitelists, and app mode. Import preserves permanent presets (merges with `mergeIncome`/`mergeExpense`) and a JSON missing a whitelist key does NOT wipe the device list.

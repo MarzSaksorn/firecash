@@ -57,7 +57,6 @@ fun QrPayloadScreen(
     slipData: VerifySlipResponse? = null,
     warning: String = "",
     photoPath: String? = null,
-    showVerification: Boolean = true,
     amountMismatch: Boolean = false,
     onBack: () -> Unit = {}
 ) {
@@ -185,10 +184,8 @@ fun QrPayloadScreen(
 
             // Verification status banner + details — always show card, fallback to payload-extracted amount if not verified
             if (slipData != null) {
-                if (showVerification) {
-                    StatusBanner(slipData = slipData)
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
+                StatusBanner(slipData = slipData)
+                Spacer(modifier = Modifier.height(12.dp))
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -208,9 +205,7 @@ fun QrPayloadScreen(
                     DetailRow("Sender Bank", slipData.sendingBankName ?: slipData.sendingBank ?: "—")
                     DetailRow("Receiver", slipData.receiverName ?: "—")
                     DetailRow("Receiver Bank", slipData.receivingBankName ?: slipData.receivingBank ?: "—")
-                    if (showVerification) {
-                        DetailRow("Amount Matched", if (slipData.isAmountMatched) "Yes" else "No")
-                    }
+                    DetailRow("Amount Matched", if (slipData.isAmountMatched) "Yes" else "No")
                 }
             } else {
                 // Fallback for old slips where slipData was null — still show a card from raw payload
@@ -232,9 +227,7 @@ fun QrPayloadScreen(
                     DetailRow("Time", "—")
                     DetailRow("Sender", "—")
                     DetailRow("Receiver", "—")
-                    if (showVerification) {
-                        DetailRow("Status", "Not verified — enable EasySlip and Sync unverified")
-                    }
+                    DetailRow("Status", "Not verified — enable EasySlip and Sync unverified")
                 }
             }
 

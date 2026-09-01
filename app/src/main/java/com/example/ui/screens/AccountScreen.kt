@@ -114,7 +114,6 @@ fun AccountScreen(
     onOpenSettings: () -> Unit,
     onOpenAnalytics: () -> Unit,
     onOpenCamera: () -> Unit = {},
-    appMode: String = "personal",
     onAddManual: (amount: Double, isMoneyIn: Boolean, note: String) -> Unit = { _, _, _ -> },
     onAutoSync: () -> Unit,
     onSyncNow: () -> Unit = {},
@@ -267,39 +266,18 @@ fun AccountScreen(
                         fontWeight = FontWeight.Bold
                     )
                 }
-                if (appMode == "shop") {
-                    IconButton(
-                        onClick = onOpenCamera,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .background(Color.White.copy(alpha = 0.12f), CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PhotoCamera,
-                            contentDescription = "Open camera",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                } else {
-                    IconButton(
-                        onClick = {
-                            showAddManualDialog = true
-                            manualAmount = ""
-                            manualNote = ""
-                            manualIsIn = true
-                        },
-                        modifier = Modifier
-                            .size(44.dp)
-                            .background(Color.White.copy(alpha = 0.12f), CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add income/expense manually",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
+                IconButton(
+                    onClick = onOpenCamera,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(Color.White.copy(alpha = 0.12f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhotoCamera,
+                        contentDescription = "Open camera",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))

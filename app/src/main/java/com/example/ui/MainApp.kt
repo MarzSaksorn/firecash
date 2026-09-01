@@ -65,8 +65,6 @@ fun MainApp(modifier: Modifier = Modifier) {
     // Seed default notification whitelist presets on first launch (no-op once seeded / user-customized)
     com.example.service.NotificationPresets.seedIfNeeded(prefs)
     var backgroundListening by remember { mutableStateOf(prefs.getBoolean("background_listening", false)) }
-    // App mode: "personal" (manual entry button on home card) or "shop" (camera button on home card)
-    var appMode by remember { mutableStateOf(prefs.getString("app_mode", "personal") ?: "personal") }
 
     // Refresh statuses whenever the activity resumes (e.g. returning from system settings)
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
@@ -176,7 +174,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     // Keep Account list live when IncomeNotificationService writes to prefs in background
     androidx.compose.runtime.DisposableEffect(prefs) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == modePrefKey(prefs, null, PREFS_SLIPS)) {
+            if (key == PREFS_SLIPS) {
                 val fresh = loadSlips(prefs)
                 // Simple diff check — replace if differs
                 if (fresh.size != savedSlips.size || fresh.toSet() != savedSlips.toSet()) {
@@ -195,7 +193,6 @@ fun MainApp(modifier: Modifier = Modifier) {
     }
 
     suspend fun verifyWithEasySlip(payload: String): VerifySlipResponse? {
-        if (appMode == "personal") return null // personal mode never calls the verification API
         if (!easySlipEnabled || apiKey.isBlank()) {
             slipWarning = if (easySlipEnabled) {
                 "No API key set — add your ${verificationProvider.label} API key in Settings to verify this slip."
@@ -380,108 +377,6 @@ fun MainApp(modifier: Modifier = Modifier) {
         saveSeenPayloads(prefs, seenPayloads)
     }
 
-    // Fallback date from the slip photo's file timestamp. Slip images are saved at
-    // transaction time (KBank MAKE etc.), so when the OCR date is unreadable (Thai
-    // glyphs garbled by the Latin recognizer) the photo's mtime is the slip's date.
-    fun photoModifiedDate(photoPath: String?): String? {
-        if (photoPath.isNullOrBlank()) return null
-        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-        return try {
-            val millis = runCatching { java.io.File(photoPath).lastModified() }.getOrDefault(0L).takeIf { it > 0 }
-                ?: runCatching {
-                    val uri = Uri.parse(photoPath)
-                    if (uri.scheme != "content") return@runCatching null
-                    context.contentResolver.query(
-                        uri,
-                        arrayOf(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED),
-                        null, null, null
-                    )?.use { c -> if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null }
-                }.getOrNull()
-            millis?.let { sdf.format(java.util.Date(it)) }
-                .also { android.util.Log.d("FireCashOCR", "photoModifiedDate path=${photoPath.takeLast(40)} millis=$millis -> $it") }
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    // Personal mode: log a slip from the recognized text of a slip photo, without calling
-    // any verification API. Amount/date/merchant come from SlipDataParser; from/to lines
-    // (จาก/ถึง or FROM/TO) decide money in/out via the known-names logic.
-    fun addOcrSlip(rawText: String, photoPath: String? = null) {
-        if (rawText.isBlank()) return
-        val parsed = SlipDataParser.parse(rawText)
-        val (sender, receiver) = SlipDataParser.extractParties(rawText)
-        // A QR fallback payload is compact (no spaces/newlines); real recognized text is not
-        val isQrPayload = !rawText.contains(" ") && !rawText.contains("\n")
-        val now = System.currentTimeMillis()
-        val sdfDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-        val sdfTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
-        // When the OCR date fell back to today (unreadable Thai date), use the photo's
-        // file timestamp — slip images are saved at transaction time.
-        val fallbackDate = sdfDate.format(java.util.Date(now))
-        val date = if (parsed.date == fallbackDate) photoModifiedDate(photoPath) ?: parsed.date else parsed.date
-        // Prefer a baht-marked amount; else trust the parsed amount only when the text really
-        // contains a decimal (avoids SlipDataParser's 45.20 fallback fabricating amounts).
-        val hasDecimal = Regex("""\d+\.\d+""").containsMatchIn(rawText)
-        val amount = extractSlipAmount(rawText)
-            ?: if (parsed.amount > 0.0 && hasDecimal) parsed.amount else null
-        // Counterparty: from/to lines, else the slip brand, else the merchant line
-        val brand = when {
-            rawText.contains("truemoney", ignoreCase = true) -> "TrueMoney"
-            rawText.contains("make by kbank", ignoreCase = true) || rawText.contains("kbank", ignoreCase = true) -> "KBank"
-            rawText.contains("scb", ignoreCase = true) || rawText.contains("siam commercial", ignoreCase = true) -> "SCB"
-            rawText.contains("bangkok bank", ignoreCase = true) -> "Bangkok Bank"
-            else -> null
-        }
-        val senderName = sender ?: if (parsed.isBankSlip) null else parsed.merchant
-        val receiverName = receiver ?: if (isQrPayload) "QR Payload" else brand ?: parsed.merchant
-        val result = VerifySlipResponse(
-            success = false,
-            isDuplicate = false,
-            transRef = parsed.bankPayload?.transRef,
-            amount = amount,
-            transDate = parsed.date,
-            transTime = parsed.time,
-            senderName = senderName,
-            receiverName = receiverName,
-            sendingBank = parsed.bankPayload?.sendingBank,
-            isAmountMatched = false,
-            verificationStatus = VerificationStatus.UNVERIFIED,
-            errorMessage = if (isQrPayload) "Personal mode — read from slip QR, not API-verified"
-            else "Personal mode — read from slip photo, not API-verified"
-        )
-        val senderKnown = isKnownName(result.senderName, knownNames)
-        val receiverKnown = isKnownName(result.receiverName, knownNames)
-        val resolvedIsMoneyIn = when {
-            senderKnown && receiverKnown -> false // transfer
-            receiverKnown -> true // money in
-            senderKnown -> false // money out
-            else -> false // unknown direction defaults to expense
-        }
-        val slip = SavedSlip(
-            payload = "ocr:$now",
-            amount = result.amount,
-            transRef = result.transRef,
-            senderName = result.senderName,
-            receiverName = result.receiverName,
-            date = date,
-            time = result.transTime ?: sdfTime.format(java.util.Date(now)),
-            verificationStatus = result.verificationStatus,
-            slipData = result.copy(transDate = date),
-            isMoneyIn = resolvedIsMoneyIn,
-            photoPath = photoPath
-        )
-        // Re-scanning the same photo (forced sync) updates the existing slip instead of duplicating
-        val existingIndex = if (photoPath != null) {
-            savedSlips.indexOfFirst { it.photoPath != null && it.photoPath == photoPath }
-        } else -1
-        if (existingIndex >= 0) savedSlips[existingIndex] = slip else savedSlips.add(slip)
-        seenPayloads.add(slip.payload)
-        saveSlips(prefs, savedSlips)
-        saveSeenPayloads(prefs, seenPayloads)
-        android.util.Log.d("FireCashOCR", "addOcrSlip amount=$amount merchant=${receiverName ?: senderName ?: "?"} isIn=$resolvedIsMoneyIn")
-    }
-
     // Export everything (slips + settings + prefs) to a JSON file and share it
     fun exportAllData() {
         try {
@@ -496,13 +391,6 @@ fun MainApp(modifier: Modifier = Modifier) {
 
             root.put("seenPayloads", JSONArray(seenPayloads.toList()))
             root.put("processedFiles", JSONArray(processedFiles.toList()))
-            // Also export the other mode's dataset so a backup never loses either side
-            val otherMode = if (appMode == "shop") "personal" else "shop"
-            val otherArr = JSONArray()
-            loadSlips(prefs, otherMode).forEach { otherArr.put(slipToJson(it)) }
-            root.put("slips_" + otherMode, otherArr)
-            root.put("seenPayloads_" + otherMode, JSONArray(loadSeenPayloads(prefs, otherMode)))
-            root.put("processedFiles_" + otherMode, JSONArray(loadProcessedFiles(prefs, otherMode)))
             root.put("trackedFolders", JSONArray(trackedFolderUris))
             root.put("knownNames", JSONArray(knownNames))
 
@@ -524,7 +412,6 @@ fun MainApp(modifier: Modifier = Modifier) {
             settings.put("notification_income_enabled", notificationIncomeEnabled)
             settings.put("notification_expense_enabled", notificationExpenseEnabled)
             settings.put("background_listening", backgroundListening)
-            settings.put("app_mode", appMode)
             root.put("settings", settings)
 
             val dir = context.getExternalFilesDir(null) ?: context.filesDir
@@ -549,40 +436,22 @@ fun MainApp(modifier: Modifier = Modifier) {
             val text = java.io.File(path).readText()
             val root = JSONObject(text)
 
-            // Restore BOTH mode datasets ("slips" legacy key = personal); the mode declared
-            // in the backup's settings also lands in memory so the screen refreshes correctly.
-            val importedAppMode = root.optJSONObject("settings")?.optString("app_mode", appMode) ?: appMode
-            fun restoreDataset(mode: String) {
-                val suffix = if (mode == "shop") "_shop" else ""
-                val legacy = suffix.isEmpty()
-                root.optJSONArray("slips" + suffix)?.let { arr ->
-                    val list = mutableListOf<SavedSlip>()
-                    for (i in 0 until arr.length()) {
-                        slipFromJson(arr.getJSONObject(i))?.let { list.add(it) }
-                    }
-                    if (mode == importedAppMode) {
-                        savedSlips.clear()
-                        savedSlips.addAll(list)
-                    }
-                    saveSlips(prefs, list, mode)
+            // Restore the single dataset ("slips" / "seenPayloads" / "processedFiles")
+            root.optJSONArray("slips")?.let { arr ->
+                val list = mutableListOf<SavedSlip>()
+                for (i in 0 until arr.length()) {
+                    slipFromJson(arr.getJSONObject(i))?.let { list.add(it) }
                 }
-                val seen = (root.optJSONArray("seenPayloads" + suffix) ?: if (legacy) root.optJSONArray("seenPayloads") else null)
-                    ?.let { arr -> (0 until arr.length()).map { arr.getString(it) }.toSet() } ?: emptySet()
-                if (mode == importedAppMode) {
-                    seenPayloads.clear()
-                    seenPayloads.addAll(seen)
-                }
-                saveSeenPayloads(prefs, seen, mode)
-                val processed = (root.optJSONArray("processedFiles" + suffix) ?: if (legacy) root.optJSONArray("processedFiles") else null)
-                    ?.let { arr -> (0 until arr.length()).map { arr.getString(it) }.toSet() } ?: emptySet()
-                if (mode == importedAppMode) {
-                    processedFiles.clear()
-                    processedFiles.addAll(processed)
-                }
-                saveProcessedFiles(prefs, processed, mode)
+                savedSlips.clear()
+                savedSlips.addAll(list)
+                saveSlips(prefs, savedSlips)
             }
-            restoreDataset("personal")
-            restoreDataset("shop")
+            val seen = root.optJSONArray("seenPayloads")
+                ?.let { arr -> (0 until arr.length()).map { arr.getString(it) }.toSet() } ?: emptySet()
+            seenPayloads.clear(); seenPayloads.addAll(seen); saveSeenPayloads(prefs, seenPayloads)
+            val processed = root.optJSONArray("processedFiles")
+                ?.let { arr -> (0 until arr.length()).map { arr.getString(it) }.toSet() } ?: emptySet()
+            processedFiles.clear(); processedFiles.addAll(processed); saveProcessedFiles(prefs, processedFiles)
 
             fun readStrArr(name: String): List<String> =
                 root.optJSONArray(name)?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList()
@@ -625,7 +494,6 @@ fun MainApp(modifier: Modifier = Modifier) {
                 notificationIncomeEnabled = s.optBoolean("notification_income_enabled", false); prefs.edit().putBoolean("notification_income_enabled", notificationIncomeEnabled).apply()
                 notificationExpenseEnabled = s.optBoolean("notification_expense_enabled", false); prefs.edit().putBoolean("notification_expense_enabled", notificationExpenseEnabled).apply()
                 backgroundListening = s.optBoolean("background_listening", false); prefs.edit().putBoolean("background_listening", backgroundListening).apply()
-                appMode = s.optString("app_mode", appMode); prefs.edit().putString("app_mode", appMode).apply()
             }
 
             if (backgroundListening) {
@@ -637,29 +505,16 @@ fun MainApp(modifier: Modifier = Modifier) {
         }
     }
 
-    // Personal mode: read a slip photo as text first; if the text is unreadable or has no
-    // amount digits (Thai-only slips — ML Kit on-device has no Thai script support), fall
-    // back to the QR payload on the same image. Never verified via any API in personal mode.
-    suspend fun readSlipText(path: String, center: Boolean = false): String {
-        val text = OcrProcessor(context).recognizeText(path, scanCenterOnly = center)
-        if (text.isNotBlank() && extractAmount(text) != null) return text
-        return OcrProcessor(context).processReceipt(path, scanCenterOnly = center).rawText
-    }
-
     fun importSlips(paths: List<String>) {
         if (paths.isEmpty()) return
         isLoading = true
         scope.launch {
             for (path in paths) {
-                if (appMode == "personal") {
-                    // Personal mode: extract text from the photo, no QR payload / no server
-                    val ocrText = readSlipText(path)
-                    if (ocrText.isNotBlank()) addOcrSlip(ocrText, photoPath = path)
-                } else {
-                    val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
-                    if (payload.isNotBlank()) {
-                        addSlip(payload, photoPath = path)
-                    }
+                // Shop mode: read the QR payload (with photo text for the fraud cross-check)
+                val ocrText = OcrProcessor(context).recognizeText(path, scanCenterOnly = false)
+                val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
+                if (payload.isNotBlank()) {
+                    addSlip(payload, photoPath = path, ocrText = ocrText)
                 }
             }
             isLoading = false
@@ -691,21 +546,14 @@ fun MainApp(modifier: Modifier = Modifier) {
             }.getOrDefault(false)
             if (!copied) continue
 
-            if (appMode == "personal") {
-                // Personal mode: text first, offline QR fallback for unreadable slips
-                val ocrText = readSlipText(tempFile.absolutePath)
-                if (ocrText.isNotBlank()) {
-                    addOcrSlip(ocrText, photoPath = file.uri.toString())
-                }
-            } else {
-                val payload = OcrProcessor(context)
-                    .processReceipt(tempFile.absolutePath, scanCenterOnly = false)
-                    .rawText
-                if (payload.isNotBlank() && payload !in seenPayloads) {
-                    seenPayloads.add(payload)
-                    // store the original content:// uri so the slip links to the real photo on device
-                    addSlip(payload, photoPath = file.uri.toString())
-                }
+            val ocrText = OcrProcessor(context).recognizeText(tempFile.absolutePath, scanCenterOnly = false)
+            val payload = OcrProcessor(context)
+                .processReceipt(tempFile.absolutePath, scanCenterOnly = false)
+                .rawText
+            if (payload.isNotBlank() && payload !in seenPayloads) {
+                seenPayloads.add(payload)
+                // store the original content:// uri so the slip links to the real photo on device
+                addSlip(payload, photoPath = file.uri.toString(), ocrText = ocrText)
             }
             // Mark processed (even blank OCR) so future opens only handle genuinely new files
             processedFiles.add(fileKey)
@@ -824,7 +672,6 @@ fun MainApp(modifier: Modifier = Modifier) {
     }
 
     fun resyncUnverifiedSlips() {
-        if (appMode == "personal") return // personal mode never verifies via API
         if (!easySlipEnabled || apiKey.isBlank()) return
         if (isLoading || isBackgroundSyncing) return
         val unverified = savedSlips.filter {
@@ -895,7 +742,6 @@ fun MainApp(modifier: Modifier = Modifier) {
                 slipData = slipData,
                 warning = slipWarning,
                 photoPath = qrPhotoPath,
-                showVerification = appMode != "personal",
                 amountMismatch = slipMismatch,
                 onBack = {
                     showPayload = false
@@ -907,54 +753,25 @@ fun MainApp(modifier: Modifier = Modifier) {
             PhotoCaptureScreen(
                 onPhotoCaptured = { path ->
                     scope.launch {
-                        if (appMode == "personal") {
-                            // Personal mode: read the slip text from the photo, no verification API
-                            isLoading = true
-                            val ocrText = readSlipText(path)
-                            isLoading = false
-                            if (ocrText.isBlank()) {
-                                Toast.makeText(context, "Couldn't read text from the slip photo", Toast.LENGTH_SHORT).show()
-                            } else {
-                                addOcrSlip(ocrText, photoPath = path)
-                            }
-                            showCapture = false
-                            showSavedSlips = true
-                        } else {
-                            // Shop mode: cross-check the slip photo text against the QR/bank amount
-                            val ocrText = OcrProcessor(context).recognizeText(path)
-                            val payload = OcrProcessor(context).processReceipt(path).rawText
-                            handlePayload(payload, photoPath = path, ocrText = ocrText)
-                        }
+                        // Cross-check the slip photo text against the QR/bank amount (fraud detection)
+                        isLoading = true
+                        val ocrText = OcrProcessor(context).recognizeText(path)
+                        val payload = OcrProcessor(context).processReceipt(path).rawText
+                        isLoading = false
+                        handlePayload(payload, photoPath = path, ocrText = ocrText)
                     }
                 },
                 onFileSelected = { /* unused – picker handled inside PhotoCaptureScreen */ },
                 onImageSelected = { path ->
                     scope.launch {
-                        if (appMode == "personal") {
-                            isLoading = true
-                            val ocrText = readSlipText(path)
-                            isLoading = false
-                            if (ocrText.isBlank()) {
-                                Toast.makeText(context, "Couldn't read text from the slip photo", Toast.LENGTH_SHORT).show()
-                            } else {
-                                addOcrSlip(ocrText, photoPath = path)
-                            }
-                            showCapture = false
-                            showSavedSlips = true
-                        } else {
-                            val ocrText = OcrProcessor(context).recognizeText(path, scanCenterOnly = false)
-                            val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
-                            handlePayload(payload, photoPath = path, ocrText = ocrText)
-                        }
+                        isLoading = true
+                        val ocrText = OcrProcessor(context).recognizeText(path, scanCenterOnly = false)
+                        val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
+                        isLoading = false
+                        handlePayload(payload, photoPath = path, ocrText = ocrText)
                     }
                 },
-                onQrDetected = { payload ->
-                    if (appMode == "personal") {
-                        // Personal mode never verifies via API; only the photo-text path is used
-                    } else {
-                        handlePayload(payload)
-                    }
-                },
+                onQrDetected = { payload -> handlePayload(payload) },
                 isLoading = isLoading,
                 onNavigateToSettings = {
                     showCapture = false
@@ -1019,7 +836,6 @@ fun MainApp(modifier: Modifier = Modifier) {
                     showSavedSlips = false
                     showCapture = true
                 },
-                appMode = appMode,
                 onAddManual = { amount, isMoneyIn, note ->
                     addManualSlip(amount, isMoneyIn, note)
                 },
@@ -1040,24 +856,6 @@ fun MainApp(modifier: Modifier = Modifier) {
         } else {
             SettingsScreen(
     rules = emptyList(),
-    appMode = appMode,
-    onSetAppMode = { mode ->
-        if (mode != appMode) {
-            // Personal and shop keep separate datasets — persist the current mode's slips,
-            // then load the other mode's own data so the two never interfere.
-            saveSlips(prefs, savedSlips)
-            saveSeenPayloads(prefs, seenPayloads)
-            saveProcessedFiles(prefs, processedFiles)
-            appMode = mode
-            prefs.edit().putString("app_mode", mode).apply()
-            savedSlips.clear()
-            savedSlips.addAll(loadSlips(prefs))
-            seenPayloads.clear()
-            seenPayloads.addAll(loadSeenPayloads(prefs))
-            processedFiles.clear()
-            processedFiles.addAll(loadProcessedFiles(prefs))
-        }
-    },
     easySlipEnabled = easySlipEnabled,
     apiKey = apiKey,
     verificationProvider = verificationProvider,
@@ -1247,24 +1045,16 @@ private const val PREFS_FOLDERS = "tracked_folders"
 private const val PREFS_KNOWN_NAMES = "known_names"
 private const val PREFS_PROCESSED_FILES = "processed_files"
 
-// Personal and shop modes keep SEPARATE datasets so switching modes never touches the
-// other mode's slips. Personal uses the legacy keys; shop gets "_shop" suffixed keys.
-// A null mode resolves to the currently active app mode.
-private fun modePrefKey(prefs: SharedPreferences, mode: String?, base: String): String {
-    val m = mode ?: prefs.getString("app_mode", "personal")
-    return if (m == "shop") base + "_shop" else base
-}
-
-private fun loadProcessedFiles(prefs: SharedPreferences, mode: String? = null): Set<String> {
-    val raw = prefs.getString(modePrefKey(prefs, mode, PREFS_PROCESSED_FILES), null) ?: return emptySet()
+private fun loadProcessedFiles(prefs: SharedPreferences): Set<String> {
+    val raw = prefs.getString(PREFS_PROCESSED_FILES, null) ?: return emptySet()
     return runCatching {
         val arr = JSONArray(raw)
         (0 until arr.length()).mapTo(mutableSetOf()) { arr.getString(it) }
     }.getOrDefault(emptySet())
 }
 
-private fun saveProcessedFiles(prefs: SharedPreferences, files: Set<String>, mode: String? = null) {
-    prefs.edit().putString(modePrefKey(prefs, mode, PREFS_PROCESSED_FILES), JSONArray(files.toList()).toString()).apply()
+private fun saveProcessedFiles(prefs: SharedPreferences, files: Set<String>) {
+    prefs.edit().putString(PREFS_PROCESSED_FILES, JSONArray(files.toList()).toString()).apply()
 }
 
 private fun loadTrackedFolders(prefs: SharedPreferences): List<String> {
@@ -1354,8 +1144,8 @@ private fun saveNotificationWhitelistExpense(prefs: SharedPreferences, list: Lis
     prefs.edit().putString(PREFS_NOTIFICATION_WHITELIST_EXPENSE, arr.toString()).apply()
 }
 
-private fun loadSlips(prefs: SharedPreferences, mode: String? = null): List<SavedSlip> {
-    val raw = prefs.getString(modePrefKey(prefs, mode, PREFS_SLIPS), null) ?: return emptyList()
+private fun loadSlips(prefs: SharedPreferences): List<SavedSlip> {
+    val raw = prefs.getString(PREFS_SLIPS, null) ?: return emptyList()
     return runCatching {
         val arr = JSONArray(raw)
         (0 until arr.length()).mapNotNull { i ->
@@ -1364,23 +1154,23 @@ private fun loadSlips(prefs: SharedPreferences, mode: String? = null): List<Save
     }.getOrDefault(emptyList())
 }
 
-private fun saveSlips(prefs: SharedPreferences, slips: List<SavedSlip>, mode: String? = null) {
+private fun saveSlips(prefs: SharedPreferences, slips: List<SavedSlip>) {
     val arr = JSONArray()
     slips.forEach { slip -> arr.put(slipToJson(slip)) }
-    prefs.edit().putString(modePrefKey(prefs, mode, PREFS_SLIPS), arr.toString()).apply()
+    prefs.edit().putString(PREFS_SLIPS, arr.toString()).apply()
 }
 
-private fun loadSeenPayloads(prefs: SharedPreferences, mode: String? = null): Set<String> {
-    val raw = prefs.getString(modePrefKey(prefs, mode, PREFS_SEEN), null) ?: return emptySet()
+private fun loadSeenPayloads(prefs: SharedPreferences): Set<String> {
+    val raw = prefs.getString(PREFS_SEEN, null) ?: return emptySet()
     return runCatching {
         val arr = JSONArray(raw)
         (0 until arr.length()).mapTo(mutableSetOf()) { arr.getString(it) }
     }.getOrDefault(emptySet())
 }
 
-private fun saveSeenPayloads(prefs: SharedPreferences, seen: Set<String>, mode: String? = null) {
+private fun saveSeenPayloads(prefs: SharedPreferences, seen: Set<String>) {
     val arr = JSONArray(seen.toList())
-    prefs.edit().putString(modePrefKey(prefs, mode, PREFS_SEEN), arr.toString()).apply()
+    prefs.edit().putString(PREFS_SEEN, arr.toString()).apply()
 }
 
 private fun slipToJson(slip: SavedSlip): JSONObject {

@@ -43,7 +43,6 @@ import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Sync
@@ -112,8 +111,6 @@ fun SettingsScreen(
     checkDuplicates: Boolean,
     knownNames: List<String> = emptyList(),
     unverifiedCount: Int = 0,
-    appMode: String = "personal",
-    onSetAppMode: (String) -> Unit = {},
     notificationIncomeEnabled: Boolean = false,
     notificationExpenseEnabled: Boolean = false,
     notificationWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
@@ -239,86 +236,6 @@ fun SettingsScreen(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(start = 4.dp)
             )
-            // Card: App Mode (homepage primary action: manual entry vs camera)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(FireCashSurfaceContainerLow)
-                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                    .padding(16.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(FireCashSurfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Storefront,
-                                contentDescription = null,
-                                tint = FireCashPrimary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "App Mode",
-                                color = FireCashOnSurface,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Personal = manual entry button on the home card • Shop = camera button on the home card",
-                                color = FireCashOnSurfaceVariant,
-                                fontSize = 12.sp,
-                                lineHeight = 16.sp
-                            )
-                        }
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp)
-                                .background(if (appMode == "personal") FireCashPrimary.copy(alpha = 0.2f) else FireCashSurfaceVariant, RoundedCornerShape(12.dp))
-                                .border(1.5.dp, if (appMode == "personal") FireCashPrimary else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                                .clickable { onSetAppMode("personal") },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Personal",
-                                color = if (appMode == "personal") FireCashPrimary else FireCashOnSurfaceVariant,
-                                fontWeight = if (appMode == "personal") FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp)
-                                .background(if (appMode == "shop") FireCashPrimary.copy(alpha = 0.2f) else FireCashSurfaceVariant, RoundedCornerShape(12.dp))
-                                .border(1.5.dp, if (appMode == "shop") FireCashPrimary else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                                .clickable { onSetAppMode("shop") },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Shop operator",
-                                color = if (appMode == "shop") FireCashPrimary else FireCashOnSurfaceVariant,
-                                fontWeight = if (appMode == "shop") FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
-                }
-            }
             // Card: My Names (auto income / transfer detection)
             Box(
                 modifier = Modifier
@@ -854,7 +771,7 @@ fun SettingsScreen(
                                     )
                                 )
                             }
-                            if (appMode != "personal" && unverifiedCount > 0) {
+                            if (unverifiedCount > 0) {
                                 Button(
                                     onClick = onSyncUnverified,
                                     enabled = apiKey.isNotBlank(),

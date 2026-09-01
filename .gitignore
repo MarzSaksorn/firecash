@@ -20,3 +20,4 @@ gradle-*.zip
 
 # Node/opencode harness artifacts
 node_modules/
+.playwright-mcp/

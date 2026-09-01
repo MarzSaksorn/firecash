@@ -304,7 +304,11 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 
 - **refactor: make FireCash shop-operator only** (5e44c9f) - removed the App Mode setting card, all personal-mode paths, the dataset split, and the showVerification parameter. The home card always opens the camera, slips always go through QR + verification with the photo-text fraud cross-check.
 
-### On-Device Tools Developed
+### Shop-Mode Fraud Detection (continued)
+
+- **feat: cross-check the slip photo date against the bank-verified date** (a574d47) - the camera now OCRs the full photo (scanCenterOnly=false) for the fraud cross-check. A new public extractSlipDate() returns null when no date is readable instead of silently falling back to today, so the date comparison only fires when the slip actually has a parseable date. The dateMismatch flag is persisted through export/import and shown as a red banner on the detail screen alongside the existing amount-mismatch banner.
+
+### On-Device Tools Developed### On-Device Tools Developed
 
 - **OcrProcessorTextTest (androidTest)** - instrumented test running the real ML Kit pipeline against slip photos pulled from the device via adb pull.
 - **adb-driven UI verification** - PowerShell scripts for dumping uiautomator hierarchy, finding element bounds, and tapping through the full camera to import to verify flow. FireCashOCR log tag diagnostics traced every step. powershell.exe + System.Drawing generated doctored slip images for fraud-detection E2E tests.

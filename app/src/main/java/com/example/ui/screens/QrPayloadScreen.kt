@@ -58,6 +58,7 @@ fun QrPayloadScreen(
     warning: String = "",
     photoPath: String? = null,
     amountMismatch: Boolean = false,
+    dateMismatch: Boolean = false,
     onBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -151,6 +152,30 @@ fun QrPayloadScreen(
                     )
                     Text(
                         text = "Amount mismatch — the amount on this slip photo differs from the QR/bank amount. Possible tampered slip!",
+                        color = Color(0xFFEF5350),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // Fraud alert: photo text date doesn't match the bank-verified date
+            if (dateMismatch) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        tint = Color(0xFFEF5350)
+                    )
+                    Text(
+                        text = "Date mismatch — the date printed on this slip photo differs from the bank-verified date. Possible tampered slip!",
                         color = Color(0xFFEF5350),
                         style = MaterialTheme.typography.bodyMedium
                     )

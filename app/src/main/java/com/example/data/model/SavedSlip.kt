@@ -15,5 +15,6 @@ data class SavedSlip(
     val isMoneyIn: Boolean = false,
     val savedAt: Long = System.currentTimeMillis(),
     val photoPath: String? = null,
-    val amountMismatch: Boolean = false
+    val amountMismatch: Boolean = false,
+    val dateMismatch: Boolean = false
 )

@@ -52,6 +52,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     var slipData by remember { mutableStateOf<VerifySlipResponse?>(null) }
     var slipWarning by remember { mutableStateOf("") }
     var slipMismatch by remember { mutableStateOf(false) }
+    var slipDateMismatch by remember { mutableStateOf(false) }
     var qrPhotoPath by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var isBackgroundSyncing by remember { mutableStateOf(false) }
@@ -274,6 +275,15 @@ fun MainApp(modifier: Modifier = Modifier) {
         if (mismatch) {
             slipWarning = "Amount mismatch — photo text shows $textAmount but QR/bank shows ${qrAmount ?: verifiedAmount}. Possible tampered slip!"
         }
+        // Date cross-check: the date printed on the slip photo must match the bank-verified date
+        val textDate = if (ocrText.isNullOrBlank()) null else SlipDataParser.extractSlipDate(ocrText)
+        val bankDate = verified?.transDate
+        val dateMismatch = textDate != null && bankDate != null && textDate != bankDate
+        slipDateMismatch = dateMismatch
+        if (dateMismatch) {
+            slipWarning = if (mismatch) "$slipWarning | Date mismatch — photo shows $textDate but bank shows $bankDate."
+                else "Date mismatch — slip photo shows $textDate but bank shows $bankDate. Possible tampered slip!"
+        }
         slipData = result
         // Auto-resolve isMoneyIn based on known names:
         // - if both sender & receiver are known -> transfer (neutral, stored as false, UI shows Transfer)
@@ -300,7 +310,8 @@ fun MainApp(modifier: Modifier = Modifier) {
             slipData = result,
             isMoneyIn = resolvedIsMoneyIn,
             photoPath = photoPath,
-            amountMismatch = mismatch
+            amountMismatch = mismatch,
+            dateMismatch = dateMismatch
         )
 
         // Dedupe: re-scanning the same slip updates the existing entry instead of adding a log
@@ -631,6 +642,7 @@ fun MainApp(modifier: Modifier = Modifier) {
         val verifiedAmount = result.amount
         val amount = old.amount ?: verifiedAmount
         val mismatch = old.amount != null && verifiedAmount != null && kotlin.math.abs(old.amount - verifiedAmount) > 0.005
+        val dateMismatch = old.date != null && result.transDate != null && old.date != result.transDate
         return old.copy(
             amount = amount,
             transRef = result.transRef ?: old.transRef,
@@ -641,7 +653,8 @@ fun MainApp(modifier: Modifier = Modifier) {
             verificationStatus = result.verificationStatus,
             slipData = result.copy(amount = amount),
             isMoneyIn = resolvedIsMoneyIn,
-            amountMismatch = old.amountMismatch || mismatch
+            amountMismatch = old.amountMismatch || mismatch,
+            dateMismatch = old.dateMismatch || dateMismatch
         )
     }
 
@@ -743,6 +756,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                 warning = slipWarning,
                 photoPath = qrPhotoPath,
                 amountMismatch = slipMismatch,
+                dateMismatch = slipDateMismatch,
                 onBack = {
                     showPayload = false
                     showSavedSlips = true
@@ -753,9 +767,9 @@ fun MainApp(modifier: Modifier = Modifier) {
             PhotoCaptureScreen(
                 onPhotoCaptured = { path ->
                     scope.launch {
-                        // Cross-check the slip photo text against the QR/bank amount (fraud detection)
+                        // OCR the ENTIRE slip photo for the fraud cross-check, then scan the QR
                         isLoading = true
-                        val ocrText = OcrProcessor(context).recognizeText(path)
+                        val ocrText = OcrProcessor(context).recognizeText(path, scanCenterOnly = false)
                         val payload = OcrProcessor(context).processReceipt(path).rawText
                         isLoading = false
                         handlePayload(payload, photoPath = path, ocrText = ocrText)
@@ -1187,6 +1201,7 @@ private fun slipToJson(slip: SavedSlip): JSONObject {
     obj.put("isMoneyIn", slip.isMoneyIn)
     obj.put("savedAt", slip.savedAt)
     obj.put("amountMismatch", slip.amountMismatch)
+    obj.put("dateMismatch", slip.dateMismatch)
     slip.slipData?.let { obj.put("slipData", responseToJson(it)) }
     return obj
 }
@@ -1206,7 +1221,8 @@ private fun slipFromJson(obj: JSONObject): SavedSlip? {
             isMoneyIn = obj.optBoolean("isMoneyIn", false),
             savedAt = obj.optLong("savedAt", System.currentTimeMillis()),
             photoPath = obj.optString("photoPath").ifEmpty { null },
-            amountMismatch = obj.optBoolean("amountMismatch", false)
+            amountMismatch = obj.optBoolean("amountMismatch", false),
+            dateMismatch = obj.optBoolean("dateMismatch", false)
         )
     }.getOrNull()
 }

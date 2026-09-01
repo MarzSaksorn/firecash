@@ -134,32 +134,38 @@ object SlipDataParser {
         return Triple(45.20, "45.20", currency)
     }
 
-    private fun extractDate(text: String): String {
-        // Thai slips: "31 ส.ค. 2569" (Buddhist Era) → 2026-08-31
+    /**
+     * Best-effort date extraction from raw slip photo text. Returns "yyyy-MM-dd" or null
+     * when no readable date is found (used by the fraud cross-check against the QR/bank date).
+     */
+    fun extractSlipDate(text: String): String? {
         val thaiMatcher = THAI_DATE_PATTERN.matcher(text)
         if (thaiMatcher.find()) {
-            val day = thaiMatcher.group(1).toIntOrNull() ?: 1
-            val month = THAI_MONTHS[thaiMatcher.group(2)] ?: 1
-            val rawYear = thaiMatcher.group(3).toIntOrNull() ?: 2026
+            val day = thaiMatcher.group(1)?.toIntOrNull() ?: return null
+            val month = THAI_MONTHS[thaiMatcher.group(2)] ?: return null
+            val rawYear = thaiMatcher.group(3)?.toIntOrNull() ?: return null
             val year = if (rawYear > 2400) rawYear - 543 else rawYear
             return String.format(Locale.US, "%04d-%02d-%02d", year, month, day)
         }
         for (pattern in DATE_PATTERNS) {
             val matcher = pattern.matcher(text)
             if (matcher.find()) {
-                val found = matcher.group(1) ?: ""
+                val found = matcher.group(1) ?: return null
                 if (found.contains("-") && found.length == 10) return found
-                // "31 Aug 2026" style → normalize to yyyy-MM-dd instead of a hardcoded fallback
                 try {
                     val parsed = SimpleDateFormat("d MMM yyyy", Locale.ENGLISH).parse(found)
                     if (parsed != null) return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(parsed)
                 } catch (_: Exception) {
-                    // fall through to today's date
+                    return null
                 }
-                return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             }
         }
-        return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        return null
+    }
+
+    private fun extractDate(text: String): String {
+        return extractSlipDate(text)
+            ?: SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
     }
 
     private fun extractTime(text: String): String {

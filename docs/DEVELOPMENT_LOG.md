@@ -1,4 +1,4 @@
-# FireCash — Development Log (Day-by-Day)
+﻿# FireCash — Development Log (Day-by-Day)
 
 > Honest, evidence-backed journal of how FireCash was built. Separated by actual calendar days from git history, plus the off-plan detour through Google AI Studio.
 
@@ -268,3 +268,43 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 ---
 
 *Generated from `git log --reverse --date=short` + `docs/*.md` + `app/src/main/java` on `2026-08-31`. Run `git log --oneline` to replay.*
+
+---
+
+## Day 6 - 2026-08-31 - Personal Mode, OCR Extraction, Fraud Detection & Shop-Only Refactor
+
+> Long session focusing on the OCR text path, fraud detection, and ultimately narrowing the app to shop-operator only. All verified live on the connected device via adb + uiautomator + logcat + FireCashOCR tag.
+
+### Personal Mode (added, then removed)
+
+- **feat: personal mode text extraction from slip photos** (2577f27 -> 9e4acb5 -> c996663) - camera/gallery/import/sync flow in Personal mode reads the photo text with ML Kit Latin recognizer (recognizeText), parses amount/date/merchant, and saves the slip directly without any API call. SlipDataParser.extractParties (from/to lines) determined counterparty. Later removed when the app became shop-only.
+- **fix: show scanning indicator during personal-mode OCR** (2577f27)
+- **feat: brand detection for slip titles** (c996663) - recognized text scanned for truemoney, kbank, scb, bangkok bank to set a readable title instead of garbled Thai glyphs.
+
+### Thai Date and Amount Fixes
+
+- **feat: parse Thai month abbreviations and Buddhist Era years** (7d4a703) - all 12 Thai month abbreviations and BE-CE conversion (subtract 543). 31 X. 2569 -> 2026-08-31.
+- **fix: fall back to photo file timestamp when OCR date is unreadable** (6466396) - ML Kit garbles Thai dates. When the parsed date falls back to today, the slip photo's lastModified time is used instead. Verified on-device: KBank slips from different days now group under the correct date.
+- **fix: only trust parsed amount when text has a decimal** (c996663) - prevents the parser's 45.20 fallback from inventing fake amounts.
+
+### Force Sync All
+
+- **feat: Force Sync All button in Settings** (3dd5273) - clears the processed_files cache and re-scans every tracked-folder photo. Re-scanning updates the existing slip (dedupe by photoPath) instead of duplicating.
+
+### Shop-Mode Fraud Detection
+
+- **feat: cross-check slip photo text amount against QR/bank amount** (1a14d7c) - compares three amount sources: photo text baht amount, EMVCo QR tag-54, and bank-verified amount. Disagreement sets SavedSlip.amountMismatch and shows a red possible tampered slip banner.
+- **fix: never let batch verification overwrite photo-extracted amounts** (abd7f55) - verifyBatch detects canned sandbox responses (same transRef across multiple slips) and discards the batch; applyVerifiedUpdate keeps the existing amount, only fills a missing one, and sets the fraud flag on disagreement.
+
+### Dataset Separation (added, then removed)
+
+- **feat: personal and shop keep separate datasets** (db6c41f) - mode-scoped prefs keys, dataset swap on mode switch, both modes exported/imported, notification listener writes to the active mode's key. Removed when the app dropped the mode switch.
+
+### Shop-Only Refactor
+
+- **refactor: make FireCash shop-operator only** (5e44c9f) - removed the App Mode setting card, all personal-mode paths, the dataset split, and the showVerification parameter. The home card always opens the camera, slips always go through QR + verification with the photo-text fraud cross-check.
+
+### On-Device Tools Developed
+
+- **OcrProcessorTextTest (androidTest)** - instrumented test running the real ML Kit pipeline against slip photos pulled from the device via adb pull.
+- **adb-driven UI verification** - PowerShell scripts for dumping uiautomator hierarchy, finding element bounds, and tapping through the full camera to import to verify flow. FireCashOCR log tag diagnostics traced every step. powershell.exe + System.Drawing generated doctored slip images for fraud-detection E2E tests.

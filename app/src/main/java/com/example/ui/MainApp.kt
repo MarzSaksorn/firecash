@@ -793,7 +793,6 @@ fun MainApp(modifier: Modifier = Modifier) {
                         handlePayload(payload, photoPath = path, ocrText = ocrText)
                     }
                 },
-                onQrDetected = { payload -> handlePayload(payload) },
                 isLoading = isLoading,
                 onNavigateToSettings = {
                     showCapture = false

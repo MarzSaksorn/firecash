@@ -314,7 +314,9 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 - **feat: flatten the slip photo before OCR/QR decode** (OpenCV) - new data/ocr/SlipDocumentDetector.kt + org.opencv:opencv:4.10.0. Every captured/picked/imported/folder slip photo is checked for a flat 4-corner document region (grayscale -> GaussianBlur -> Canny -> dilate -> RETR_EXTERNAL contours -> approxPolyDP epsilon sweep). When found, the region is perspective-warped (getPerspectiveTransform + warpPerspective) into a flat copy (OcrProcessor.flattenedCopy), and QR + text recognition run on THAT. Verified on-device with a rotated real KBank slip: raw OCR merged lines (Promp | l...), flattened OCR isolated them (Prompt | Pay, 60.00 un).
 - **feat: live slip-detection hint in the camera preview** - the CameraX analyzer samples the Y plane every 4th frame (step 3, straight into OpenCV via SlipDocumentDetector.detectYPlane, no RGB bitmap allocation). When a flat slip is in view the center frame turns green with a "Slip detected - tap shutter" hint.
 
-### On-Device Tools Developed"### On-Device Tools Developed
+- **feat: disable live QR auto-scan** - the CameraX analyzer no longer runs ML Kit barcode scanning on every preview frame. The flow is now intentional: frame the slip (green hint when a flat surface is detected), tap the shutter, and the QR is decoded from the captured (flattened) photo. Removed the onQrDetected callback wiring.
+
+### On-Device Tools Developed""### On-Device Tools Developed
 
 - **OcrProcessorTextTest (androidTest)** - instrumented test running the real ML Kit pipeline against slip photos pulled from the device via adb pull.
 - **adb-driven UI verification** - PowerShell scripts for dumping uiautomator hierarchy, finding element bounds, and tapping through the full camera to import to verify flow. FireCashOCR log tag diagnostics traced every step. powershell.exe + System.Drawing generated doctored slip images for fraud-detection E2E tests.

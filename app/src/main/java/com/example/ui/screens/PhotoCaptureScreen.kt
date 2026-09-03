@@ -33,7 +33,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,13 +41,10 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.common.InputImage
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Simple photo capture UI.
@@ -63,7 +59,6 @@ fun PhotoCaptureScreen(
     onPhotoCaptured: (String) -> Unit,
     onFileSelected: () -> Unit,
     onImageSelected: (String) -> Unit,
-    onQrDetected: (String) -> Unit = {},
     isLoading: Boolean = false,
     onNavigateToSettings: () -> Unit = {},
     onNavigateToAccount: () -> Unit = {},
@@ -103,8 +98,6 @@ fun PhotoCaptureScreen(
     val previewView = remember { PreviewView(context) }
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
-    val scanLock = remember { AtomicBoolean(false) }
-    val currentOnQrDetected by rememberUpdatedState(onQrDetected)
     // Live slip detection hint — green frame when a flat slip is in view
     var slipDetected by remember { mutableStateOf(false) }
     var frameTick by remember { mutableStateOf(0) }
@@ -118,54 +111,24 @@ fun PhotoCaptureScreen(
                 val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
                 imageCapture = ImageCapture.Builder().build()
 
-                val barcodeScanner = BarcodeScanning.getClient()
                 val imageAnalysis = ImageAnalysis.Builder()
                     .setTargetResolution(Size(1280, 720))
                     .build()
                 imageAnalysis.setAnalyzer(cameraExecutor, ImageAnalysis.Analyzer { imageProxy ->
-                    val mediaImage = imageProxy.image
-                    if (mediaImage == null) {
-                        imageProxy.close()
-                        return@Analyzer
-                    }
-                    // Live slip (flat surface) detection every few frames — feeds the green
-                    // frame hint. Cheap: samples the Y plane at step 3 straight into OpenCV.
-                    if (!scanLock.get()) {
+                    // Live slip (flat surface) detection — feeds the green frame hint.
+                    // Cheap: samples the Y plane at step 3 straight into OpenCV.
+                    try {
                         val tick = frameTick
                         frameTick = tick + 1
                         if (tick % 4 == 0) {
-                            try {
-                                val plane = imageProxy.planes[0]
-                                val found = com.example.data.ocr.SlipDocumentDetector
-                                    .detectYPlane(imageProxy.width, imageProxy.height, plane.rowStride, plane.buffer)
-                                slipDetected = found != null
-                            } catch (_: Exception) {
-                                slipDetected = false
-                            }
+                            val plane = imageProxy.planes[0]
+                            val found = com.example.data.ocr.SlipDocumentDetector
+                                .detectYPlane(imageProxy.width, imageProxy.height, plane.rowStride, plane.buffer)
+                            slipDetected = found != null
                         }
-                        val input = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                        barcodeScanner.process(input)
-                            .addOnSuccessListener { barcodes ->
-                                val w = imageProxy.width.toFloat()
-                                val h = imageProxy.height.toFloat()
-                                // Center selection ~ 60% of frame (matches 280dp overlay)
-                                val left = w * 0.20f
-                                val right = w * 0.80f
-                                val top = h * 0.20f
-                                val bottom = h * 0.80f
-                                val inFrame = barcodes.firstOrNull { bc ->
-                                    val box = bc.boundingBox ?: return@firstOrNull false
-                                    val cx = box.centerX().toFloat()
-                                    val cy = box.centerY().toFloat()
-                                    cx in left..right && cy in top..bottom && bc.rawValue != null
-                                }
-                                val value = inFrame?.rawValue
-                                if (value != null && scanLock.compareAndSet(false, true)) {
-                                    currentOnQrDetected(value)
-                                }
-                            }
-                            .addOnCompleteListener { imageProxy.close() }
-                    } else {
+                    } catch (_: Exception) {
+                        slipDetected = false
+                    } finally {
                         imageProxy.close()
                     }
                 })

@@ -318,7 +318,21 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 
 - **feat: draw the live slip frame around the detected slip on the preview** - the camera preview now draws a green 4-corner outline right around the slip, not just a fixed center box. The analyzer reports the detected quad rotated into display pixels; the overlay maps it through the same FILL_CENTER crop the PreviewView uses (scale = max(view/rotW, view/rotH), centered) so the frame hugs the slip as the user moves the phone. A faint white box + "Align the slip within the view" shows while nothing is detected.
 
-### On-Device Tools Developed"""### On-Device Tools Developed
+### On-Device Tools Developed
 
 - **OcrProcessorTextTest (androidTest)** - instrumented test running the real ML Kit pipeline against slip photos pulled from the device via adb pull.
 - **adb-driven UI verification** - PowerShell scripts for dumping uiautomator hierarchy, finding element bounds, and tapping through the full camera to import to verify flow. FireCashOCR log tag diagnostics traced every step. powershell.exe + System.Drawing generated doctored slip images for fraud-detection E2E tests.
+
+---
+
+## Day 7 - 2026-09-03 - The Crop Is the Slip Photo
+
+> The flattened slip region now REPLACES the full camera frame as the stored slip photograph. Before, flattening only fed OCR/QR; the slip kept pointing at the whole frame. Now the crop is persisted, becomes `photoPath`, and the full frame is deleted after the slip is saved.
+
+- **feat: persist the flattened crop under the app Pictures dir instead of cache** - `OcrProcessor.flattenedCopy()` now writes `getExternalFilesDir(DIRECTORY_PICTURES)/<base>_flat.jpg` (falling back to `filesDir`), not `cacheDir/flat_<ts>.jpg`. The file name is deterministic: derived from the source photo's name (sanitized), so re-processing the same photo overwrites one crop file instead of piling up timestamped copies.
+- **feat: store the crop as the slip's photo on every ingest path** - camera shutter, gallery pick, Import Slip Photos, and tracked-folder Force Sync all pass the flattened path to `addSlip(photoPath = …)` (falling back to the original when no slip region is detected: full-frame file for camera/picker/import, content:// URI for tracked-folder photos). Force Sync of a folder photo whose payload is already known *upgrades* the existing slip's photoPath to the crop.
+- **feat: delete the full frame once the crop is saved** - camera/gallery/import delete their full-frame JPEG after `addSlip` persists (slip survives via the crop). When flattening found nothing or OCR/QR found no payload, the crop is deleted and the full frame kept — a failed scan never destroys the photo. Tracked-folder originals are never touched (they live in the user's photo folder); the temp cache copy is cleaned up after processing.
+- **test: crop persistence assertions in OcrProcessorTextTest** - instrumented test now asserts the crop file exists under `Pictures/` (not cache) and that a second `flattenedCopy()` returns the same deterministic path. Verified on device: `ReceiveMoney_QR_…_flat.jpg` created during a Force Sync All, its slip's photoPath pointing at the crop, no duplicate slips created.
+
+- **on-device verification** - adb Export Data → JSON pull: 43 slips, one new crop-referencing slip, no new duplicates (the single dup pair pre-dates this build). No FATAL exceptions.
+

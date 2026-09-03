@@ -50,6 +50,19 @@ class OcrProcessorTextTest {
                 "FireCashOCR",
                 "FLATTEN slip4: raw=[${rawText.replace("\n", " | ")}] flatPath=$flatPath flat=[${flatText.replace("\n", " | ")}]"
             )
+            if (flatPath != null) {
+                val flatFile = File(flatPath)
+                val picturesDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES)
+                val existsInPictures = flatFile.exists() && flatFile.parentFile?.absolutePath == picturesDir?.absolutePath
+                val secondRun = runBlocking { processor.flattenedCopy(skewed.absolutePath) }
+                val deterministic = secondRun == flatPath
+                android.util.Log.d(
+                    "FireCashOCR",
+                    "FLATTEN slip4 crop: persistedInPictures=$existsInPictures deterministicName=$deterministic"
+                )
+                org.junit.Assert.assertTrue("crop should persist under Pictures (not cache)", existsInPictures)
+                org.junit.Assert.assertTrue("crop name must be deterministic per source", deterministic)
+            }
         }
     }
 

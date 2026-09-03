@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Environment
 import java.io.File
 import java.io.FileOutputStream
 import com.google.mlkit.vision.common.InputImage
@@ -56,10 +57,15 @@ class OcrProcessor(private val context: Context? = null) {
 
     /**
      * If a flat slip/document is detectable in the photo, writes a perspective-flattened copy
-     * to cache and returns its path — OCR + QR decoding should run on THAT. Returns null when
-     * no slip region is found (caller keeps working with the original photo).
+     * to the app's Pictures directory and returns its path — the caller should store THAT as
+     * the slip's photo (the slip photo is the crop, not the full frame) and run OCR + QR
+     * decoding on it. Returns null when no slip region is found (caller keeps the original).
+     *
+     * The output file name is deterministic (derived from the source file name), so
+     * re-processing the same photo (e.g. a tracked-folder Force Sync) overwrites the same
+     * crop file instead of leaving duplicate copies behind.
      */
-    suspend fun flattenedCopy(imageUri: String): String? = withContext(Dispatchers.Default) {
+    suspend fun flattenedCopy(imageUri: String, outName: String? = null): String? = withContext(Dispatchers.Default) {
         if (imageUri.isBlank()) return@withContext null
         runCatching {
             val bitmap = BitmapFactory.decodeFile(imageUri) ?: return@withContext null
@@ -67,8 +73,14 @@ class OcrProcessor(private val context: Context? = null) {
             bitmap.recycle()
             if (flat == null) return@withContext null
             val ctx = context ?: return@withContext null
-            val out = File(ctx.cacheDir, "flat_${System.currentTimeMillis()}.jpg")
-            android.util.Log.d("FireCashOCR", "flattened slip ${flat.width}x${flat.height} -> ${out.name}")
+            val dir = ctx.getExternalFilesDir(Environment.DIRECTORY_PICTURES) ?: ctx.filesDir
+            if (!dir.exists()) dir.mkdirs()
+            val base = outName?.takeIf { it.isNotBlank() }
+                ?: runCatching { File(imageUri).nameWithoutExtension }
+                    .getOrDefault("slip")
+                    .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            val out = File(dir, "${base}_flat.jpg")
+            android.util.Log.d("FireCashOCR", "flattened slip ${flat.width}x${flat.height} -> ${out.absolutePath}")
             FileOutputStream(out).use { flat.compress(Bitmap.CompressFormat.JPEG, 92, it) }
             flat.recycle()
             out.absolutePath

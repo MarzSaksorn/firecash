@@ -339,19 +339,6 @@ fun MainApp(modifier: Modifier = Modifier) {
         saveSeenPayloads(prefs, seenPayloads)
     }
 
-    fun handlePayload(payload: String, photoPath: String? = null, ocrText: String? = null) {
-        if (payload.isBlank()) return
-        qrPayload = payload
-        qrPhotoPath = photoPath
-        isLoading = true
-        scope.launch {
-            addSlip(payload, photoPath = photoPath, ocrText = ocrText)
-            isLoading = false
-            showCapture = false
-            showPayload = true
-        }
-    }
-
     fun savePayload() {
         if (qrPayload.isBlank()) return
         isLoading = true
@@ -522,11 +509,20 @@ fun MainApp(modifier: Modifier = Modifier) {
         scope.launch {
             for (path in paths) {
                 val processor = OcrProcessor(context)
+                // The crop becomes the stored slip photo; the imported full-frame copy is
+                // deleted once a crop was produced (the crop carries the slip content).
                 val workPath = processor.flattenedCopy(path) ?: path
                 val ocrText = processor.recognizeText(workPath, scanCenterOnly = false)
                 val payload = processor.processReceipt(workPath, scanCenterOnly = false).rawText
                 if (payload.isNotBlank()) {
-                    addSlip(payload, photoPath = path, ocrText = ocrText)
+                    addSlip(payload, photoPath = workPath, ocrText = ocrText)
+                    if (workPath != path) {
+                        runCatching { File(path).delete() }
+                            .onFailure { android.util.Log.w("FireCashOCR", "could not delete imported frame $path: ${it.message}") }
+                    }
+                } else if (workPath != path) {
+                    // Nothing worth logging — keep the full frame, drop the useless crop
+                    runCatching { File(workPath).delete() }
                 }
             }
             isLoading = false
@@ -559,19 +555,39 @@ fun MainApp(modifier: Modifier = Modifier) {
             if (!copied) continue
 
             val processor = OcrProcessor(context)
-            val workPath = processor.flattenedCopy(tempFile.absolutePath) ?: tempFile.absolutePath
+            // Deterministic crop name from the tracked photo itself, so re-scanning the same
+            // folder overwrites one crop file instead of piling up copies. The URI hash keeps
+            // same-named photos in different folders from colliding on one crop file.
+            val cropName = (file.name?.substringBeforeLast('.') ?: "slip")
+                .replace(Regex("[^A-Za-z0-9._-]"), "_") +
+                "_${Integer.toHexString(fileKey.hashCode()).take(8)}"
+            val flatPath = processor.flattenedCopy(tempFile.absolutePath, outName = cropName)
+            val workPath = flatPath ?: tempFile.absolutePath
             val ocrText = processor.recognizeText(workPath, scanCenterOnly = false)
             val payload = processor
                 .processReceipt(workPath, scanCenterOnly = false)
                 .rawText
             if (payload.isNotBlank() && payload !in seenPayloads) {
                 seenPayloads.add(payload)
-                // store the original content:// uri so the slip links to the real photo on device
-                addSlip(payload, photoPath = file.uri.toString(), ocrText = ocrText)
+                // Prefer the persisted crop (it is what OCR/QR ran on); fall back to the
+                // content:// uri of the original photo when no slip region was found.
+                addSlip(payload, photoPath = flatPath ?: file.uri.toString(), ocrText = ocrText)
+            } else if (payload.isBlank() && flatPath != null) {
+                // Nothing worth logging — keep the user's photo in its folder, drop the crop
+                runCatching { File(flatPath).delete() }
+            } else if (flatPath != null) {
+                // Payload already known — a re-scan upgraded the stored photo to the crop
+                // (deterministic name ⇒ the same file each time, so nothing piles up).
+                val idx = savedSlips.indexOfFirst { it.payload == payload }
+                if (idx >= 0 && savedSlips[idx].photoPath != flatPath) {
+                    savedSlips[idx] = savedSlips[idx].copy(photoPath = flatPath)
+                    saveSlips(prefs, savedSlips)
+                }
             }
             // Mark processed (even blank OCR) so future opens only handle genuinely new files
             processedFiles.add(fileKey)
             saveProcessedFiles(prefs, processedFiles)
+            runCatching { tempFile.delete() }
         }
     }
 
@@ -771,26 +787,55 @@ fun MainApp(modifier: Modifier = Modifier) {
                 onPhotoCaptured = { path ->
                     scope.launch {
                         // Flatten the slip (document detection + perspective warp) so the
-                        // QR + OCR read the flat document, then cross-check text vs QR/bank.
+                        // QR + OCR read the flat document. The CROP becomes the stored slip
+                        // photo; the full camera frame is dropped once the slip is saved.
                         isLoading = true
                         val processor = OcrProcessor(context)
                         val workPath = processor.flattenedCopy(path) ?: path
                         val ocrText = processor.recognizeText(workPath, scanCenterOnly = false)
                         val payload = processor.processReceipt(workPath, scanCenterOnly = false).rawText
+                        if (payload.isNotBlank()) {
+                            qrPayload = payload
+                            qrPhotoPath = workPath
+                            addSlip(payload, photoPath = workPath, ocrText = ocrText)
+                            if (workPath != path) {
+                                runCatching { File(path).delete() }
+                                    .onFailure { android.util.Log.w("FireCashOCR", "could not delete full frame $path: ${it.message}") }
+                            }
+                            showCapture = false
+                            showPayload = true
+                        } else if (workPath != path) {
+                            // Nothing worth logging — keep the full frame, drop the useless crop
+                            runCatching { File(workPath).delete() }
+                        }
                         isLoading = false
-                        handlePayload(payload, photoPath = path, ocrText = ocrText)
                     }
                 },
                 onFileSelected = { /* unused – picker handled inside PhotoCaptureScreen */ },
                 onImageSelected = { path ->
                     scope.launch {
+                        // Flatten the slip like a camera shot: the CROP becomes the stored
+                        // photo; the picked full frame is dropped once the slip is saved.
                         isLoading = true
                         val processor = OcrProcessor(context)
                         val workPath = processor.flattenedCopy(path) ?: path
                         val ocrText = processor.recognizeText(workPath, scanCenterOnly = false)
                         val payload = processor.processReceipt(workPath, scanCenterOnly = false).rawText
+                        if (payload.isNotBlank()) {
+                            qrPayload = payload
+                            qrPhotoPath = workPath
+                            addSlip(payload, photoPath = workPath, ocrText = ocrText)
+                            if (workPath != path) {
+                                runCatching { File(path).delete() }
+                                    .onFailure { android.util.Log.w("FireCashOCR", "could not delete picked frame $path: ${it.message}") }
+                            }
+                            showCapture = false
+                            showPayload = true
+                        } else if (workPath != path) {
+                            // Nothing worth logging — keep the full frame, drop the useless crop
+                            runCatching { File(workPath).delete() }
+                        }
                         isLoading = false
-                        handlePayload(payload, photoPath = path, ocrText = ocrText)
                     }
                 },
                 isLoading = isLoading,

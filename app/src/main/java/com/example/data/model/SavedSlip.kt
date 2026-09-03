@@ -16,5 +16,9 @@ data class SavedSlip(
     val savedAt: Long = System.currentTimeMillis(),
     val photoPath: String? = null,
     val amountMismatch: Boolean = false,
-    val dateMismatch: Boolean = false
+    val dateMismatch: Boolean = false,
+    /** Manual override for the income/expense/transfer classification.
+     *  null = auto-detect from known names, "income" = force income,
+     *  "expense" = force expense, "transfer" = force transfer. */
+    val manualCategory: String? = null
 )

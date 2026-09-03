@@ -203,6 +203,7 @@ class IncomeNotificationService : NotificationListenerService() {
             obj.put("verificationStatus", slip.verificationStatus.name)
             obj.put("isMoneyIn", slip.isMoneyIn)
             obj.put("savedAt", slip.savedAt)
+            slip.manualCategory?.let { obj.put("manualCategory", it) }
             return obj
         }
 
@@ -279,7 +280,8 @@ class IncomeNotificationService : NotificationListenerService() {
                     verificationStatus = runCatching { VerificationStatus.valueOf(obj.optString("verificationStatus")) }.getOrDefault(VerificationStatus.UNVERIFIED),
                     slipData = null,
                     isMoneyIn = obj.optBoolean("isMoneyIn", true),
-                    savedAt = obj.optLong("savedAt", System.currentTimeMillis())
+                    savedAt = obj.optLong("savedAt", System.currentTimeMillis()),
+                    manualCategory = obj.optString("manualCategory").ifEmpty { null }
                 )
             }.getOrNull()
         }

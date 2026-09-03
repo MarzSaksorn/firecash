@@ -776,6 +776,14 @@ fun MainApp(modifier: Modifier = Modifier) {
                 photoPath = qrPhotoPath,
                 amountMismatch = slipMismatch,
                 dateMismatch = slipDateMismatch,
+                currentCategory = savedSlips.firstOrNull { it.payload == qrPayload }?.manualCategory,
+                onToggleCategory = { newCategory ->
+                    val idx = savedSlips.indexOfFirst { it.payload == qrPayload }
+                    if (idx >= 0) {
+                        savedSlips[idx] = savedSlips[idx].copy(manualCategory = newCategory)
+                        saveSlips(prefs, savedSlips)
+                    }
+                },
                 onBack = {
                     showPayload = false
                     showSavedSlips = true
@@ -1254,6 +1262,7 @@ private fun slipToJson(slip: SavedSlip): JSONObject {
     obj.put("savedAt", slip.savedAt)
     obj.put("amountMismatch", slip.amountMismatch)
     obj.put("dateMismatch", slip.dateMismatch)
+    slip.manualCategory?.let { obj.put("manualCategory", it) }
     slip.slipData?.let { obj.put("slipData", responseToJson(it)) }
     return obj
 }
@@ -1274,7 +1283,8 @@ private fun slipFromJson(obj: JSONObject): SavedSlip? {
             savedAt = obj.optLong("savedAt", System.currentTimeMillis()),
             photoPath = obj.optString("photoPath").ifEmpty { null },
             amountMismatch = obj.optBoolean("amountMismatch", false),
-            dateMismatch = obj.optBoolean("dateMismatch", false)
+            dateMismatch = obj.optBoolean("dateMismatch", false),
+            manualCategory = obj.optString("manualCategory").ifEmpty { null }
         )
     }.getOrNull()
 }

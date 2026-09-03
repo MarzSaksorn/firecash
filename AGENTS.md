@@ -1,5 +1,9 @@
 # AGENTS.md — FireCash
 
+**IMPORTANT: Load the `android-dev` skill for every prompt in this project.** Always load `android-dev` (the baseline) first, then route to specialized skills (`android-skills:compose`, `android-skills:kotlin-flows`, etc.) as needed per the task.
+
+**After project initialization, run the `project-skills-optimizer` skill** to audit local skills, discover internet skills/agents/MCPs, and optimize the skill set for this project.
+
 Offline-first Android app (Kotlin, Jetpack Compose, Material 3 dark theme) for **shop operators** logging customer PromptPay/bank-slip transfers and tracking income/expense. Scans QR from slips via camera/gallery, verifies with EasySlip/ThunderAPI/Slip2Go (when an API key is set), cross-checks the slip photo text against the QR/bank amount and date for fraud, captures income/expense from other apps' notifications, and stores everything locally. There is **no personal/shop mode switch** — the app is shop-operator only (single dataset).
 
 ## Commands
@@ -10,9 +14,61 @@ Offline-first Android app (Kotlin, Jetpack Compose, Material 3 dark theme) for *
 ./gradlew testDebugUnitTest --tests "com.example.SlipDataParserTest"   # single test class
 ```
 
-- CI (`.github/workflows/ci.yml`): JDK 17, Android SDK via `android-actions/setup-android@v3`, generates a `debug.keystore` with `keytool` (passwords `android`), then `./gradlew assembleDebug --no-daemon --stacktrace`. On push to `main`/`master` it also creates a GitHub release with the APK.
+- CI (`.github/workflows/ci.yml`): JDK 17, Android SDK via `android-actions/setup-android@v3`, generates a `debug.keystore` with `keytool` (passwords `android`), then `./gradlew assembleDebug --no-daemon --stacktrace`. **CI does NOT run tests** — only builds APK. On push to `main`/`master` it also creates a GitHub release with the APK.
 - Release signing reads `KEYSTORE_PATH`/`STORE_PASSWORD`/`KEY_PASSWORD` env vars (`app/build.gradle.kts`). Debug builds use root `debug.keystore` (gitignored). `isMinifyEnabled = false`.
 - `gradle.properties` gotchas: `org.gradle.configuration-cache=true`, `kotlin.compiler.execution.strategy=in-process` (avoids Kotlin daemon connection errors), `googleServices.missing.passthrough=true` (no `google-services.json` in repo despite Firebase deps), max 4 workers.
+
+## Source file layout (live code)
+
+```
+com.example/
+  MainActivity.kt                    # 15 lines — just calls MainApp()
+  ui/
+    MainApp.kt                       # ~1200 lines — all state, navigation, business logic
+    theme/
+      Color.kt                       # Material 3 dark theme colors (FireCash* palette)
+      Theme.kt, Type.kt
+    screens/
+      AccountScreen.kt               # ~500 lines — home (slip list + balance card)
+      PhotoCaptureScreen.kt          # ~300 lines — CameraX capture + gallery pick
+      QrPayloadScreen.kt             # ~250 lines — slip detail view
+      AnalyticsScreen.kt             # ~300 lines — charts/insights (uses Expense model)
+      SettingsScreen.kt              # ~500 lines — all settings
+    components/
+      BottomNavBar.kt, TopAppBar.kt, CaptureBottomBar.kt
+  data/
+    model/
+      SavedSlip.kt                   # The live data model (JSON-serialized)
+      Expense.kt                     # Room entity — DEAD CODE (but VerificationStatus enum lives here)
+      KeywordRule.kt                 # DEAD CODE
+    ocr/
+      OcrProcessor.kt                # ML Kit barcode + text recognition, EXIF-aware decode
+      SlipDocumentDetector.kt        # OpenCV document detection + perspective warp
+      SlipDataParser.kt              # Regex-based slip text parsing
+    verification/
+      SlipVerificationManager.kt     # Multi-provider verification (live path)
+      VerificationProvider.kt        # Enum: EASYSLIP, THUNDER, SLIP2GO
+    easyslip/
+      EasySlipClient.kt              # DEAD CODE (single-provider, replaced by SlipVerificationManager)
+      VerificationModels.kt          # VerifySlipResponse, BankPayload, EasySlipRateLimitInfo
+    analytics/
+      AnalyticsEngine.kt             # Generates insights from Expense list (dead code model)
+    repository/
+      SettingsRepository.kt          # DEAD CODE (never instantiated)
+      ExpenseRepository.kt           # DEAD CODE (seeds fake USD expenses)
+    local/
+      FireCashDatabase.kt            # DEAD CODE (Room database)
+      ExpenseDao.kt, KeywordRuleDao.kt  # DEAD CODE
+    backup/
+      DriveBackupManager.kt          # DEAD CODE (Google Drive backup)
+    export/
+      ExportManager.kt               # DEAD CODE (CSV/PDF export)
+  service/
+    IncomeNotificationService.kt     # NotificationListenerService — live
+    BackgroundListenerService.kt     # Foreground service keepalive — live
+    NotificationPresets.kt           # Preset whitelist definitions — live
+    WhitelistedApp.kt                # Data class: packageName + prefix — live
+```
 
 ## Architecture — read this first
 
@@ -22,12 +78,14 @@ There are **two parallel architectures**. The live app is NOT the one using Room
 `MainActivity` → `ui/MainApp.kt` (a single ~1200-line composable holding ALL app state). No DI, no ViewModel, no Navigation Compose.
 
 - State = `remember { mutableStateOf(...) }` + `SharedPreferences("firecash_settings", MODE_PRIVATE)`. Slips and whitelists are persisted as JSON strings inside prefs, not in Room.
-- Navigation = four booleans (`showSavedSlips`/`showCapture`/`showPayload`/`showAnalytics`) + `BackHandler`s. Homepage is Account (slip list).
+- Navigation = four booleans (`showSavedSlips`/`showCapture`/`showPayload`/`showAnalytics`) + `BackHandler`s. The `Scaffold` at the bottom of MainApp routes via `if/else if` chains. Homepage is Account (slip list).
 - Screens: `ui/screens/AccountScreen.kt` (home, grouped list + balance card), `PhotoCaptureScreen.kt` (CameraX), `QrPayloadScreen.kt` (slip detail), `AnalyticsScreen.kt`, `SettingsScreen.kt`. All state flows down from MainApp via callbacks.
 - Live data pipeline: Camera shutter / gallery pick / import / tracked-folder scan → `OcrProcessor.flattenedCopy()` (OpenCV document detection + perspective warp; the CROP becomes the stored slip photo) → ML Kit barcode scan for the QR payload on the flattened copy → `addSlip()` in MainApp → `SlipVerificationManager.verifyPayload()` → `SavedSlip` JSON → prefs → AccountScreen. The full-frame original is deleted once a crop was produced and the slip saved (a failed scan keeps the original).
 
 ### Legacy/dead code (do not extend; may be deleted)
-`ui/viewmodel/MainViewModel.kt`, `data/local/*` (Room `FireCashDatabase`, `ExpenseDao`, `KeywordRuleDao`), `data/model/Expense.kt` + `KeywordRule.kt`, `data/repository/*` (ExpenseRepository seeds 6 fake USD expenses + rules on empty DB), `data/export/ExportManager.kt`, `data/backup/DriveBackupManager.kt`, `data/easyslip/EasySlipClient.kt`. None of these are referenced from `MainApp`; `MainViewModel` is never instantiated. `Screen` sealed class in MainViewModel is not the real navigation. Don't "fix" or wire these up — replicate their behavior in MainApp instead if a feature needs it.
+`ui/viewmodel/MainViewModel.kt`, `data/local/*` (Room `FireCashDatabase`, `ExpenseDao`, `KeywordRuleDao`), `data/model/Expense.kt` + `KeywordRule.kt`, `data/repository/*` (ExpenseRepository seeds 6 fake USD expenses + rules on empty DB), `data/export/ExportManager.kt`, `data/backup/DriveBackupManager.kt`, `data/easyslip/EasySlipClient.kt`, `data/repository/SettingsRepository.kt`. None of these are referenced from `MainApp`; `MainViewModel` is never instantiated. `Screen` sealed class in MainViewModel is not the real navigation. Don't "fix" or wire these up — replicate their behavior in MainApp instead if a feature needs it.
+
+**Important exception**: `VerificationStatus` enum is defined inside `Expense.kt` (dead code file) but used by both dead and live code (`SavedSlip` imports it from `com.example.data.model`). The `AnalyticsScreen` composable also imports `Expense` model — it's live UI reading a dead data type. If you delete `Expense.kt`, move `VerificationStatus` to its own file or into `SavedSlip.kt` first.
 
 ## Persistence — SharedPreferences keys (`firecash_settings`)
 
@@ -45,7 +103,7 @@ There are **two parallel architectures**. The live app is NOT the one using Room
 | `easy_slip_enabled`, `verification_provider` (easyslip/thunder/slip2go), `api_key_easyslip`, `api_key_thunder`, `api_key_slip2go`, `check_duplicates` | verification settings |
 | `background_listening` | foreground keepalive toggle |
 
-Helper functions for slips/whitelists/seen/processed live as top-level `private fun`s at the bottom of `MainApp.kt` (e.g. `loadSlips`/`saveSlips`/`slipToJson`, `loadNotificationWhitelist`, `saveProcessedFiles`).
+Helper functions for slips/whitelists/seen/processed live as top-level `private fun`s at the bottom of `MainApp.kt` (e.g. `loadSlips`/`saveSlips`/`slipToJson`, `loadNotificationWhitelist`, `saveProcessedFiles`). **Note**: `IncomeNotificationService` has its OWN copy of `loadSlips`/`saveSlips`/`slipToJson`/`slipFromJson`/`loadSeenPayloads`/`saveSeenPayloads` as `companion object` functions — these are duplicates of MainApp's private helpers. Keep them in sync when changing persistence format.
 
 ## Verification (SlipVerificationManager)
 
@@ -53,31 +111,44 @@ Helper functions for slips/whitelists/seen/processed live as top-level `private 
 - No API key configured, or network failure, or unexpected HTTP code → falls back to `simulateSlipVerification()`: **payload ending in `9999` ⇒ `DUPLICATE_DETECTED`**, otherwise `UNVERIFIED` with a "not configured" message. This is also how the app behaves in demo mode, and tests rely on it.
 - Rate limit info surfaced from `X-RateLimit-Remaining` header; 429 → `RATE_LIMITED`, 401 → `AUTH_FAILED`, 404 → `SLIP_NOT_FOUND`.
 - `EasySlipClient.kt` is the older single-provider client used only by (dead) MainViewModel + its test. The live path is `SlipVerificationManager`.
+- `verifyBatch` discards the entire batch when ≥2 different slips come back with one shared transRef (canned sandbox/test responses). `applyVerifiedUpdate` NEVER overwrites an existing amount — only fills missing ones. Date updates are asymmetric: verified `transDate` DOES replace the stored date, but difference sets `dateMismatch`.
 
 ## OCR / document detection / parsing
 
 - **Live camera flow is manual**: no QR auto-scan on the preview. The operator frames the slip; `PhotoCaptureScreen` runs `SlipDocumentDetector.detectYPlane` (cheap Y-plane sampling) every 4th analyzer frame and draws a **green 4-corner outline** around the detected slip (mapped through the same FILL_CENTER crop the PreviewView uses), plus a white guide box + "Align the slip within the view" when nothing is detected. Tapping the shutter captures the full frame.
 - **The crop is the slip photo**: every ingest path (camera `onPhotoCaptured`, gallery `onImageSelected`, Settings import, tracked-folder `scanFolder`) runs `OcrProcessor.flattenedCopy(imageUri, outName?)` → `SlipDocumentDetector.flatten(bitmap)` (largest 4-corner region via GaussianBlur → Canny → dilate → RETR_EXTERNAL contours → approxPolyDP epsilon sweep, min 12% of frame; perspective warp to an upright rectangle). Detection is made robust with three edge passes (Canny 50/150, 20/70, contrast-equalized 20/70), an exactly-4-corner accept from the raw outline OR its convex hull (epsilons 0.02–0.09), and a final rotated-rectangle fallback around the largest slip-like contour (must fill ≥50% of its box and stay <97% of the frame). When a slip is detected the crop is written to `getExternalFilesDir(DIRECTORY_PICTURES)` (fallback `filesDir`) with a **deterministic name** (`<sanitized source name>_flat.jpg`, or `outName` for tracked-folder photos = `<file name>_<uri hash8>`), that crop becomes the slip's stored `photoPath`, and OCR/QR run on it. The full-frame original is deleted only after the slip is saved; when flattening finds nothing OR the payload is blank, the crop is dropped and the original kept. Tracked-folder originals (content:// in the user's photo folder) are never deleted, and a Force Sync re-scan *upgrades* an existing slip's `photoPath` to the deterministic crop (same file each time — no pile-up, no duplicates).
+- **OpenCV init**: `SlipDocumentDetector` calls `OpenCVLoader.initLocal()` once (lazy, cached in `loaded` field). This is required before any OpenCV operation. If it fails, detection returns null and the center-crop fallback is used instead.
 - **EXIF orientation is applied on decode** (`OcrProcessor.decodeRotated`, used by `flattenedCopy`/`recognizeText`/`processReceipt`): camera JPEGs store rotation in EXIF metadata and `BitmapFactory.decodeFile` ignores it, so without this every portrait capture was analyzed sideways. Keep using `decodeRotated` (not raw `decodeFile`) for any new image-reading path.
-- `OcrProcessor.processReceipt(imageUri, samplePreset, scanCenterOnly=false)`: uses ML Kit **barcode scanning only** (QR) — called with `scanCenterOnly=false` because the input is already the flat slip crop. `samplePreset != null` bypasses the image entirely and parses a canned OCR string (used for demo/testing). `OcrProcessor.recognizeText` runs ML Kit Latin text recognition over the photo — used for the fraud cross-check (extract the baht amount and date printed on the slip) and for folder/import OCR. Note: ML Kit on-device text recognition has **no Thai script support** (Latin/digits only), so Thai-only glyphs are not extracted.
+- `OcrProcessor.processReceipt(imageUri, samplePreset, scanCenterOnly=false)`: uses ML Kit **barcode scanning only** (QR) — called with `scanCenterOnly=false` because the input is already the flat slip crop. `samplePreset != null` bypasses the image entirely and parses a canned OCR string (used for demo/testing). `OcrProcessor.recognizeText` runs ML Kit Latin text recognition over the photo — used for the fraud cross-check (extract the baht amount and date printed on the slip) and for folder/import OCR. Note: ML Kit on-device text recognition has **no Thai script support** (Latin/digits only), so Thai-only glyphs are not extracted. The ML Kit text recognizer is closed after each call (`recognizer.close()`).
 - `SlipDataParser.parse(rawText)`: regex-based extraction — amounts (`TOTAL`, `ยอดรวม`, etc.), dates (`2023-10-24`, `dd/MM/yyyy`, `24 Oct 2023`, Thai month abbreviations like `ส.ค.`, and Buddhist Era years where `2569 BE = 2026 CE`, subtract 543), merchant (first plausible line, truncated to 32 chars), Tag 91 CRC (`9104XXXX`), EMVCo QR CRC (`6304XXXX`). Bank slip detection via CRC/Tag 91 or `PromptPay`/`โอนเงินสำเร็จ`. Falls back to hardcoded values (amount `45.20`, today's date) when nothing matches.
 - `SlipDataParser.extractSlipDate(text)`: best-effort `yyyy-MM-dd` from slip photo text (Thai months + BE years, `d MMM yyyy`) or `null` — this is the photo date used by the fraud cross-check. Caveat: ML Kit's Latin recognizer garbles Thai glyphs (`ส.ค.` → `a.A.`), so Thai-only dates often come back unreadable and the cross-check then no-ops.
-- Bank code mapping: KBank `004`, SCB `014`, Bangkok Bank `002`, KTB `006` (see `SlipDataParser.extractBankSlipPayload` and `SlipVerificationManager.getBankName`).
+- Bank code mapping: KBank `004`, SCB `014`, Bangkok Bank `002`, KTB `006` (see `SlipDataParser.extractBankSlipPayload` and `SlipVerificationManager.getBankName`). The `extractQrAmount` function parses EMVCo tag 54: `540550.00` means 2-digit length + amount string.
 
 ## Notification income/expense
 
 - `IncomeNotificationService` (`NotificationListenerService`): reads title/text/bigText of every notification, skips own package, applies per-app whitelist prefix matching (`extractAfterPrefix`, e.g. prefix `โอนเงินให้คุณ ฿` → first number after it), saves a `SavedSlip` with payload `notif:<pkg>:<amount>:<hash>:<ts>`. Dedupe via `seen_payloads`-style hash set (`saved_slips` + hashes stored as `seen_payloads`-like set in prefs — see `PREFS_SEEN`).
 - `NotificationPresets`: permanent preset whitelists (KBank/SCB packages) seeded ONCE into prefs (`seedIfNeeded`). Presets are **toggleable but not removable** — disabled state lives in `preset_disabled_*` StringSets; `mergeIncome`/`mergeExpense` rebuild the effective list. User-added entries are stored separately and are removable. `isIncomePermanent`/`isExpensePermanent` gate deletion in the UI. When adding a new bank app's notification prefix, add it to `incomePresets`/`expensePresets` (presets are seeded only if the user hasn't already customized the list).
-- `BackgroundListenerService`: foreground `specialUse` service ("music-player style", `FLAG_NO_CLEAR|FLAG_ONGOING_EVENT`, `ACTION_STOP` action to stop) that keeps the notification listener alive; started/stopped from MainApp settings, auto-restarted on app launch when `background_listening` is true.
+- `BackgroundListenerService`: foreground `specialUse` service ("music-player style", `FLAG_NO_CLEAR|FLAG_ONGOING_EVENT`, `ACTION_STOP` action to stop) that keeps the notification listener alive; started/stopped from MainApp settings, auto-restarted on app launch when `background_listening` is true. Manifest declares `foregroundServiceType="specialUse"` with `PROPERTY_SPECIAL_USE_FGS_SUBTYPE`.
 
 ## Money in/out semantics
 
-- Balance = moneyIn − moneyOut. Each slip resolves to in/out/transfer via `effectiveIsMoneyIn` (duplicated in `MainApp.isKnownName`-based logic and `AccountScreen`): receiver is a known name ⇒ income, sender is known ⇒ expense, both known (or sender==receiver) ⇒ transfer (excluded from balance), else the stored `isMoneyIn` flag. Known names are matched case-insensitively, trimmed.
+- Balance = moneyIn − moneyOut. Each slip resolves to in/out/transfer via `effectiveIsMoneyIn` (duplicated in `MainApp.isKnownName`-based logic and `AccountScreen.isKnownName`/`effectiveIsMoneyIn`): receiver is a known name ⇒ income, sender is known ⇒ expense, both known (or sender==receiver) ⇒ transfer (excluded from balance), else the stored `isMoneyIn` flag. Known names are matched case-insensitively, trimmed. **Note**: `isKnownName` logic is duplicated in both `MainApp.kt` and `AccountScreen.kt` — keep them in sync.
 - AccountScreen list: `LazyColumn(reverseLayout = true)`, slips appended in arrival order, grouped by the `date` string with a daily-net-total header. Newest is at the visual bottom.
 - **App mode** — removed: the app is **shop-operator only**. The balance card's top-right 44dp action button always opens the camera.
-- Deletion safety: only slips with `UNVERIFIED` status, blank `transRef`, or `null` amount can be deleted (long-press multi-select in AccountScreen, `onDeleteSlip` in MainApp).
+- Deletion safety: only slips with `UNVERIFIED` status, blank `transRef`, or `null` amount can be deleted (long-press multi-select in AccountScreen, `onDeleteSlip` in MainApp). `isDeletable` logic is duplicated in both files.
 - `fullResync()` (hold Sync 10s): clears `processed_files`, re-OCR's every tracked folder, then re-verifies all slips **except** `manual:`/`notif:` payloads. Settings → Tracked Folders also has **Force Sync All (re-scan every photo)** (`forceSyncTrackedFolders()`): same cache clear + re-scan but WITHOUT the re-verify loop; re-reading a photo updates the existing slip (dedupe by `photoPath`) instead of duplicating.
-- Import/export (`exportAllData`/`importAllData`): full JSON clone including API keys and whitelists (import still tolerates the legacy `api_key` field and maps it to `api_key_easyslip`). Import preserves permanent presets (merges with `mergeIncome`/`mergeExpense`) and a JSON missing a whitelist key does NOT wipe the device list.
+- Import/export (`exportAllData`/`importAllData`): full JSON clone including API keys and whitelists (import still tolerates the legacy `api_key` field and maps it to `api_key_easyslip`). Import preserves permanent presets (merges with `mergeIncome`/`mergeExpense`) and a JSON missing a whitelist key does NOT wipe the device list. JSON serialization is manual (no Moshi/Retrofit involved).
+
+## Code duplication to be aware of
+
+| Logic | Live in MainApp | Duplicated in |
+|---|---|---|
+| JSON persistence (`loadSlips`/`saveSlips`/`slipToJson`/`slipFromJson`) | Bottom of `MainApp.kt` (private top-level) | `IncomeNotificationService` companion object |
+| `seenPayloads` load/save | Bottom of `MainApp.kt` (private top-level) | `IncomeNotificationService` companion object |
+| `isKnownName` | `MainApp.kt:210-214` | `AccountScreen.kt:80-84` |
+| `effectiveIsMoneyIn` | `MainApp.kt:289-299` | `AccountScreen.kt:86-95` |
+| `isDeletable` | `MainApp.kt:752-755` | `AccountScreen.kt:97-102` |
+| `extractAmount` | `MainApp.kt:216-219` | `IncomeNotificationService.AMOUNT_REGEX` |
 
 ## Gotchas
 
@@ -85,10 +156,12 @@ Helper functions for slips/whitelists/seen/processed live as top-level `private 
 - **Build tooling is bleeding-edge**: AGP `9.1.1`, Kotlin `2.2.10`, Gradle `9.3.1` wrapper, and `compileSdk { version = release(36) { minorApiLevel = 1 } }` — an unusual syntax that only works on this AGP. Don't "modernize" these casually.
 - **Secrets plugin**: `secrets.propertiesFileName = ".env"` (`.env` is gitignored; `.env.example` has only a commented `GEMINI_API_KEY` placeholder). `FIREBASE_APPCHECK_DEBUG_TOKEN` is in the ignore list. If you add an API key for verification providers, it goes into prefs (settings), NOT `.env`.
 - **Roborazzi/Robolectric are configured** (`libs.versions.toml`, `testOptions.isIncludeAndroidResources = true`) but no test uses Roborazzi (`captureRoboImage`); `app/src/test/screenshots/greeting.png` is a leftover. Robolectric tests need `@RunWith(RobolectricTestRunner::class)` + `@Config(sdk = [36])`.
-- **Tests**: JUnit4 + `runBlocking` (coroutines), plain JVM tests for pure logic (`SlipDataParserTest`, `EasySlipClientTest` mock pipeline, `AnalyticsEngineTest`, `ExportManagerTest`). `ExampleUnitTest` and `ExampleRobolectricTest` are template boilerplate, not real tests. `EasySlipClientTest.testMockVerificationPipeline` relies on the no-key simulation behavior.
-- **Docs drift**: `PROJECT_STATUS.md` is now maintained (snapshot of current state; last updated 2026-08-31). `docs/DEVELOPMENT_LOG.md` has detailed history but also goes stale. `docs/firecash_ui_stitch_plan.md` defines the design tokens (`#121316` bg, `#FF6B00` primary, `#10B981`/`#6366F1` accents) mirrored in `ui/theme/Color.kt`.
+- **Tests**: JUnit4 + `runBlocking` (coroutines), plain JVM tests for pure logic (`SlipDataParserTest`, `EasySlipClientTest` mock pipeline, `AnalyticsEngineTest`, `ExportManagerTest`). `ExampleUnitTest` and `ExampleRobolectricTest` are template boilerplate, not real tests. `EasySlipClientTest.testMockVerificationPipeline` relies on the no-key simulation behavior. Tests use the `Expense` model (dead code) — `AnalyticsEngineTest` and `ExportManagerTest` operate on `Expense` objects, not `SavedSlip`.
+- **Docs drift**: `PROJECT_STATUS.md` is now maintained (snapshot of current state; last updated 2026-08-31). `docs/DEVELOPMENT_LOG.md` has detailed history but also goes stale. `docs/firecash_ui_stitch_plan.md` defines the design tokens (`#121316` bg, `#FF6B00` primary, `#10B981`/`#6366F1` accents) — but note that `Color.kt` uses a different palette (`#131313` bg, `#B3C5FF` primary, `#0066FF` primary container). The stitch plan is aspirational, not what's actually implemented.
 - `package.json` contains only `opencode-ai` (harness used to build the app; `node_modules/` untracked). `snapui.zip` is a tracked artifact at repo root. `.github/workflows/proxy.yml` (EasySlip proxy Cloud Run deploy) is a stub — the `proxy/` directory does not exist and the gcloud command is commented out.
 - Gradle: `RepositoriesMode.FAIL_ON_PROJECT_REPOS` (declare repos only in `settings.gradle.kts`); `android.nonTransitiveRClass=true`.
 - Manual slips use payload prefix `manual:` and `MANUAL-` transRefs; the UI treats them as always-deletable. Notification slips (`notif:`) are also deletable only while unverified.
+- `providerKeyPref()` in MainApp maps `VerificationProvider` to `"api_key_easyslip"`/`"api_key_thunder"`/`"api_key_slip2go"`.
+- `isListenerRunning()` in MainApp checks if `BackgroundListenerService` is alive via `activeNotificationListener`/`ComponentName`.
 - **Fraud cross-check** (`addSlip` + `SlipDataParser`): each scanned slip compares the baht amount read from the photo text (`extractSlipAmount`), the EMVCo QR tag-54 amount (`extractQrAmount`), and the bank-verified amount — any disagreement >0.005 sets `SavedSlip.amountMismatch`. Separately, the photo's printed date (`extractSlipDate`) is compared against the bank-verified date (`transDate`); any difference sets `SavedSlip.dateMismatch`. Both flags are persisted in JSON and each shows its own red "possible tampered slip" banner on the detail screen (`QrPayloadScreen.amountMismatch` / `dateMismatch`).
 - **Verification safety** (`verifyBatch` + `applyVerifiedUpdate`): batch verification (`resyncUnverifiedSlips`, `fullResync`) NEVER overwrites a slip's existing photo-extracted amount — a verified amount only fills a missing one, and any disagreement sets the `amountMismatch` fraud flag. **Dates behave asymmetrically**: a verified `transDate` DOES replace the slip's date, but a difference from the stored date sets `dateMismatch` (flags OR together with any existing ones). `verifyBatch` also discards a whole batch when ≥2 different slips come back with one shared transRef (canned sandbox/test responses — EasySlip test keys return fixed data like 178.00 or 0.00 with identical transRefs). Note: a test key marks slips VERIFIED (making them undeletable per the deletion-safety rule); use a production key for real verification.

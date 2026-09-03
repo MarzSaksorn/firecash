@@ -15,9 +15,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -36,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
@@ -59,6 +63,8 @@ fun QrPayloadScreen(
     photoPath: String? = null,
     amountMismatch: Boolean = false,
     dateMismatch: Boolean = false,
+    currentCategory: String? = null,
+    onToggleCategory: ((String?) -> Unit)? = null,
     onBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -256,6 +262,13 @@ fun QrPayloadScreen(
                 }
             }
 
+            // Manual income/expense/transfer toggle
+            Spacer(modifier = Modifier.height(16.dp))
+            CategoryToggle(
+                currentCategory = currentCategory,
+                onToggle = onToggleCategory
+            )
+
             // Photo of the slip on device — thumbnail + open link
             if (!photoPath.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -398,4 +411,79 @@ private fun DetailRow(label: String, value: String) {
 private fun extractAmount(text: String): Double? {
     val regex = Regex("""\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?""")
     return regex.find(text)?.value?.replace(",", "")?.toDoubleOrNull()
+}
+
+@Composable
+private fun CategoryToggle(
+    currentCategory: String?,
+    onToggle: ((String?) -> Unit)?
+) {
+    val options = listOf(
+        "income" to "Income" to Icons.Default.ArrowUpward,
+        "expense" to "Expense" to Icons.Default.ArrowDownward,
+        "transfer" to "Transfer" to Icons.Default.SwapHoriz
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(FireCashSurfaceContainerLow, RoundedCornerShape(16.dp))
+            .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "Classification",
+            color = FireCashOnSurface,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            options.forEach { (keyLabel, icon) ->
+                val (key, label) = keyLabel
+                val selected = when (currentCategory) {
+                    null -> false
+                    key -> true
+                    else -> false
+                }
+                val bgColor = if (selected) when (key) {
+                    "income" -> Color(0xFF10B981)
+                    "expense" -> Color(0xFFEF4444)
+                    else -> Color(0xFF6366F1)
+                } else FireCashSurfaceContainerLow
+                Button(
+                    onClick = {
+                        onToggle?.invoke(if (selected) null else key)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = bgColor),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = label,
+                        color = Color.White,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+        if (currentCategory == null) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "Auto-detected from known names",
+                color = FireCashOnSurfaceVariant,
+                fontSize = 11.sp
+            )
+        }
+    }
 }

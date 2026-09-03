@@ -84,6 +84,12 @@ private fun isKnownName(name: String?, knownNames: List<String>): Boolean {
 }
 
 private fun effectiveIsMoneyIn(slip: SavedSlip, knownNames: List<String>): Boolean? {
+    // Manual override takes precedence
+    when (slip.manualCategory) {
+        "income" -> return true
+        "expense" -> return false
+        "transfer" -> return null
+    }
     if (isSelfTransfer(slip, knownNames)) return null // Transfer - excluded from balance
     val receiverKnown = isKnownName(slip.receiverName, knownNames)
     val senderKnown = isKnownName(slip.senderName, knownNames)

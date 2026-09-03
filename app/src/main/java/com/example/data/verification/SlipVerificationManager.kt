@@ -92,14 +92,38 @@ class SlipVerificationManager {
             response.code == 401 -> authFailedResponse()
             response.code == 404 -> {
                 val errJson = runCatching { JSONObject(responseBody) }.getOrNull()
+                val code = errJson?.optJSONObject("error")?.optString("code") ?: "SLIP_NOT_FOUND"
                 VerifySlipResponse(
                     success = false,
-                    errorCode = errJson?.optString("error.code") ?: "SLIP_NOT_FOUND",
-                    errorMessage = errJson?.optString("error.message") ?: "Slip not found or invalid.",
-                    verificationStatus = VerificationStatus.SLIP_NOT_FOUND
+                    errorCode = code,
+                    errorMessage = errJson?.optJSONObject("error")?.optString("message") ?: "Slip not found or invalid.",
+                    verificationStatus = when (code) {
+                        "SLIP_PENDING" -> VerificationStatus.SLIP_NOT_FOUND
+                        else -> VerificationStatus.SLIP_NOT_FOUND
+                    }
                 )
             }
-            !response.isSuccessful -> simulateSlipVerification(payload)
+            response.code == 400 -> {
+                val errJson = runCatching { JSONObject(responseBody) }.getOrNull()
+                val code = errJson?.optJSONObject("error")?.optString("code") ?: "VALIDATION_ERROR"
+                val msg = errJson?.optJSONObject("error")?.optString("message") ?: "Request validation failed"
+                VerifySlipResponse(
+                    success = false,
+                    errorCode = code,
+                    errorMessage = msg,
+                    verificationStatus = if (msg.contains("duplicate", ignoreCase = true))
+                        VerificationStatus.DUPLICATE_DETECTED else VerificationStatus.UNVERIFIED
+                )
+            }
+            !response.isSuccessful -> {
+                val errJson = runCatching { JSONObject(responseBody) }.getOrNull()
+                VerifySlipResponse(
+                    success = false,
+                    errorCode = errJson?.optJSONObject("error")?.optString("code") ?: "API_ERROR",
+                    errorMessage = errJson?.optJSONObject("error")?.optString("message") ?: "API error (HTTP ${response.code})",
+                    verificationStatus = VerificationStatus.UNVERIFIED
+                )
+            }
             else -> parseEasySlipResponse(JSONObject(responseBody))
         }
     }

@@ -1,23 +1,20 @@
 package com.example
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Typeface
+import android.graphics.BitmapFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.data.ocr.OcrProcessor
+import com.example.data.ocr.SlipDocumentDetector
 import java.io.File
-import java.io.FileOutputStream
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Runs the Personal-mode pipeline against REAL slip photos pulled from the device
- * (pushed into the app's external files dir as slip1/slip2/slip3). Logs exactly what
- * text recognition and the QR scan produce for each one under the FireCashOCR tag.
+ * Verifies the document-detection + perspective-flatten pipeline against a
+ * perspective-skewed real slip photo pushed to the app files dir as slip4.jpg.
+ * Logs under the FireCashOCR tag so results can be read via logcat.
  */
 @RunWith(AndroidJUnit4::class)
 class OcrProcessorTextTest {
@@ -41,24 +38,36 @@ class OcrProcessorTextTest {
             )
         }
 
-        // Synthetic fallback check: Latin-only image must still extract text
-        val width = 1400
-        val height = 800
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        canvas.drawColor(Color.WHITE)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.BLACK
-            textSize = 80f
-            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        // Flatten test: skewed slip (slip4.jpg) — raw OCR vs OCR after perspective flatten
+        val skewed = File(filesDir, "slip4.jpg")
+        if (skewed.exists()) {
+            val rawText = runBlocking { processor.recognizeText(skewed.absolutePath, scanCenterOnly = false) }
+            val flatPath = runBlocking { processor.flattenedCopy(skewed.absolutePath) }
+            val flatText = if (flatPath != null) {
+                runBlocking { processor.recognizeText(flatPath, scanCenterOnly = false) }
+            } else ""
+            android.util.Log.d(
+                "FireCashOCR",
+                "FLATTEN slip4: raw=[${rawText.replace("\n", " | ")}] flatPath=$flatPath flat=[${flatText.replace("\n", " | ")}]"
+            )
         }
-        canvas.drawText("KASIKORNBANK", 80f, 200f, paint)
-        canvas.drawText("Amount: 450.00 THB", 80f, 460f, paint)
-        val file = File(context.cacheDir, "synthetic_slip.jpg")
-        FileOutputStream(file).use { out -> bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out) }
+    }
+
+    @Test
+    fun documentDetectorFindsSlipOnSkewedPhoto() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val filesDir = context.getExternalFilesDir(null) ?: context.filesDir
+        val skewed = File(filesDir, "slip4.jpg")
+        if (!skewed.exists()) return
+
+        val bitmap = BitmapFactory.decodeFile(skewed.absolutePath)
+        val quad = SlipDocumentDetector.detect(bitmap)
+        val flat = SlipDocumentDetector.flatten(bitmap)
+        android.util.Log.d(
+            "FireCashOCR",
+            "DETECT slip4: quad=${quad?.points?.joinToString { "(${it.x.toInt()},${it.y.toInt()})" }} flat=${flat?.width}x${flat?.height}"
+        )
         bitmap.recycle()
-        val text = runBlocking { processor.recognizeText(file.absolutePath) }
-        file.delete()
-        android.util.Log.d("FireCashOCR", "SYNTHETIC: text=[$text]")
+        flat?.recycle()
     }
 }

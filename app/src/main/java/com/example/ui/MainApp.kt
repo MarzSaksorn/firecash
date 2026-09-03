@@ -521,9 +521,10 @@ fun MainApp(modifier: Modifier = Modifier) {
         isLoading = true
         scope.launch {
             for (path in paths) {
-                // Shop mode: read the QR payload (with photo text for the fraud cross-check)
-                val ocrText = OcrProcessor(context).recognizeText(path, scanCenterOnly = false)
-                val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
+                val processor = OcrProcessor(context)
+                val workPath = processor.flattenedCopy(path) ?: path
+                val ocrText = processor.recognizeText(workPath, scanCenterOnly = false)
+                val payload = processor.processReceipt(workPath, scanCenterOnly = false).rawText
                 if (payload.isNotBlank()) {
                     addSlip(payload, photoPath = path, ocrText = ocrText)
                 }
@@ -557,9 +558,11 @@ fun MainApp(modifier: Modifier = Modifier) {
             }.getOrDefault(false)
             if (!copied) continue
 
-            val ocrText = OcrProcessor(context).recognizeText(tempFile.absolutePath, scanCenterOnly = false)
-            val payload = OcrProcessor(context)
-                .processReceipt(tempFile.absolutePath, scanCenterOnly = false)
+            val processor = OcrProcessor(context)
+            val workPath = processor.flattenedCopy(tempFile.absolutePath) ?: tempFile.absolutePath
+            val ocrText = processor.recognizeText(workPath, scanCenterOnly = false)
+            val payload = processor
+                .processReceipt(workPath, scanCenterOnly = false)
                 .rawText
             if (payload.isNotBlank() && payload !in seenPayloads) {
                 seenPayloads.add(payload)
@@ -767,10 +770,13 @@ fun MainApp(modifier: Modifier = Modifier) {
             PhotoCaptureScreen(
                 onPhotoCaptured = { path ->
                     scope.launch {
-                        // OCR the ENTIRE slip photo for the fraud cross-check, then scan the QR
+                        // Flatten the slip (document detection + perspective warp) so the
+                        // QR + OCR read the flat document, then cross-check text vs QR/bank.
                         isLoading = true
-                        val ocrText = OcrProcessor(context).recognizeText(path, scanCenterOnly = false)
-                        val payload = OcrProcessor(context).processReceipt(path).rawText
+                        val processor = OcrProcessor(context)
+                        val workPath = processor.flattenedCopy(path) ?: path
+                        val ocrText = processor.recognizeText(workPath, scanCenterOnly = false)
+                        val payload = processor.processReceipt(workPath, scanCenterOnly = false).rawText
                         isLoading = false
                         handlePayload(payload, photoPath = path, ocrText = ocrText)
                     }
@@ -779,8 +785,10 @@ fun MainApp(modifier: Modifier = Modifier) {
                 onImageSelected = { path ->
                     scope.launch {
                         isLoading = true
-                        val ocrText = OcrProcessor(context).recognizeText(path, scanCenterOnly = false)
-                        val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
+                        val processor = OcrProcessor(context)
+                        val workPath = processor.flattenedCopy(path) ?: path
+                        val ocrText = processor.recognizeText(workPath, scanCenterOnly = false)
+                        val payload = processor.processReceipt(workPath, scanCenterOnly = false).rawText
                         isLoading = false
                         handlePayload(payload, photoPath = path, ocrText = ocrText)
                     }

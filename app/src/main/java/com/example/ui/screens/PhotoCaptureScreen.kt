@@ -105,6 +105,9 @@ fun PhotoCaptureScreen(
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     val scanLock = remember { AtomicBoolean(false) }
     val currentOnQrDetected by rememberUpdatedState(onQrDetected)
+    // Live slip detection hint — green frame when a flat slip is in view
+    var slipDetected by remember { mutableStateOf(false) }
+    var frameTick by remember { mutableStateOf(0) }
 
     // Initialise CameraX when permission is granted
     if (permissionGranted) {
@@ -121,7 +124,25 @@ fun PhotoCaptureScreen(
                     .build()
                 imageAnalysis.setAnalyzer(cameraExecutor, ImageAnalysis.Analyzer { imageProxy ->
                     val mediaImage = imageProxy.image
-                    if (mediaImage != null && !scanLock.get()) {
+                    if (mediaImage == null) {
+                        imageProxy.close()
+                        return@Analyzer
+                    }
+                    // Live slip (flat surface) detection every few frames — feeds the green
+                    // frame hint. Cheap: samples the Y plane at step 3 straight into OpenCV.
+                    if (!scanLock.get()) {
+                        val tick = frameTick
+                        frameTick = tick + 1
+                        if (tick % 4 == 0) {
+                            try {
+                                val plane = imageProxy.planes[0]
+                                val found = com.example.data.ocr.SlipDocumentDetector
+                                    .detectYPlane(imageProxy.width, imageProxy.height, plane.rowStride, plane.buffer)
+                                slipDetected = found != null
+                            } catch (_: Exception) {
+                                slipDetected = false
+                            }
+                        }
                         val input = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
                         barcodeScanner.process(input)
                             .addOnSuccessListener { barcodes ->
@@ -228,7 +249,7 @@ fun PhotoCaptureScreen(
             }
         }
 
-        // QR scanning frame overlay
+        // QR scanning frame overlay — green + hint when a flat slip is detected
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -238,16 +259,20 @@ fun PhotoCaptureScreen(
             Box(
                 modifier = Modifier
                     .size(280.dp)
-                    .border(2.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(16.dp))
+                    .border(
+                        2.dp,
+                        if (slipDetected) Color(0xFF66BB6A) else Color.White.copy(alpha = 0.9f),
+                        RoundedCornerShape(16.dp)
+                    )
             )
             Text(
-                text = "Align QR code within the frame",
+                text = if (slipDetected) "Slip detected — tap shutter" else "Align QR code within the frame",
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 40.dp)
                     .background(Color.Black.copy(alpha = 0.6f))
                     .padding(horizontal = 12.dp, vertical = 6.dp),
-                color = Color.White
+                color = if (slipDetected) Color(0xFF66BB6A) else Color.White
             )
         }
 

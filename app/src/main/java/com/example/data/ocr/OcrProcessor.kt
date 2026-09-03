@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import java.io.File
+import java.io.FileOutputStream
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -51,6 +52,27 @@ class OcrProcessor(private val context: Context? = null) {
         } catch (e: Exception) {
             ""
         }
+    }
+
+    /**
+     * If a flat slip/document is detectable in the photo, writes a perspective-flattened copy
+     * to cache and returns its path — OCR + QR decoding should run on THAT. Returns null when
+     * no slip region is found (caller keeps working with the original photo).
+     */
+    suspend fun flattenedCopy(imageUri: String): String? = withContext(Dispatchers.Default) {
+        if (imageUri.isBlank()) return@withContext null
+        runCatching {
+            val bitmap = BitmapFactory.decodeFile(imageUri) ?: return@withContext null
+            val flat = SlipDocumentDetector.flatten(bitmap)
+            bitmap.recycle()
+            if (flat == null) return@withContext null
+            val ctx = context ?: return@withContext null
+            val out = File(ctx.cacheDir, "flat_${System.currentTimeMillis()}.jpg")
+            android.util.Log.d("FireCashOCR", "flattened slip ${flat.width}x${flat.height} -> ${out.name}")
+            FileOutputStream(out).use { flat.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+            flat.recycle()
+            out.absolutePath
+        }.getOrNull()
     }
 
     private suspend fun runRecognition(recognizer: TextRecognizer, image: InputImage): String =

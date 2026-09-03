@@ -157,19 +157,36 @@ object SlipDocumentDetector {
         }
     }
 
-    /** Runs the edge/contour pipeline on a grayscale [gray] Mat and returns the best 4-corner polygon. */
+    /**
+     * Runs the edge/contour pipeline on a grayscale [gray] Mat and returns the best 4-corner
+     * polygon. Tries progressively harder to find the slip so detection does not depend on a
+     * single lucky Canny threshold:
+     *  1. standard edges,  2. softer edges (dim / blurry slips),  3. contrast-normalized.
+     * Each pass accepts an exactly-4-corner polygon from the raw outline OR its convex hull,
+     * and falls back to the rotated minimum-area rectangle of the largest slip-like contour.
+     */
     private fun detectQuadInGray(gray: Mat, minArea: Double): Quad? {
+        quadWithCanny(gray, minArea, 50.0, 150.0)?.let { return it }
+        quadWithCanny(gray, minArea, 20.0, 70.0)?.let { return it }
+        val norm = Mat()
+        try {
+            Imgproc.equalizeHist(gray, norm)
+            quadWithCanny(norm, minArea, 20.0, 70.0)?.let { return it }
+        } finally {
+            norm.release()
+        }
+        Log.d(TAG, "no quad found (minArea=${minArea.toInt()})")
+        return null
+    }
+
+    private fun quadWithCanny(gray: Mat, minArea: Double, cannyLow: Double, cannyHigh: Double): Quad? {
         val blur = Mat()
         Imgproc.GaussianBlur(gray, blur, Size(5.0, 5.0), 0.0)
-
         val edges = Mat()
-        Imgproc.Canny(blur, edges, 50.0, 150.0)
-
-        // Dilate so slip borders form one continuous outline
+        Imgproc.Canny(blur, edges, cannyLow, cannyHigh)
         val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(3.0, 3.0))
         val dilated = Mat()
         Imgproc.dilate(edges, dilated, kernel)
-
         val hierarchy = Mat()
         val contours = ArrayList<MatOfPoint>()
         try {
@@ -181,35 +198,101 @@ object SlipDocumentDetector {
         } finally {
             blur.release(); edges.release(); kernel.release(); dilated.release(); hierarchy.release()
         }
-
         try {
             val sorted = contours.sortedByDescending { Imgproc.contourArea(it) }
-            var best: Quad? = null
             for (contour in sorted) {
                 val area = Imgproc.contourArea(contour)
                 if (area < minArea) break // any smaller contour can't be the slip
                 val pts2f = MatOfPoint2f(*contour.toArray())
-                val peri = Imgproc.arcLength(pts2f, true)
-                // Sweep the approximation epsilon until the outline converges to 4 corners
-                for (eps in listOf(0.02, 0.03, 0.045, 0.06)) {
-                    val approx = MatOfPoint2f()
-                    Imgproc.approxPolyDP(pts2f, approx, eps * peri, true)
-                    if (approx.total() == 4L) {
-                        val quad = orderPoints(approx.toArray())
-                        if (quad != null) {
-                            if (best == null || area > Imgproc.contourArea(contour)) best = quad
-                            if (area >= minArea * 2) return quad // confident: big + exactly 4 corners
-                        }
-                    }
-                    approx.release()
+                try {
+                    val peri = Imgproc.arcLength(pts2f, true)
+                    // 1) sweep the approximation epsilon until the outline has 4 corners
+                    quadFromApprox(pts2f, peri)?.let { return it }
+                    // 2) jagged outline: simplify the convex hull instead
+                    hullQuad(contour)?.let { return it }
+                } finally {
+                    pts2f.release()
                 }
-                pts2f.release()
             }
-            Log.d(TAG, "contours=${sorted.size} best=${best?.let { "found(${it.points.joinToString { p -> "${p.x.toInt()},${p.y.toInt()}" }})" } ?: "none"} minArea=${minArea.toInt()}")
-            return best
+            // 3) last resort: tight rotated rectangle around the largest slip-like contour
+            rectFallback(sorted, minArea, gray.cols(), gray.rows())?.let { return it }
+            Log.d(TAG, "contours=${sorted.size} best=none canny=$cannyLow/$cannyHigh minArea=${minArea.toInt()}")
         } finally {
             contours.forEach { it.release() }
         }
+        return null
+    }
+
+    /** approxPolyDP epsilon sweep looking for an exactly-4-corner polygon of [pts2f]. */
+    private fun quadFromApprox(pts2f: MatOfPoint2f, peri: Double): Quad? {
+        for (eps in listOf(0.02, 0.03, 0.045, 0.06, 0.09)) {
+            val approx = MatOfPoint2f()
+            var quad: Quad? = null
+            try {
+                Imgproc.approxPolyDP(pts2f, approx, eps * peri, true)
+                if (approx.total() == 4L) quad = orderPoints(approx.toArray())
+            } finally {
+                approx.release()
+            }
+            if (quad != null) return quad
+        }
+        return null
+    }
+
+    /** Convex-hull fallback for outlines that never simplify to exactly 4 raw corners. */
+    private fun hullQuad(contour: MatOfPoint): Quad? {
+        val hullIdx = org.opencv.core.MatOfInt()
+        try {
+            Imgproc.convexHull(contour, hullIdx)
+            val all = contour.toArray()
+            val hullPts = hullIdx.toArray().map { all[it] }.toTypedArray()
+            if (hullPts.size < 4) return null
+            if (hullPts.size == 4) return orderPoints(hullPts)
+            val hull2f = MatOfPoint2f(*hullPts)
+            try {
+                return quadFromApprox(hull2f, Imgproc.arcLength(hull2f, true))
+            } finally {
+                hull2f.release()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "convexHull failed: ${e.message}")
+            return null
+        } finally {
+            hullIdx.release()
+        }
+    }
+
+    /**
+     * Tightest rotated rectangle around the largest contour that is big enough and roughly
+     * rectangular (contour fills most of its bounding box) — catches slips whose border is
+     * too soft to close into a clean 4-corner outline. Skips a region covering ~the whole
+     * frame (that is the frame edge, not the slip).
+     */
+    private fun rectFallback(sorted: List<MatOfPoint>, minArea: Double, frameW: Int, frameH: Int): Quad? {
+        val frameArea = frameW.toDouble() * frameH
+        for (contour in sorted) {
+            val area = Imgproc.contourArea(contour)
+            if (area < minArea) break
+            val pts2f = MatOfPoint2f(*contour.toArray())
+            try {
+                val rect = Imgproc.minAreaRect(pts2f)
+                val rectArea = rect.size.width * rect.size.height
+                if (rectArea < minArea || rectArea > frameArea * 0.97) continue
+                if (area < rectArea * 0.5) continue // too sparse to be a filled slip
+                val corners = Array(4) { Point() }
+                rect.points(corners)
+                val quad = orderPoints(corners)
+                if (quad != null) {
+                    Log.d(TAG, "rotated-rect fallback ${rect.size.width.toInt()}x${rect.size.height.toInt()}")
+                    return quad
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "minAreaRect failed: ${e.message}")
+            } finally {
+                pts2f.release()
+            }
+        }
+        return null
     }
 
     /** Sorts 4 points into TL, TR, BR, BL order. */

@@ -336,3 +336,15 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 
 - **on-device verification** - adb Export Data → JSON pull: 43 slips, one new crop-referencing slip, no new duplicates (the single dup pair pre-dates this build). No FATAL exceptions.
 
+---
+
+## Day 7b - 2026-09-03 - Making Slip Flattening Reliable
+
+> "The flattening sometimes works and sometimes doesn't." Two root causes fixed: (1) JPEG EXIF rotation was ignored, so portrait captures were handed to OpenCV/ML Kit sideways; (2) the detector only tried one fixed Canny threshold and demanded the outline simplify to exactly 4 corners, with no fallback. Both made detection depend on luck (phone orientation, lighting, outline noise).
+
+- **fix: decode photos with their EXIF rotation applied** - `OcrProcessor` gained `decodeRotated()`, used by `flattenedCopy`, `recognizeText`, and `processReceipt`. Camera JPEGs store orientation in EXIF metadata (`BitmapFactory.decodeFile` ignores it), so portrait captures were analyzed rotated 90°, which broke text-OCR and made flatten results depend on how the phone was held. Verified on device: force-sync now flattens 6 folder photos that previously produced "best=none" (TrueMoney invoices + a KBank slip among them) — before the fix only 1 of those photos flattened.
+- **fix: robust slip-quad detection** - `SlipDocumentDetector.detectQuadInGray` now tries three edge passes (Canny 50/150, then 20/70, then contrast-equalized 20/70), accepts an exactly-4-corner polygon from the raw outline OR its convex hull (epsilon sweep now includes 0.09), and as a last resort uses the tightest rotated rectangle around the largest slip-like contour (must fill ≥50% of its bounding box and stay under 97% of the frame, so frame edges and text blobs are rejected). Each pass logs under `SlipFlattener`; failed passes are visible as `best=none canny=…` then `no quad found`.
+- **on-device measurement** - Force Sync All over the two tracked folders: previous build flattened 1 photo; this build flattened 6 (`Image_2db109de`, `ReceiveMoney_QR`, 4 TrueMoney `invoice_*` crops), each persisted under Pictures with a deterministic `_flat.jpg` name. Instrumented `OcrProcessorTextTest` (crop persists under Pictures + deterministic name) passes. No FATAL exceptions.
+
+> Note: the device's slip list shrank across adb exports during this session (43 → 36) because blind UI taps while driving the delete-capable Account list (long-press multi-select) removed test slips — not a code path in this change; the only `savedSlips.removeAt` lives in the UI-only `onDeleteSlip`, which this diff does not touch.
+

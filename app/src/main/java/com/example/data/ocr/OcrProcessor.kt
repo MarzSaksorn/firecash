@@ -3,6 +3,7 @@ package com.example.data.ocr
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
 import android.os.Environment
 import java.io.File
@@ -35,7 +36,7 @@ class OcrProcessor(private val context: Context? = null) {
     ): String = withContext(Dispatchers.Default) {
         if (imageUri.isNullOrEmpty()) return@withContext ""
         try {
-            val bitmap = BitmapFactory.decodeFile(imageUri) ?: return@withContext ""
+            val bitmap = decodeRotated(imageUri) ?: return@withContext ""
             val image = if (scanCenterOnly) InputImage.fromBitmap(cropToCenter(bitmap), 0)
             else InputImage.fromBitmap(bitmap, 0)
 
@@ -68,7 +69,7 @@ class OcrProcessor(private val context: Context? = null) {
     suspend fun flattenedCopy(imageUri: String, outName: String? = null): String? = withContext(Dispatchers.Default) {
         if (imageUri.isBlank()) return@withContext null
         runCatching {
-            val bitmap = BitmapFactory.decodeFile(imageUri) ?: return@withContext null
+            val bitmap = decodeRotated(imageUri) ?: return@withContext null
             val flat = SlipDocumentDetector.flatten(bitmap)
             bitmap.recycle()
             if (flat == null) return@withContext null
@@ -113,7 +114,7 @@ class OcrProcessor(private val context: Context? = null) {
                 )
 
                 // Crop the image to the QR frame area (matching the on‑screen overlay)
-                val bitmap = BitmapFactory.decodeFile(imageUri)
+                val bitmap = decodeRotated(imageUri)
                 val scanImage = when {
                     bitmap == null -> null
                     scanCenterOnly -> InputImage.fromBitmap(cropToCenter(bitmap), 0)
@@ -194,6 +195,33 @@ class OcrProcessor(private val context: Context? = null) {
         val left = ((w - side) / 2f).toInt()
         val top = ((h - side) / 2f).toInt()
         return Bitmap.createBitmap(bitmap, left, top, side.toInt(), side.toInt())
+    }
+
+    /**
+     * Decodes [imageUri] with its EXIF rotation applied. JPEGs from the camera (and most phone
+     * galleries) store orientation in EXIF metadata; [BitmapFactory.decodeFile] ignores it, so
+     * without this every portrait capture would be handed to OpenCV/ML Kit sideways — and
+     * document detection + OCR would fail or mis-flatten depending on how the phone was held.
+     */
+    private fun decodeRotated(imageUri: String): Bitmap? {
+        val raw = BitmapFactory.decodeFile(imageUri) ?: return null
+        val degrees = runCatching {
+            val exif = android.media.ExifInterface(imageUri)
+            when (exif.getAttributeInt(
+                android.media.ExifInterface.TAG_ORIENTATION,
+                android.media.ExifInterface.ORIENTATION_NORMAL
+            )) {
+                android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90
+                android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180
+                android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270
+                else -> 0
+            }
+        }.getOrDefault(0)
+        if (degrees == 0) return raw
+        val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
+        val rotated = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true)
+        if (rotated != raw) raw.recycle()
+        return rotated
     }
 }
 

@@ -316,7 +316,9 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 
 - **feat: disable live QR auto-scan** - the CameraX analyzer no longer runs ML Kit barcode scanning on every preview frame. The flow is now intentional: frame the slip (green hint when a flat surface is detected), tap the shutter, and the QR is decoded from the captured (flattened) photo. Removed the onQrDetected callback wiring.
 
-### On-Device Tools Developed""### On-Device Tools Developed
+- **feat: draw the live slip frame around the detected slip on the preview** - the camera preview now draws a green 4-corner outline right around the slip, not just a fixed center box. The analyzer reports the detected quad rotated into display pixels; the overlay maps it through the same FILL_CENTER crop the PreviewView uses (scale = max(view/rotW, view/rotH), centered) so the frame hugs the slip as the user moves the phone. A faint white box + "Align the slip within the view" shows while nothing is detected.
+
+### On-Device Tools Developed"""### On-Device Tools Developed
 
 - **OcrProcessorTextTest (androidTest)** - instrumented test running the real ML Kit pipeline against slip photos pulled from the device via adb pull.
 - **adb-driven UI verification** - PowerShell scripts for dumping uiautomator hierarchy, finding element bounds, and tapping through the full camera to import to verify flow. FireCashOCR log tag diagnostics traced every step. powershell.exe + System.Drawing generated doctored slip images for fraud-detection E2E tests.

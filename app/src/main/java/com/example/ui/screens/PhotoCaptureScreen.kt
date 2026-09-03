@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -98,9 +99,13 @@ fun PhotoCaptureScreen(
     val previewView = remember { PreviewView(context) }
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
-    // Live slip detection hint — green frame when a flat slip is in view
-    var slipDetected by remember { mutableStateOf(false) }
+    // Live slip detection: rotated-frame quad (in display pixels) when a flat slip is in view
+    var slipQuad by remember { mutableStateOf<List<Pair<Float, Float>>?>(null) }
+    var slipRotW by remember { mutableStateOf(1) }
+    var slipRotH by remember { mutableStateOf(1) }
     var frameTick by remember { mutableStateOf(0) }
+    // Preview view size in px so the quad can be mapped onto the screen
+    var viewPx by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
 
     // Initialise CameraX when permission is granted
     if (permissionGranted) {
@@ -115,8 +120,8 @@ fun PhotoCaptureScreen(
                     .setTargetResolution(Size(1280, 720))
                     .build()
                 imageAnalysis.setAnalyzer(cameraExecutor, ImageAnalysis.Analyzer { imageProxy ->
-                    // Live slip (flat surface) detection — feeds the green frame hint.
-                    // Cheap: samples the Y plane at step 3 straight into OpenCV.
+                    // Live slip (flat surface) detection — cheap Y-plane sampling into OpenCV.
+                    // The quad is rotated into the display orientation and reported in frame px.
                     try {
                         val tick = frameTick
                         frameTick = tick + 1
@@ -124,10 +129,30 @@ fun PhotoCaptureScreen(
                             val plane = imageProxy.planes[0]
                             val found = com.example.data.ocr.SlipDocumentDetector
                                 .detectYPlane(imageProxy.width, imageProxy.height, plane.rowStride, plane.buffer)
-                            slipDetected = found != null
+                            if (found != null) {
+                                val w = imageProxy.width.toFloat()
+                                val h = imageProxy.height.toFloat()
+                                val rot = imageProxy.imageInfo.rotationDegrees
+                                val pts = found.points.map { p ->
+                                    when (rot) {
+                                        90 -> (h - 1 - p.y).toFloat() to p.x.toFloat()      // portrait CW
+                                        270 -> p.y.toFloat() to (w - 1 - p.x).toFloat()      // portrait CCW
+                                        180 -> (w - 1 - p.x).toFloat() to (h - 1 - p.y).toFloat()
+                                        else -> p.x.toFloat() to p.y.toFloat()
+                                    }
+                                }
+                                // display dims after rotation
+                                val rotW = if (rot == 90 || rot == 270) h.toInt() else w.toInt()
+                                val rotH = if (rot == 90 || rot == 270) w.toInt() else h.toInt()
+                                slipQuad = pts
+                                slipRotW = rotW
+                                slipRotH = rotH
+                            } else {
+                                slipQuad = null
+                            }
                         }
                     } catch (_: Exception) {
-                        slipDetected = false
+                        slipQuad = null
                     } finally {
                         imageProxy.close()
                     }
@@ -212,30 +237,62 @@ fun PhotoCaptureScreen(
             }
         }
 
-        // QR scanning frame overlay — green + hint when a flat slip is detected
+        // Slip frame overlay: draws the live detected quad right around the slip on the
+        // preview (mapped from camera-frame px through the same center-crop the preview uses).
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
+                .onSizeChanged { viewPx = it }
         ) {
-            Box(
-                modifier = Modifier
-                    .size(280.dp)
-                    .border(
-                        2.dp,
-                        if (slipDetected) Color(0xFF66BB6A) else Color.White.copy(alpha = 0.9f),
-                        RoundedCornerShape(16.dp)
+            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                val quad = slipQuad ?: return@Canvas
+                if (viewPx.width == 0 || viewPx.height == 0) return@Canvas
+                val rotW = slipRotW.toFloat()
+                val rotH = slipRotH.toFloat()
+                if (rotW <= 0f || rotH <= 0f) return@Canvas
+                val scale = kotlin.math.max(viewPx.width / rotW, viewPx.height / rotH)
+                val dispW = rotW * scale
+                val dispH = rotH * scale
+                val ox = (viewPx.width - dispW) / 2f
+                val oy = (viewPx.height - dispH) / 2f
+                fun toOffset(p: Pair<Float, Float>) = androidx.compose.ui.geometry.Offset(
+                    ox + p.first * scale,
+                    oy + p.second * scale
+                )
+                val path = androidx.compose.ui.graphics.Path().apply {
+                    quad.forEachIndexed { i, p ->
+                        val o = toOffset(p)
+                        if (i == 0) moveTo(o.x, o.y) else lineTo(o.x, o.y)
+                    }
+                    close()
+                }
+                drawPath(path, color = Color(0xFF66BB6A), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4.dp.toPx()))
+            }
+
+            // Gentle white guide box while no slip is detected yet
+            if (slipQuad == null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(280.dp)
+                            .border(2.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(16.dp))
                     )
-            )
+                }
+            }
+
             Text(
-                text = if (slipDetected) "Slip detected — tap shutter" else "Align QR code within the frame",
+                text = if (slipQuad != null) "Slip detected — tap shutter" else "Align the slip within the view",
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 40.dp)
+                    .padding(bottom = 100.dp)
                     .background(Color.Black.copy(alpha = 0.6f))
                     .padding(horizontal = 12.dp, vertical = 6.dp),
-                color = if (slipDetected) Color(0xFF66BB6A) else Color.White
+                color = if (slipQuad != null) Color(0xFF66BB6A) else Color.White
             )
         }
 

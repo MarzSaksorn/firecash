@@ -16,7 +16,6 @@ import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
@@ -71,8 +70,29 @@ class OcrProcessor(private val context: Context? = null) {
         runCatching {
             val bitmap = decodeRotated(imageUri) ?: return@withContext null
             val flat = SlipDocumentDetector.flatten(bitmap)
+            if (flat == null) {
+                // The slip region wasn't found as a clean 4-corner polygon, but the photo
+                // still needs to be easier for OCR than the full frame.  Crop to the center
+                // 60 % square — the camera guide box already puts the slip there, and this
+                // removes most background noise that would confuse text recognition.
+                android.util.Log.d("FireCashOCR", "no quad — center-cropping as fallback")
+                val cropped = cropToCenter(bitmap)
+                bitmap.recycle()
+                if (cropped == null) return@withContext null
+                val ctx = context ?: return@withContext null
+                val dir = ctx.getExternalFilesDir(Environment.DIRECTORY_PICTURES) ?: ctx.filesDir
+                if (!dir.exists()) dir.mkdirs()
+                val base = outName?.takeIf { it.isNotBlank() }
+                    ?: runCatching { File(imageUri).nameWithoutExtension }
+                        .getOrDefault("slip")
+                        .replace(Regex("[^A-Za-z0-9._-]"), "_")
+                val out = File(dir, "${base}_flat.jpg")
+                android.util.Log.d("FireCashOCR", "center-crop fallback ${cropped.width}x${cropped.height} -> ${out.name}")
+                FileOutputStream(out).use { cropped.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+                cropped.recycle()
+                return@withContext out.absolutePath
+            }
             bitmap.recycle()
-            if (flat == null) return@withContext null
             val ctx = context ?: return@withContext null
             val dir = ctx.getExternalFilesDir(Environment.DIRECTORY_PICTURES) ?: ctx.filesDir
             if (!dir.exists()) dir.mkdirs()
@@ -100,8 +120,6 @@ class OcrProcessor(private val context: Context? = null) {
         samplePreset: SampleSlipPreset? = null,
         scanCenterOnly: Boolean = true
     ): ParsedReceiptResult = withContext(Dispatchers.Default) {
-        delay(600)
-
         if (samplePreset != null) {
             return@withContext SlipDataParser.parse(samplePreset.rawOcr)
         }

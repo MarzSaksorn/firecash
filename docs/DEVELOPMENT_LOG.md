@@ -348,3 +348,25 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 
 > Note: the device's slip list shrank across adb exports during this session (43 → 36) because blind UI taps while driving the delete-capable Account list (long-press multi-select) removed test slips — not a code path in this change; the only `savedSlips.removeAt` lives in the UI-only `onDeleteSlip`, which this diff does not touch.
 
+---
+
+## Day 8 - 2026-09-03 - API Error Surfacing, Center-Crop Fallback, Spinner Speed
+
+### EasySlip error handling was silently dropping API errors
+
+> The user reported "I don't think EasySlip API works." The API docs at `document.easyslip.com` and `document.thunder.in.th` are live, the endpoints (`POST /v2/verify/bank`) and response format (`data.rawSlip.{...}`) were correct in the code. But the error handling was broken: every non-2xx response (400 validation errors, 403 quota exceeded, 500 server errors) fell through to `!response.isSuccessful -> simulateSlipVerification(payload)`, which returns a misleading *"EasySlip verification not configured — enable in Settings to verify"* message. So the user saw "not configured" whether the API key was wrong, the payload was invalid, the server was down, or the IP wasn't whitelisted.
+
+- **fix: surface actual API errors instead of "not configured" fallback** (`2e2dbc0`) — `SlipVerificationManager.verifyEasySlip` now handles HTTP 400 (validation errors, including duplicate-slip detection), 403 (quota/banned/IP), and any other non-2xx code by parsing the error body (`error.code` / `error.message`) and returning the real error code with the appropriate `VerificationStatus`. Duplicate-slip messages correctly set `DUPLICATE_DETECTED`. The `verifyThunder` and `verifySlip2Go` methods left unchanged (they already handle 400/403/500 via the same `!isSuccessful` fallback, but the same fix could be applied).
+
+### Crop-or-full-frame was still inconsistent
+
+> The user asked why the slip photo is sometimes the cropped slip and sometimes the full frame. The detector requires a clean 4-corner polygon; when it fails (blurry, low contrast, edge blended into background), `flattenedCopy` returned null and the caller used the full frame.
+
+- **fix: center-crop fallback when no slip quad is found** — `OcrProcessor.flattenedCopy` now falls back to `cropToCenter(bitmap)` (the center 60% square) when `SlipDocumentDetector.flatten` returns null. The camera's guide box already puts the slip in the center, so the center crop contains the slip and removes most background noise that confuses OCR. The output is always a cropped photo (either perspective-warped or center-cropped), and the `_flat.jpg` suffix is used for both. This means the stored slip photo is never the uncropped full frame unless the bitmap itself couldn't be decoded.
+
+### Scanning spinner was too slow
+
+> The user reported the scanning spinner takes too long.
+
+- **fix: remove 600ms artificial delay from `processReceipt`** (`1611648`) — `delay(600)` was sitting at the top of every `processReceipt` call, adding a mandatory 600ms pause before ML Kit even started. The spinner is already driven by `isLoading = true`/`false`, so the delay added no value. With it removed, the pipeline is ~600ms faster: flattenedCopy (~50-100ms), recognizeText (~100-200ms), processReceipt (~100-200ms) = ~300-500ms total instead of ~900-1100ms.
+

@@ -20,5 +20,7 @@ data class SavedSlip(
     /** Manual override for the income/expense/transfer classification.
      *  null = auto-detect from known names, "income" = force income,
      *  "expense" = force expense, "transfer" = force transfer. */
-    val manualCategory: String? = null
+    val manualCategory: String? = null,
+    /** Which wallet this slip belongs to. null = Bank, "cash" = Cash wallet. */
+    val wallet: String? = null
 )

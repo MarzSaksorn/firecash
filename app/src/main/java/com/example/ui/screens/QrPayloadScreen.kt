@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CheckCircle
@@ -65,6 +66,8 @@ fun QrPayloadScreen(
     dateMismatch: Boolean = false,
     currentCategory: String? = null,
     onToggleCategory: ((String?) -> Unit)? = null,
+    currentWallet: String? = null,
+    onToggleWallet: ((String?) -> Unit)? = null,
     onBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -269,6 +272,13 @@ fun QrPayloadScreen(
                 onToggle = onToggleCategory
             )
 
+            // Wallet toggle
+            Spacer(modifier = Modifier.height(16.dp))
+            WalletToggle(
+                currentWallet = currentWallet,
+                onToggle = onToggleWallet
+            )
+
             // Photo of the slip on device — thumbnail + open link
             if (!photoPath.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -405,6 +415,65 @@ private fun DetailRow(label: String, value: String) {
             color = if (copied) Color(0xFF66BB6A) else FireCashOnSurface,
             style = MaterialTheme.typography.bodyMedium
         )
+    }
+}
+
+@Composable
+private fun WalletToggle(
+    currentWallet: String?,
+    onToggle: ((String?) -> Unit)?
+) {
+    val options = listOf(
+        null to "Bank" to Icons.Default.AccountBalance,
+        "cash" to "Cash" to Icons.Default.AccountBalance
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(FireCashSurfaceContainerLow, RoundedCornerShape(16.dp))
+            .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "Wallet",
+            color = FireCashOnSurface,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            options.forEach { (keyLabel, icon) ->
+                val (key, label) = keyLabel
+                val selected = currentWallet == key
+                val bgColor = if (selected) when (key) {
+                    null -> Color(0xFF2563EB)
+                    else -> Color(0xFF10B981)
+                } else FireCashSurfaceContainerLow
+                Button(
+                    onClick = { onToggle?.invoke(key) },
+                    colors = ButtonDefaults.buttonColors(containerColor = bgColor),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = label,
+                        color = Color.White,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
     }
 }
 

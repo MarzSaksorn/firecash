@@ -133,6 +133,10 @@ fun AccountScreen(
     val moneyIn = slips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null }.sumOf { it.amount!! }
     val moneyOut = slips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null }.sumOf { it.amount!! }
     val balance = moneyIn - moneyOut
+    val bankBalance = slips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null && (it.wallet == null || it.wallet == "bank") }.sumOf { it.amount!! } -
+        slips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null && (it.wallet == null || it.wallet == "bank") }.sumOf { it.amount!! }
+    val cashBalance = slips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null && it.wallet == "cash" }.sumOf { it.amount!! } -
+        slips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null && it.wallet == "cash" }.sumOf { it.amount!! }
     var selectedKeys by remember { mutableStateOf(setOf<Long>()) }
     var showDeleteMultiDialog by remember { mutableStateOf(false) }
     val isSelectionMode = selectedKeys.isNotEmpty()
@@ -335,6 +339,46 @@ fun AccountScreen(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
                     )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            // Wallet breakdown
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            text = "Bank",
+                            color = FireCashOnSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            text = "THB %.2f".format(Locale.US, bankBalance),
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "Cash",
+                            color = FireCashOnSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            text = "THB %.2f".format(Locale.US, cashBalance),
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }

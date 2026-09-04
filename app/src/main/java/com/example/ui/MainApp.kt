@@ -784,6 +784,14 @@ fun MainApp(modifier: Modifier = Modifier) {
                         saveSlips(prefs, savedSlips)
                     }
                 },
+                currentWallet = savedSlips.firstOrNull { it.payload == qrPayload }?.wallet,
+                onToggleWallet = { newWallet ->
+                    val idx = savedSlips.indexOfFirst { it.payload == qrPayload }
+                    if (idx >= 0) {
+                        savedSlips[idx] = savedSlips[idx].copy(wallet = newWallet)
+                        saveSlips(prefs, savedSlips)
+                    }
+                },
                 onBack = {
                     showPayload = false
                     showSavedSlips = true
@@ -1263,6 +1271,7 @@ private fun slipToJson(slip: SavedSlip): JSONObject {
     obj.put("amountMismatch", slip.amountMismatch)
     obj.put("dateMismatch", slip.dateMismatch)
     slip.manualCategory?.let { obj.put("manualCategory", it) }
+    slip.wallet?.let { obj.put("wallet", it) }
     slip.slipData?.let { obj.put("slipData", responseToJson(it)) }
     return obj
 }
@@ -1284,7 +1293,8 @@ private fun slipFromJson(obj: JSONObject): SavedSlip? {
             photoPath = obj.optString("photoPath").ifEmpty { null },
             amountMismatch = obj.optBoolean("amountMismatch", false),
             dateMismatch = obj.optBoolean("dateMismatch", false),
-            manualCategory = obj.optString("manualCategory").ifEmpty { null }
+            manualCategory = obj.optString("manualCategory").ifEmpty { null },
+            wallet = obj.optString("wallet").ifEmpty { null }
         )
     }.getOrNull()
 }

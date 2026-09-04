@@ -204,6 +204,7 @@ class IncomeNotificationService : NotificationListenerService() {
             obj.put("isMoneyIn", slip.isMoneyIn)
             obj.put("savedAt", slip.savedAt)
             slip.manualCategory?.let { obj.put("manualCategory", it) }
+            slip.wallet?.let { obj.put("wallet", it) }
             return obj
         }
 
@@ -281,7 +282,8 @@ class IncomeNotificationService : NotificationListenerService() {
                     slipData = null,
                     isMoneyIn = obj.optBoolean("isMoneyIn", true),
                     savedAt = obj.optLong("savedAt", System.currentTimeMillis()),
-                    manualCategory = obj.optString("manualCategory").ifEmpty { null }
+                    manualCategory = obj.optString("manualCategory").ifEmpty { null },
+                    wallet = obj.optString("wallet").ifEmpty { null }
                 )
             }.getOrNull()
         }

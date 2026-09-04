@@ -370,3 +370,22 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 
 - **fix: remove 600ms artificial delay from `processReceipt`** (`1611648`) — `delay(600)` was sitting at the top of every `processReceipt` call, adding a mandatory 600ms pause before ML Kit even started. The spinner is already driven by `isLoading = true`/`false`, so the delay added no value. With it removed, the pipeline is ~600ms faster: flattenedCopy (~50-100ms), recognizeText (~100-200ms), processReceipt (~100-200ms) = ~300-500ms total instead of ~900-1100ms.
 
+---
+
+## Day 9 - 2026-09-04 - Wallet Categories, Manual Override, Bank/Cash Tabs
+
+### Income/Expense/Transfer manual override
+
+> The user wanted to reclassify slips that the auto-detection got wrong (e.g., a transfer that should be an expense).
+
+- **feat: manual income/expense/transfer override** (`31c8b5f`) — added `manualCategory` field to `SavedSlip` (null = auto, `"income"`, `"expense"`, `"transfer"`). The slip detail screen (`QrPayloadScreen`) shows three toggle buttons (Income/Expense/Transfer); tapping the active button resets to auto-detection. `effectiveIsMoneyIn` in `AccountScreen`, `AnalyticsScreen`, and `MainApp` all check the override first. Verified on device: toggled a slip to Expense, it persisted and affected the balance.
+
+### Bank and Cash wallet categories
+
+> The user wanted to track bank transfers and cash transactions separately.
+
+- **feat: Bank/Cash wallet field on each slip** (`0575cda`) — added `wallet` field to `SavedSlip` (null = Bank, `"cash"` = Cash). The slip detail screen has a Wallet toggle (Bank/Cash) alongside the classification toggle. Serialized in `slipToJson`/`slipFromJson` in both `MainApp` and `IncomeNotificationService`.
+- **feat: Bank/Cash tab bar on account screen** (`91cf462`) — added a tab bar below the header to switch between Bank and Cash views. The slip list filters by the selected wallet. The camera button becomes a plus button on the Cash tab (opens the manual add dialog).
+- **revert: remove wallet breakdown from balance card** (`8d03464`) — the small Bank/Cash balance box inside the balance card was removed after the user said "no still there". The tab bar stayed.
+- **chore: move spending summary to a graph icon** (`936335b`) — the full-width "View Spending Summary" button was removed from below the balance card and replaced with a TrendingUp graph icon button beside the camera/plus button in the balance card header. Verified on device: graph icon opens the Spending Summary (Analytics) screen.
+

@@ -48,6 +48,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     var showPayload by remember { mutableStateOf(false) }
     var showSavedSlips by remember { mutableStateOf(true) }
     var showAnalytics by remember { mutableStateOf(false) }
+    var analyticsWallet by remember { mutableStateOf<String?>(null) }
     var qrPayload by remember { mutableStateOf("") }
     var slipData by remember { mutableStateOf<VerifySlipResponse?>(null) }
     var slipWarning by remember { mutableStateOf("") }
@@ -911,7 +912,8 @@ fun MainApp(modifier: Modifier = Modifier) {
                     showCapture = false
                     showAnalytics = false
                 },
-                onOpenAnalytics = {
+                onOpenAnalytics = { wallet ->
+                    analyticsWallet = wallet
                     showSavedSlips = false
                     showAnalytics = true
                 },
@@ -928,7 +930,8 @@ fun MainApp(modifier: Modifier = Modifier) {
             )
         } else if (showAnalytics) {
             AnalyticsScreen(
-                slips = savedSlips,
+                slips = if (analyticsWallet == "cash") savedSlips.filter { it.wallet == "cash" }
+                    else savedSlips.filter { it.wallet != "cash" },
                 knownNames = knownNames,
                 onBack = {
                     showAnalytics = false

@@ -120,7 +120,7 @@ fun AccountScreen(
     onSlipClick: (SavedSlip) -> Unit,
     onDeleteSlip: (SavedSlip) -> Unit = {},
     onOpenSettings: () -> Unit,
-    onOpenAnalytics: () -> Unit,
+    onOpenAnalytics: (String?) -> Unit,
     onOpenCamera: () -> Unit = {},
     onAddManual: (amount: Double, isMoneyIn: Boolean, note: String, wallet: String?) -> Unit = { _, _, _, _ -> },
     onAutoSync: () -> Unit,
@@ -345,7 +345,7 @@ fun AccountScreen(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     IconButton(
-                        onClick = onOpenAnalytics,
+                        onClick = { onOpenAnalytics(selectedWallet) },
                         modifier = Modifier
                             .size(44.dp)
                             .background(Color.White.copy(alpha = 0.12f), CircleShape)

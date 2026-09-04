@@ -351,7 +351,7 @@ fun MainApp(modifier: Modifier = Modifier) {
         }
     }
 
-    fun addManualSlip(amount: Double, isMoneyIn: Boolean, note: String) {
+    fun addManualSlip(amount: Double, isMoneyIn: Boolean, note: String, wallet: String? = null) {
         if (amount <= 0) return
         val now = System.currentTimeMillis()
         val sdfDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
@@ -367,7 +367,8 @@ fun MainApp(modifier: Modifier = Modifier) {
             verificationStatus = VerificationStatus.UNVERIFIED,
             slipData = null,
             isMoneyIn = isMoneyIn,
-            savedAt = now
+            savedAt = now,
+            wallet = wallet
         )
         savedSlips.add(slip)
         seenPayloads.add(slip.payload)
@@ -918,8 +919,8 @@ fun MainApp(modifier: Modifier = Modifier) {
                     showSavedSlips = false
                     showCapture = true
                 },
-                onAddManual = { amount, isMoneyIn, note ->
-                    addManualSlip(amount, isMoneyIn, note)
+                onAddManual = { amount, isMoneyIn, note, wallet ->
+                    addManualSlip(amount, isMoneyIn, note, wallet)
                 },
                 onAutoSync = { syncTrackedFolderInBackground() },
                 onSyncNow = { syncTrackedFolderInBackground() },

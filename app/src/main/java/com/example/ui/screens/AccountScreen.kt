@@ -122,7 +122,7 @@ fun AccountScreen(
     onOpenSettings: () -> Unit,
     onOpenAnalytics: () -> Unit,
     onOpenCamera: () -> Unit = {},
-    onAddManual: (amount: Double, isMoneyIn: Boolean, note: String) -> Unit = { _, _, _ -> },
+    onAddManual: (amount: Double, isMoneyIn: Boolean, note: String, wallet: String?) -> Unit = { _, _, _, _ -> },
     onAutoSync: () -> Unit,
     onSyncNow: () -> Unit = {},
     onFullResync: () -> Unit = {},
@@ -134,7 +134,10 @@ fun AccountScreen(
     }
     var selectedWallet by remember { mutableStateOf<String?>(null) } // null = Bank, "cash" = Cash
     val walletSlips = remember(slips, selectedWallet) {
-        if (selectedWallet == null) slips else slips.filter { it.wallet == "cash" }
+        when (selectedWallet) {
+            "cash" -> slips.filter { it.wallet == "cash" }
+            else -> slips.filter { it.wallet != "cash" }
+        }
     }
     val moneyIn = walletSlips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null }.sumOf { it.amount!! }
     val moneyOut = walletSlips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null }.sumOf { it.amount!! }
@@ -733,7 +736,7 @@ fun AccountScreen(
                         onClick = {
                             val amt = manualAmount.toDoubleOrNull()
                             if (amt != null && amt > 0) {
-                                onAddManual(amt, manualIsIn, manualNote.trim())
+                                onAddManual(amt, manualIsIn, manualNote.trim(), selectedWallet)
                                 showAddManualDialog = false
                             }
                         },

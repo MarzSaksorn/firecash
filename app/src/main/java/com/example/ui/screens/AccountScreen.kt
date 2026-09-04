@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -130,8 +131,12 @@ fun AccountScreen(
     LaunchedEffect(Unit) {
         onAutoSync()
     }
-    val moneyIn = slips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null }.sumOf { it.amount!! }
-    val moneyOut = slips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null }.sumOf { it.amount!! }
+    var selectedWallet by remember { mutableStateOf<String?>(null) } // null = Bank, "cash" = Cash
+    val walletSlips = remember(slips, selectedWallet) {
+        if (selectedWallet == null) slips else slips.filter { it.wallet == "cash" }
+    }
+    val moneyIn = walletSlips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null }.sumOf { it.amount!! }
+    val moneyOut = walletSlips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null }.sumOf { it.amount!! }
     val balance = moneyIn - moneyOut
     val bankBalance = slips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null && (it.wallet == null || it.wallet == "bank") }.sumOf { it.amount!! } -
         slips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null && (it.wallet == null || it.wallet == "bank") }.sumOf { it.amount!! }
@@ -149,12 +154,12 @@ fun AccountScreen(
     var manualAmount by remember { mutableStateOf("") }
     var manualIsIn by remember { mutableStateOf(true) }
     var manualNote by remember { mutableStateOf("") }
-    val filteredSlips = remember(slips, searchQuery, knownNames) {
-        if (searchQuery.isBlank()) slips
+    val filteredSlips = remember(walletSlips, searchQuery, knownNames) {
+        if (searchQuery.isBlank()) walletSlips
         else {
             val q = searchQuery.trim()
             val qLower = q.lowercase(Locale.ROOT)
-            slips.filter { slip ->
+            walletSlips.filter { slip ->
                 val dateMatch = slip.date?.lowercase(Locale.ROOT)?.contains(qLower) == true
                 val title = when {
                     isSelfTransfer(slip, knownNames) -> "transfer"
@@ -213,7 +218,7 @@ fun AccountScreen(
                         )
                     }
                 }
-                TextButton(onClick = { selectedKeys = slips.map { it.savedAt }.toSet() }) {
+                TextButton(onClick = { selectedKeys = walletSlips.map { it.savedAt }.toSet() }) {
                     Text("All", color = FireCashPrimary, fontSize = 13.sp)
                 }
             } else {
@@ -250,6 +255,64 @@ fun AccountScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // Wallet tab bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            val bankSelected = selectedWallet == null
+            TextButton(
+                onClick = { selectedWallet = null },
+                colors = ButtonDefaults.textButtonColors(
+                    containerColor = if (bankSelected) FireCashSecondaryContainer else Color.Transparent
+                ),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AccountBalance,
+                    contentDescription = "Bank",
+                    tint = FireCashOnSurface,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Bank",
+                    color = FireCashOnSurface,
+                    fontWeight = if (bankSelected) FontWeight.Bold else FontWeight.Normal,
+                    fontSize = 14.sp
+                )
+            }
+            val cashSelected = selectedWallet == "cash"
+            TextButton(
+                onClick = { selectedWallet = "cash" },
+                colors = ButtonDefaults.textButtonColors(
+                    containerColor = if (cashSelected) FireCashSecondaryContainer else Color.Transparent
+                ),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Cash",
+                    tint = FireCashOnSurface,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Cash",
+                    color = FireCashOnSurface,
+                    fontWeight = if (cashSelected) FontWeight.Bold else FontWeight.Normal,
+                    fontSize = 14.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
         // Balance card - camera button at top-right, persistent
         Column(
             modifier = Modifier
@@ -277,14 +340,14 @@ fun AccountScreen(
                     )
                 }
                 IconButton(
-                    onClick = onOpenCamera,
+                    onClick = if (selectedWallet == "cash") { { showAddManualDialog = true } } else onOpenCamera,
                     modifier = Modifier
                         .size(44.dp)
                         .background(Color.White.copy(alpha = 0.12f), CircleShape)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.PhotoCamera,
-                        contentDescription = "Open camera",
+                        imageVector = if (selectedWallet == "cash") Icons.Default.Add else Icons.Default.PhotoCamera,
+                        contentDescription = if (selectedWallet == "cash") "Add cash entry" else "Open camera",
                         tint = Color.White,
                         modifier = Modifier.size(22.dp)
                     )

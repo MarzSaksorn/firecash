@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.material3.AlertDialog
@@ -339,18 +340,33 @@ fun AccountScreen(
                         fontWeight = FontWeight.Bold
                     )
                 }
-                IconButton(
-                    onClick = if (selectedWallet == "cash") { { showAddManualDialog = true } } else onOpenCamera,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(Color.White.copy(alpha = 0.12f), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = if (selectedWallet == "cash") Icons.Default.Add else Icons.Default.PhotoCamera,
-                        contentDescription = if (selectedWallet == "cash") "Add cash entry" else "Open camera",
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(
+                        onClick = onOpenAnalytics,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(Color.White.copy(alpha = 0.12f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.TrendingUp,
+                            contentDescription = "View Spending Summary",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = if (selectedWallet == "cash") { { showAddManualDialog = true } } else onOpenCamera,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(Color.White.copy(alpha = 0.12f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = if (selectedWallet == "cash") Icons.Default.Add else Icons.Default.PhotoCamera,
+                            contentDescription = if (selectedWallet == "cash") "Add cash entry" else "Open camera",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -406,23 +422,7 @@ fun AccountScreen(
             }
         }
 
-        // Summary button
-        Button(
-            onClick = onOpenAnalytics,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = FireCashPrimary),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text(
-                text = "View Spending Summary",
-                color = Color.White,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
 
-        Spacer(modifier = Modifier.height(20.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),

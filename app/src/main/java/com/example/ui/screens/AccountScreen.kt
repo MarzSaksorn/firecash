@@ -404,46 +404,6 @@ fun AccountScreen(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            // Wallet breakdown
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
-                    .padding(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(
-                            text = "Bank",
-                            color = FireCashOnSurfaceVariant,
-                            fontSize = 12.sp
-                        )
-                        Text(
-                            text = "THB %.2f".format(Locale.US, bankBalance),
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = "Cash",
-                            color = FireCashOnSurfaceVariant,
-                            fontSize = 12.sp
-                        )
-                        Text(
-                            text = "THB %.2f".format(Locale.US, cashBalance),
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
         }
 
         // Summary button

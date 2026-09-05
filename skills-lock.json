@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "skill-hunter": {
+      "source": "CE0Alex/skill-hunter",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "e490fe367d724116c5d0285543d31b0be6510118430be41d0aca1f1510e64f44"
+    }
+  }
+}

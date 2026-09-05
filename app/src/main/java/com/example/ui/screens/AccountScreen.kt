@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.model.SavedSlip
 import com.example.ui.theme.FireCashBackground
+import com.example.ui.theme.FireCashOnSecondaryContainer
 import com.example.ui.theme.FireCashOnSurface
 import com.example.ui.theme.FireCashOnSurfaceVariant
 import com.example.ui.theme.FireCashPrimary
@@ -158,12 +159,23 @@ fun AccountScreen(
     var manualAmount by remember { mutableStateOf("") }
     var manualIsIn by remember { mutableStateOf(true) }
     var manualNote by remember { mutableStateOf("") }
-    val filteredSlips = remember(walletSlips, searchQuery, knownNames) {
-        if (searchQuery.isBlank()) walletSlips
+    var filterCategory by remember { mutableStateOf<String?>(null) } // null=All, "income", "expense", "transfer"
+    val filteredSlips = remember(walletSlips, searchQuery, knownNames, filterCategory) {
+        val categoryFiltered = if (filterCategory != null) {
+            walletSlips.filter { slip ->
+                when (filterCategory) {
+                    "income" -> effectiveIsMoneyIn(slip, knownNames) == true
+                    "expense" -> effectiveIsMoneyIn(slip, knownNames) == false
+                    "transfer" -> effectiveIsMoneyIn(slip, knownNames) == null
+                    else -> true
+                }
+            }
+        } else walletSlips
+        if (searchQuery.isBlank()) categoryFiltered
         else {
             val q = searchQuery.trim()
             val qLower = q.lowercase(Locale.ROOT)
-            walletSlips.filter { slip ->
+            categoryFiltered.filter { slip ->
                 val dateMatch = slip.date?.lowercase(Locale.ROOT)?.contains(qLower) == true
                 val title = when {
                     isSelfTransfer(slip, knownNames) -> "transfer"
@@ -508,6 +520,38 @@ fun AccountScreen(
                         contentDescription = "Sync (tap = new slips, hold 10s = full resync)",
                         tint = FireCashPrimary,
                         modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+        // Filter chips
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            val chips = listOf(
+                null to "All",
+                "income" to "Income",
+                "expense" to "Expense",
+                "transfer" to "Transfer"
+            )
+            chips.forEach { (key, label) ->
+                val selected = filterCategory == key
+                TextButton(
+                    onClick = { filterCategory = key },
+                    colors = ButtonDefaults.textButtonColors(
+                        containerColor = if (selected) FireCashSecondaryContainer else FireCashSurfaceContainerLow
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text(
+                        text = label,
+                        color = if (selected) FireCashOnSecondaryContainer else FireCashOnSurfaceVariant,
+                        fontSize = 12.sp,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
                     )
                 }
             }

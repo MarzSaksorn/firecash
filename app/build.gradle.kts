@@ -140,4 +140,6 @@ implementation("com.google.mlkit:text-recognition:16.0.0")
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
+  "ksp"(libs.showkase.processor)
+  implementation(libs.showkase)
 }

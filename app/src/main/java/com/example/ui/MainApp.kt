@@ -40,6 +40,8 @@ import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.QrPayloadScreen
 import com.example.ui.screens.AccountScreen
 import com.example.ui.screens.AnalyticsScreen
+import com.example.ui.components.FireCashBottomBar
+import com.example.ui.components.NavTab
 import com.example.ui.theme.FireCashBackground
 
 @Composable
@@ -49,6 +51,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     var showSavedSlips by remember { mutableStateOf(true) }
     var showAnalytics by remember { mutableStateOf(false) }
     var analyticsWallet by remember { mutableStateOf<String?>(null) }
+    var currentTab by remember { mutableStateOf(NavTab.HOME) }
     var qrPayload by remember { mutableStateOf("") }
     var slipData by remember { mutableStateOf<VerifySlipResponse?>(null) }
     var slipWarning by remember { mutableStateOf("") }
@@ -767,7 +770,35 @@ fun MainApp(modifier: Modifier = Modifier) {
 
     Scaffold(
         containerColor = FireCashBackground,
-        modifier = modifier.fillMaxSize()
+        modifier = modifier.fillMaxSize(),
+        bottomBar = {
+            FireCashBottomBar(
+                currentTab = currentTab,
+                onTabSelected = { tab ->
+                    currentTab = tab
+                    when (tab) {
+                        NavTab.HOME -> {
+                            showSavedSlips = true
+                            showAnalytics = false
+                            showCapture = false
+                            showPayload = false
+                        }
+                        NavTab.ANALYTICS -> {
+                            showSavedSlips = false
+                            showAnalytics = true
+                            showCapture = false
+                            showPayload = false
+                        }
+                        NavTab.SETTINGS -> {
+                            showSavedSlips = false
+                            showAnalytics = false
+                            showCapture = false
+                            showPayload = false
+                        }
+                    }
+                }
+            )
+        }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(bottom = paddingValues.calculateBottomPadding())) {
         if (showPayload) {

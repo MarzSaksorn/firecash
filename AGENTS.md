@@ -165,3 +165,56 @@ Helper functions for slips/whitelists/seen/processed live as top-level `private 
 - `isListenerRunning()` in MainApp checks if `BackgroundListenerService` is alive via `activeNotificationListener`/`ComponentName`.
 - **Fraud cross-check** (`addSlip` + `SlipDataParser`): each scanned slip compares the baht amount read from the photo text (`extractSlipAmount`), the EMVCo QR tag-54 amount (`extractQrAmount`), and the bank-verified amount — any disagreement >0.005 sets `SavedSlip.amountMismatch`. Separately, the photo's printed date (`extractSlipDate`) is compared against the bank-verified date (`transDate`); any difference sets `SavedSlip.dateMismatch`. Both flags are persisted in JSON and each shows its own red "possible tampered slip" banner on the detail screen (`QrPayloadScreen.amountMismatch` / `dateMismatch`).
 - **Verification safety** (`verifyBatch` + `applyVerifiedUpdate`): batch verification (`resyncUnverifiedSlips`, `fullResync`) NEVER overwrites a slip's existing photo-extracted amount — a verified amount only fills a missing one, and any disagreement sets the `amountMismatch` fraud flag. **Dates behave asymmetrically**: a verified `transDate` DOES replace the slip's date, but a difference from the stored date sets `dateMismatch` (flags OR together with any existing ones). `verifyBatch` also discards a whole batch when ≥2 different slips come back with one shared transRef (canned sandbox/test responses — EasySlip test keys return fixed data like 178.00 or 0.00 with identical transRefs). Note: a test key marks slips VERIFIED (making them undeletable per the deletion-safety rule); use a production key for real verification.
+
+## Agent Configuration (Crush)
+
+### Skills installed (rcosteira79/android-skills)
+All 21 skills from `github.com/rcosteira79/android-skills` are installed in `~/.config/crush/skills/`. The `android-dev` skill is the baseline that routes to specialized skills. Key ones:
+
+| Skill | Purpose |
+|---|---|
+| `android-dev` | Baseline — routes to all specialized skills |
+| `compose` | Jetpack Compose (state, animation, navigation, performance, 19 ref files) |
+| `android-ux` | Material Design 3 UX, M3 compliance audit (10 categories) |
+| `android-retrofit` | OkHttp/Retrofit networking |
+| `android-data-layer` | Repository pattern, error boundaries |
+| `android-testing` | Compose-test, Robolectric, K/N traps |
+| `android-debugging` | Logcat, ANR, Perfetto, memory leaks |
+| `android-gradle-logic` | Convention plugins, build config |
+| `gradle-build-performance` | Build optimization, kapt→KSP |
+| `android-source-search` | AOSP/AndroidX source lookup |
+| `kotlin-coroutines` | Scope, cancellation, structured concurrency |
+| `kotlin-flows` | StateFlow/SharedFlow/Channel traps |
+| `coil-compose` | Image loading in Compose |
+| `datastore` | Preferences, typed storage, corruption recovery |
+| `modularization` | Module visibility discipline |
+| `paging` | Paging 3, LazyPagingItems, RemoteMediator |
+| `kmp-boundaries` | expect/actual boundary design |
+| `kmp-ktor` | Ktor client, MockEngine |
+| `koin` | DI (DSL/annotations, verification) |
+| `pdf-annotations` | PDF editing (API 36.1) |
+| `rxjava-migration` | RxJava→coroutines (only when asked) |
+
+### Skills installed (design & taste)
+| Skill | Source | Installs | Purpose |
+|---|---|---|---|
+| `frontend-design` | anthropics/skills | 854K | Production-grade UI, anti-generic AI aesthetics |
+| `ui-ux-pro-max` | nextlevelbuilder | 344K | 50+ styles, 161 palettes, 57 fonts, 99 UX guidelines |
+| `design-taste-frontend` | leonxlnx/taste-skill | 443K | Taste enforcement, 50+ point production readiness |
+| `high-end-visual-design` | leonxlnx/taste-skill | 328K | Premium agency design (Awwwards-tier) |
+| `prompt-optimizer` | dreamor | — | 61 frameworks, CLARITY validation, multi-version output |
+| `skill-hunter` | CE0Alex | — | Analyze repo, recommend best-fit skill stack from registries |
+
+### MCP servers configured
+| Server | Status | Purpose |
+|---|---|---|
+| `phone` | ✅ crushrc | Android phone control via ADB (UI, calls, SMS, apps, screenshots, contacts) |
+| `context7` | ✅ connected | Library docs lookup (Android/Kotlin/Compose API docs) |
+| `memory` | ✅ connected | Persistent knowledge graph across sessions |
+| `sequential-thinking` | ✅ connected | Complex reasoning step-by-step |
+| `filesystem` | ✅ connected | Read/write project files through MCP |
+| `mcp-zero` | ✅ connected | Tool discovery from 2,797 tools across 308 MCP servers |
+| `stitch` | ✅ built-in | Design system management (create/apply design systems, generate screens, edit screens, generate variants, list projects/screens) |
+
+### Showkase dependency added
+`com.airbnb.android:showkase:1.0.5` (KSP) — component browser for `@Composable`s, colors, typography. Add `@ShowkaseRoot` to `MainApp` and `@Showkase` to components to make them browsable.

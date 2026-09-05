@@ -267,64 +267,26 @@ fun AccountScreen(
                         tint = FireCashPrimary
                     )
                 }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Wallet tab bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            val bankSelected = selectedWallet == null
-            TextButton(
-                onClick = { selectedWallet = null },
-                colors = ButtonDefaults.textButtonColors(
-                    containerColor = if (bankSelected) FireCashSecondaryContainer else Color.Transparent
-                ),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.AccountBalance,
-                    contentDescription = "Bank",
-                    tint = FireCashOnSurface,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Bank",
-                    color = FireCashOnSurface,
-                    fontWeight = if (bankSelected) FontWeight.Bold else FontWeight.Normal,
-                    fontSize = 14.sp
-                )
-            }
-            val cashSelected = selectedWallet == "cash"
-            TextButton(
-                onClick = { selectedWallet = "cash" },
-                colors = ButtonDefaults.textButtonColors(
-                    containerColor = if (cashSelected) FireCashSecondaryContainer else Color.Transparent
-                ),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Cash",
-                    tint = FireCashOnSurface,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "Cash",
-                    color = FireCashOnSurface,
-                    fontWeight = if (cashSelected) FontWeight.Bold else FontWeight.Normal,
-                    fontSize = 14.sp
-                )
+                // Wallet toggle: Bank / Cash
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(
+                            if (selectedWallet == "cash") FireCashSecondaryContainer else FireCashSurfaceContainerLow,
+                            CircleShape
+                        )
+                        .clickable {
+                            selectedWallet = if (selectedWallet == "cash") null else "cash"
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (selectedWallet == "cash") Icons.Default.Add else Icons.Default.AccountBalance,
+                        contentDescription = if (selectedWallet == "cash") "Switch to Bank" else "Switch to Cash",
+                        tint = if (selectedWallet == "cash") FireCashOnSecondaryContainer else FireCashOnSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
 

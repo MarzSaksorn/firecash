@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -51,8 +52,8 @@ fun FireCashBottomBar(
             .fillMaxWidth()
             .background(FireCashSurfaceContainer)
             .navigationBarsPadding()
-            .height(68.dp)
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .height(64.dp)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceAround,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -95,10 +96,10 @@ private fun BottomNavItem(
 
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(bgColor)
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -108,11 +109,12 @@ private fun BottomNavItem(
             tint = contentColor,
             modifier = Modifier.size(22.dp)
         )
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
             color = contentColor,
-            fontSize = 11.sp,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+            fontSize = 10.sp,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
         )
     }
 }

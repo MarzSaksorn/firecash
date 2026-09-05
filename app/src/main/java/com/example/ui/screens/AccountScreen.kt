@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
@@ -831,6 +832,16 @@ private fun TransactionRow(
         isIn -> Color(0xFF66BB6A)
         else -> Color(0xFFEF5350)
     }
+    val title = when {
+        isSelf -> "Transfer"
+        isIn -> slip.senderName ?: slip.receiverName ?: "Income"
+        else -> slip.receiverName ?: slip.senderName ?: "Expense"
+    }
+    val category = when {
+        isSelf -> "Transfer"
+        isIn -> "Income"
+        else -> "Expense"
+    }
 
     Row(
         modifier = Modifier
@@ -870,6 +881,7 @@ private fun TransactionRow(
             }
             Spacer(modifier = Modifier.width(10.dp))
         }
+        // Category icon
         Box(
             modifier = Modifier
                 .size(40.dp)
@@ -878,49 +890,45 @@ private fun TransactionRow(
         ) {
             Icon(
                 imageVector = arrow,
-                contentDescription = if (isIn) "Money in" else "Money out",
+                contentDescription = null,
                 tint = color,
                 modifier = Modifier.size(20.dp)
             )
         }
-
         Spacer(modifier = Modifier.width(12.dp))
-
+        // Merchant + category + time
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = when {
-                    isSelf -> "Transfer"
-                    isIn -> slip.senderName ?: "Transfer"
-                    else -> slip.receiverName ?: "Transfer"
-                },
+                text = title,
                 color = Color.White,
                 fontSize = 15.sp,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-            Text(
-                text = slip.transRef ?: slip.payload.take(20),
-                color = FireCashOnSurfaceVariant,
-                fontSize = 12.sp
-            )
-        }
-
-        Column(horizontalAlignment = Alignment.End) {
-            if (!slip.time.isNullOrBlank()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = slip.time!!,
+                    text = category,
                     color = FireCashOnSurfaceVariant,
-                    fontSize = 11.sp
+                    fontSize = 12.sp
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                if (!slip.time.isNullOrBlank()) {
+                    Text(
+                        text = " • ${slip.time}",
+                        color = FireCashOnSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                }
             }
-            Text(
-                text = if (isSelf) "THB %.2f".format(Locale.US, slip.amount ?: 0.0)
-                else "${if (isIn) "+" else "-"}THB %.2f".format(Locale.US, slip.amount ?: 0.0),
-                color = color,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold
-            )
         }
+        // Amount
+        Text(
+            text = if (isSelf) "THB %.2f".format(Locale.US, slip.amount ?: 0.0)
+            else "${if (isIn) "+" else "-"}THB %.2f".format(Locale.US, slip.amount ?: 0.0),
+            color = color,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 

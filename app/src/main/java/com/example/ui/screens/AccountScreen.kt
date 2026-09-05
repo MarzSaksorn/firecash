@@ -329,110 +329,122 @@ fun AccountScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Balance card - camera button at top-right, persistent
-        Column(
+        // Balance card - Stitch design
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(FireCashSecondaryContainer, RoundedCornerShape(20.dp))
-                .padding(20.dp)
+                .background(FireCashSecondaryContainer, RoundedCornerShape(24.dp))
+                .padding(24.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column {
-                    Text(
-                        text = "Current Balance",
-                        color = FireCashOnSurfaceVariant,
-                        fontSize = 13.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "THB %.2f".format(Locale.US, balance),
-                        color = Color.White,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(
-                        onClick = { onOpenAnalytics(selectedWallet) },
-                        modifier = Modifier
-                            .size(44.dp)
-                            .background(Color.White.copy(alpha = 0.12f), CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.TrendingUp,
-                            contentDescription = "View Spending Summary",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = if (selectedWallet == "cash") { { showAddManualDialog = true } } else onOpenCamera,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .background(Color.White.copy(alpha = 0.12f), CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = if (selectedWallet == "cash") Icons.Default.Add else Icons.Default.PhotoCamera,
-                            contentDescription = if (selectedWallet == "cash") "Add cash entry" else "Open camera",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowDownward,
-                            contentDescription = null,
-                            tint = Color(0xFF66BB6A),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
+            Column {
+                // Current Balance label
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column {
                         Text(
-                            text = "Money In",
+                            text = "Total Balance",
                             color = FireCashOnSurfaceVariant,
-                            fontSize = 13.sp
+                            fontSize = 14.sp
                         )
-                    }
-                    Text(
-                        text = "THB %.2f".format(Locale.US, moneyIn),
-                        color = Color(0xFF66BB6A),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowUpward,
-                            contentDescription = null,
-                            tint = Color(0xFFEF5350),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Money Out",
-                            color = FireCashOnSurfaceVariant,
-                            fontSize = 13.sp
+                            text = "THB %.2f".format(Locale.US, balance),
+                            color = Color.White,
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
-                    Text(
-                        text = "THB %.2f".format(Locale.US, moneyOut),
-                        color = Color(0xFFEF5350),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Analytics button
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(Color.White.copy(alpha = 0.15f), CircleShape)
+                                .clickable { onOpenAnalytics(selectedWallet) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.TrendingUp,
+                                contentDescription = "Analytics",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        // Camera / Plus button
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(Color.White.copy(alpha = 0.15f), CircleShape)
+                                .clickable {
+                                    if (selectedWallet == "cash") showAddManualDialog = true
+                                    else onOpenCamera()
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (selectedWallet == "cash") Icons.Default.Add else Icons.Default.PhotoCamera,
+                                contentDescription = if (selectedWallet == "cash") "Add cash" else "Scan slip",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+                // Money In / Out row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Money In
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowDownward,
+                                contentDescription = null,
+                                tint = Color(0xFF66BB6A),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Income",
+                                color = FireCashOnSurfaceVariant,
+                                fontSize = 12.sp
+                            )
+                        }
+                        Text(
+                            text = "THB %.2f".format(Locale.US, moneyIn),
+                            color = Color(0xFF66BB6A),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    // Money Out
+                    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Spent",
+                                color = FireCashOnSurfaceVariant,
+                                fontSize = 12.sp
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.ArrowUpward,
+                                contentDescription = null,
+                                tint = Color(0xFFEF5350),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Text(
+                            text = "THB %.2f".format(Locale.US, moneyOut),
+                            color = Color(0xFFEF5350),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
         }

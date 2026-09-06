@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.example.ui.theme.FireCashSecondary
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -266,7 +267,7 @@ fun PhotoCaptureScreen(
                     }
                     close()
                 }
-                drawPath(path, color = Color(0xFF66BB6A), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4.dp.toPx()))
+                drawPath(path, color = FireCashSecondary, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4.dp.toPx()))
             }
 
             // Gentle white guide box while no slip is detected yet
@@ -292,7 +293,7 @@ fun PhotoCaptureScreen(
                     .padding(bottom = 100.dp)
                     .background(Color.Black.copy(alpha = 0.6f))
                     .padding(horizontal = 12.dp, vertical = 6.dp),
-                color = if (slipQuad != null) Color(0xFF66BB6A) else Color.White
+                color = if (slipQuad != null) FireCashSecondary else Color.White
             )
         }
 

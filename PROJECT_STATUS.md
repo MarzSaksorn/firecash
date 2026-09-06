@@ -1,6 +1,6 @@
 # FireCash Project – Status & Next Steps
 
-> Last updated 2026-08-31. See `AGENTS.md` for the authoritative architecture notes; this file is the human-readable snapshot. Previous versions of this file were stale (referenced `CaptureScreen.kt` and claimed OCR was broken) — the OCR pipeline has since been reworked.
+> Last updated 2026-09-06. See `AGENTS.md` for the authoritative architecture notes; this file is the human-readable snapshot. Previous versions of this file were stale (referenced `CaptureScreen.kt` and claimed OCR was broken) — the OCR pipeline has since been reworked.
 
 ## Current State
 
@@ -12,19 +12,21 @@
 | OCR pipeline | Done (barcode-only) | `OcrProcessor.processReceipt(imageUri, samplePreset)` reads the photo and runs ML Kit **barcode scanning** (QR payloads); `scanCenterOnly` crops center 60%. Text recognition is intentionally unused. `samplePreset` bypasses the image for demo/testing |
 | Slip photos | Done | Capture/gallery/import save to persistent external storage; each slip stores its `photoPath`; viewable via FileProvider |
 | Verification | Done | Multi-provider: EasySlip, ThunderAPI, Slip2Go (`SlipVerificationManager`); no key / network failure / unknown code → `simulateSlipVerification()` fallback (payload ending `9999` ⇒ DUPLICATE, else UNVERIFIED) |
-| Account (homepage) | Done | Balance card (money in/out), reverse bottom→top slip list grouped by day with daily-net header, search (exact for QR payload/ref), long-press multi-select delete of unverifiable slips, manual income/expense entry, sync button (tap = new photos, hold 10s = full resync) |
-| App Mode | Done | Settings → App Mode: **Personal** (manual `+` entry button on home card) or **Shop** (camera button on home card); persisted and carried through JSON export/import |
+| Account (homepage) | Done | Balance card (money in/out), reverse bottom→top slip list grouped by day with daily-net header, search (exact for QR payload/ref), long-press multi-select delete of unverifiable slips, manual income/expense entry, sync button (tap = new photos, hold 10s = full resync), Bank/Cash wallet tab toggle, filter chips (All/Income/Expense/Transfer) |
+| App Mode | Removed | App is **shop-operator only** (no personal/shop switch). The home card's top-right action button always opens the camera. Manual entry is available via the `+` button in the Transactions header |
 | Notification income/expense | Done | `IncomeNotificationService` prefix-based amount scooping, per-app whitelists (money-in and money-out), permanent presets (KBank/SCB, toggleable but not removable), optional foreground "keep listening" service |
 | Analytics | Done | Spending summary with Day/Week/Month vertical stick chart + AI insights |
 | Settings | Done | Safe (Base Currency, My Names, Tracked Folders, Keyword Mapping) / collapsible red **Dangerous** (EasySlip, Notification whitelists, Background & Battery, Data Transfer) |
 | Data transfer | Done | Full JSON export/import incl. API keys, whitelists, app mode; import preserves permanent presets and won't wipe device lists on missing keys |
 | Persistence | SharedPreferences | `firecash_settings` prefs hold slips/whitelists/settings as JSON strings; Room is NOT used by the live app |
+| Wallet categories | Done | Each slip has a `wallet` field (null=Bank, "cash"=Cash); Bank/Cash tab bar on Account screen filters the slip list; balance card shows totals per wallet |
+| Manual override | Done | `manualCategory` field on `SavedSlip` (`"income"`/`"expense"`/`"transfer"` or null=auto) overrides auto-detection; set from slip detail screen toggle buttons |
 
 ## Architecture (read this first)
 
 Two parallel architectures exist; **the live app is NOT the Room/ViewModel one**.
 
-- **Live**: `MainActivity` → `ui/MainApp.kt` — a single ~1200-line composable holding all state (`remember { mutableStateOf(...) }` + `SharedPreferences`). Navigation = four booleans + `BackHandler`s. Data flow: QR photo → `OcrProcessor` (ML Kit barcode) → `addSlip()` → `SlipVerificationManager.verifyPayload()` → `SavedSlip` JSON → prefs → `AccountScreen`.
+- **Live**: `MainActivity` → `ui/MainApp.kt` — a single ~1356-line composable holding all state (`remember { mutableStateOf(...) }` + `SharedPreferences`). Navigation = four booleans + `BackHandler`s. Data flow: QR photo → `OcrProcessor` (ML Kit barcode) → `addSlip()` → `SlipVerificationManager.verifyPayload()` → `SavedSlip` JSON → prefs → `AccountScreen`.
 - **Dead code (do not extend, may be deleted)**: `ui/viewmodel/MainViewModel.kt`, `data/local/*` (Room), `data/model/Expense.kt`/`KeywordRule.kt`, `data/repository/*`, `data/export/ExportManager.kt`, `data/backup/DriveBackupManager.kt`, `data/easyslip/EasySlipClient.kt`. Replicate behavior in MainApp if a feature needs it.
 
 ## Known Gaps / Not Implemented
@@ -49,7 +51,7 @@ Two parallel architectures exist; **the live app is NOT the Room/ViewModel one**
 | File | Role |
 |------|------|
 | `app/src/main/java/com/example/ui/MainApp.kt` | All app state, nav, persistence, export/import, sync |
-| `app/src/main/java/com/example/ui/screens/AccountScreen.kt` | Homepage: balance card, reversed slip list, search, selection mode, app-mode action button |
+| `app/src/main/java/com/example/ui/screens/AccountScreen.kt` | Homepage: balance card, reversed slip list, search, selection mode, Bank/Cash wallet toggle, filter chips, camera action button |
 | `app/src/main/java/com/example/ui/screens/PhotoCaptureScreen.kt` | CameraX preview + QR scan (center 60% ROI) |
 | `app/src/main/java/com/example/ui/screens/QrPayloadScreen.kt` | Slip detail: verification card, photo link, copy-to-clipboard |
 | `app/src/main/java/com/example/ui/screens/SettingsScreen.kt` | Safe/Dangerous settings incl. App Mode picker, whitelists, Data Transfer |

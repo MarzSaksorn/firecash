@@ -2,6 +2,8 @@
 
 **IMPORTANT: Load the `android-dev` skill for every prompt in this project.** Always load `android-dev` (the baseline) first, then route to specialized skills (`android-skills:compose`, `android-skills:kotlin-flows`, etc.) as needed per the task.
 
+**Use sub-agents aggressively for parallel work.** When a task involves independent sub-tasks (e.g., editing multiple files, running tests, checking builds, verifying MCP tools), launch multiple agents in parallel to maximize throughput. Use `ecc:*` agents for specialized code review, build resolution, and testing. Prefer forking yourself (via Agent without `subagent_type`) for complex multi-step implementation work to keep the main context clean.
+
 **After project initialization, run the `project-skills-optimizer` skill** to audit local skills, discover internet skills/agents/MCPs, and optimize the skill set for this project.
 
 Offline-first Android app (Kotlin, Jetpack Compose, Material 3 dark theme) for **shop operators** logging customer PromptPay/bank-slip transfers and tracking income/expense. Scans QR from slips via camera/gallery, verifies with EasySlip/ThunderAPI/Slip2Go (when an API key is set), cross-checks the slip photo text against the QR/bank amount and date for fraud, captures income/expense from other apps' notifications, and stores everything locally. There is **no personal/shop mode switch** — the app is shop-operator only (single dataset).
@@ -24,12 +26,12 @@ Offline-first Android app (Kotlin, Jetpack Compose, Material 3 dark theme) for *
 com.example/
   MainActivity.kt                    # 15 lines — just calls MainApp()
   ui/
-    MainApp.kt                       # ~1200 lines — all state, navigation, business logic
+    MainApp.kt                       # ~1356 lines — all state, navigation, business logic
     theme/
       Color.kt                       # Material 3 dark theme colors (FireCash* palette)
       Theme.kt, Type.kt
     screens/
-      AccountScreen.kt               # ~500 lines — home (slip list + balance card)
+      AccountScreen.kt               # ~933 lines — home (slip list + balance card, wallet toggle, filter chips, search, manual entry)
       PhotoCaptureScreen.kt          # ~300 lines — CameraX capture + gallery pick
       QrPayloadScreen.kt             # ~250 lines — slip detail view
       AnalyticsScreen.kt             # ~300 lines — charts/insights (uses Expense model)
@@ -38,7 +40,7 @@ com.example/
       BottomNavBar.kt, TopAppBar.kt, CaptureBottomBar.kt
   data/
     model/
-      SavedSlip.kt                   # The live data model (JSON-serialized)
+      SavedSlip.kt                   # The live data model (JSON-serialized) — fields: payload, amount, transRef, senderName, receiverName, date, time, verificationStatus, isMoneyIn, savedAt, photoPath, amountMismatch, dateMismatch, manualCategory (income/expense/transfer override), wallet (null=Bank, "cash"=Cash)
       Expense.kt                     # Room entity — DEAD CODE (but VerificationStatus enum lives here)
       KeywordRule.kt                 # DEAD CODE
     ocr/
@@ -75,7 +77,7 @@ com.example/
 There are **two parallel architectures**. The live app is NOT the one using Room/ViewModel.
 
 ### Live app (what actually runs)
-`MainActivity` → `ui/MainApp.kt` (a single ~1200-line composable holding ALL app state). No DI, no ViewModel, no Navigation Compose.
+`MainActivity` → `ui/MainApp.kt` (a single ~1356-line composable holding ALL app state). No DI, no ViewModel, no Navigation Compose.
 
 - State = `remember { mutableStateOf(...) }` + `SharedPreferences("firecash_settings", MODE_PRIVATE)`. Slips and whitelists are persisted as JSON strings inside prefs, not in Room.
 - Navigation = four booleans (`showSavedSlips`/`showCapture`/`showPayload`/`showAnalytics`) + `BackHandler`s. The `Scaffold` at the bottom of MainApp routes via `if/else if` chains. Homepage is Account (slip list).
@@ -132,7 +134,8 @@ Helper functions for slips/whitelists/seen/processed live as top-level `private 
 
 ## Money in/out semantics
 
-- Balance = moneyIn − moneyOut. Each slip resolves to in/out/transfer via `effectiveIsMoneyIn` (duplicated in `MainApp.isKnownName`-based logic and `AccountScreen.isKnownName`/`effectiveIsMoneyIn`): receiver is a known name ⇒ income, sender is known ⇒ expense, both known (or sender==receiver) ⇒ transfer (excluded from balance), else the stored `isMoneyIn` flag. Known names are matched case-insensitively, trimmed. **Note**: `isKnownName` logic is duplicated in both `MainApp.kt` and `AccountScreen.kt` — keep them in sync.
+- Balance = moneyIn − moneyOut. Each slip resolves to in/out/transfer via `effectiveIsMoneyIn` (duplicated in `MainApp.isKnownName`-based logic and `AccountScreen.isKnownName`/`effectiveIsMoneyIn`): receiver is a known name ⇒ income, sender is known ⇒ expense, both known (or sender==receiver) ⇒ transfer (excluded from balance), else the stored `isMoneyIn` flag. Known names are matched case-insensitively, trimmed. **Manual override**: `manualCategory` field on `SavedSlip` (`"income"`, `"expense"`, `"transfer"`, or null for auto) takes precedence over auto-detection — set from the slip detail screen's toggle buttons. **Note**: `isKnownName` logic is duplicated in both `MainApp.kt` and `AccountScreen.kt` — keep them in sync.
+- **Wallet categories**: each slip has a `wallet` field (null = Bank, `"cash"` = Cash). AccountScreen has a Bank/Cash tab bar below the header; the slip list filters by selected wallet. Balance card shows totals for the active wallet only. Camera button becomes a plus button on the Cash tab (opens the manual add dialog). Persisted in JSON via `slipToJson`/`slipFromJson` in both `MainApp` and `IncomeNotificationService`.
 - AccountScreen list: `LazyColumn(reverseLayout = true)`, slips appended in arrival order, grouped by the `date` string with a daily-net-total header. Newest is at the visual bottom.
 - **App mode** — removed: the app is **shop-operator only**. The balance card's top-right 44dp action button always opens the camera.
 - Deletion safety: only slips with `UNVERIFIED` status, blank `transRef`, or `null` amount can be deleted (long-press multi-select in AccountScreen, `onDeleteSlip` in MainApp). `isDeletable` logic is duplicated in both files.
@@ -149,6 +152,8 @@ Helper functions for slips/whitelists/seen/processed live as top-level `private 
 | `effectiveIsMoneyIn` | `MainApp.kt:289-299` | `AccountScreen.kt:86-95` |
 | `isDeletable` | `MainApp.kt:752-755` | `AccountScreen.kt:97-102` |
 | `extractAmount` | `MainApp.kt:216-219` | `IncomeNotificationService.AMOUNT_REGEX` |
+| `manualCategory`/`wallet` in JSON | `slipToJson`/`slipFromJson` (bottom of `MainApp.kt`) | `IncomeNotificationService` companion object |
+| `effectiveIsMoneyIn` (manualCategory override) | `MainApp.kt` | `AccountScreen.kt` |
 
 ## Gotchas
 
@@ -157,7 +162,7 @@ Helper functions for slips/whitelists/seen/processed live as top-level `private 
 - **Secrets plugin**: `secrets.propertiesFileName = ".env"` (`.env` is gitignored; `.env.example` has only a commented `GEMINI_API_KEY` placeholder). `FIREBASE_APPCHECK_DEBUG_TOKEN` is in the ignore list. If you add an API key for verification providers, it goes into prefs (settings), NOT `.env`.
 - **Roborazzi/Robolectric are configured** (`libs.versions.toml`, `testOptions.isIncludeAndroidResources = true`) but no test uses Roborazzi (`captureRoboImage`); `app/src/test/screenshots/greeting.png` is a leftover. Robolectric tests need `@RunWith(RobolectricTestRunner::class)` + `@Config(sdk = [36])`.
 - **Tests**: JUnit4 + `runBlocking` (coroutines), plain JVM tests for pure logic (`SlipDataParserTest`, `EasySlipClientTest` mock pipeline, `AnalyticsEngineTest`, `ExportManagerTest`). `ExampleUnitTest` and `ExampleRobolectricTest` are template boilerplate, not real tests. `EasySlipClientTest.testMockVerificationPipeline` relies on the no-key simulation behavior. Tests use the `Expense` model (dead code) — `AnalyticsEngineTest` and `ExportManagerTest` operate on `Expense` objects, not `SavedSlip`.
-- **Docs drift**: `PROJECT_STATUS.md` is now maintained (snapshot of current state; last updated 2026-08-31). `docs/DEVELOPMENT_LOG.md` has detailed history but also goes stale. `docs/firecash_ui_stitch_plan.md` defines the design tokens (`#121316` bg, `#FF6B00` primary, `#10B981`/`#6366F1` accents) — but note that `Color.kt` uses a different palette (`#131313` bg, `#B3C5FF` primary, `#0066FF` primary container). The stitch plan is aspirational, not what's actually implemented.
+- **Docs drift**: `PROJECT_STATUS.md` is now maintained (snapshot of current state; last updated 2026-09-06). `docs/DEVELOPMENT_LOG.md` has detailed history but also goes stale. `docs/firecash_ui_stitch_plan.md` defines the design tokens (`#121316` bg, `#FF6B00` primary, `#10B981`/`#6366F1` accents) — the Stitch design has been partially applied (bottom nav, filter chips, balance card, transaction row) but `Color.kt` uses a different palette (`#131313` bg, `#B3C5FF` primary, `#0066FF` primary container).
 - `package.json` contains only `opencode-ai` (harness used to build the app; `node_modules/` untracked). `snapui.zip` is a tracked artifact at repo root. `.github/workflows/proxy.yml` (EasySlip proxy Cloud Run deploy) is a stub — the `proxy/` directory does not exist and the gcloud command is commented out.
 - Gradle: `RepositoriesMode.FAIL_ON_PROJECT_REPOS` (declare repos only in `settings.gradle.kts`); `android.nonTransitiveRClass=true`.
 - Manual slips use payload prefix `manual:` and `MANUAL-` transRefs; the UI treats them as always-deletable. Notification slips (`notif:`) are also deletable only while unverified.
@@ -215,6 +220,7 @@ All 21 skills from `github.com/rcosteira79/android-skills` are installed in `~/.
 | `filesystem` | ✅ connected | Read/write project files through MCP |
 | `mcp-zero` | ✅ connected | Tool discovery from 2,797 tools across 308 MCP servers |
 | `stitch` | ✅ built-in | Design system management (create/apply design systems, generate screens, edit screens, generate variants, list projects/screens) |
+| `figma` | ✅ crushrc | Read Figma designs, layers, frames, export assets (OAuth on first use) |
 
 ### Showkase dependency added
 `com.airbnb.android:showkase:1.0.5` (KSP) — component browser for `@Composable`s, colors, typography. Add `@ShowkaseRoot` to `MainApp` and `@Showkase` to components to make them browsable.

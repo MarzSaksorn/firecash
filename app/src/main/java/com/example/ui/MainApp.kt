@@ -41,9 +41,12 @@ import com.example.ui.screens.QrPayloadScreen
 import com.example.ui.screens.AccountScreen
 import com.example.ui.screens.AnalyticsScreen
 import com.example.ui.theme.FireCashBackground
+import com.example.ui.components.FireCashBottomBar
+import com.example.ui.components.NavTab
 
 @Composable
 fun MainApp(modifier: Modifier = Modifier) {
+    var currentTab by remember { mutableStateOf(NavTab.HOME) }
     var showCapture by remember { mutableStateOf(false) }
     var showPayload by remember { mutableStateOf(false) }
     var showSavedSlips by remember { mutableStateOf(true) }
@@ -767,7 +770,35 @@ fun MainApp(modifier: Modifier = Modifier) {
 
     Scaffold(
         containerColor = FireCashBackground,
-        modifier = modifier.fillMaxSize()
+        modifier = modifier.fillMaxSize(),
+        bottomBar = {
+            FireCashBottomBar(
+                currentTab = currentTab,
+                onTabSelected = { tab ->
+                    currentTab = tab
+                    when (tab) {
+                        NavTab.HOME, NavTab.CARDS -> {
+                            showSavedSlips = true
+                            showCapture = false
+                            showPayload = false
+                            showAnalytics = false
+                        }
+                        NavTab.SPENDING -> {
+                            showAnalytics = true
+                            showSavedSlips = false
+                            showCapture = false
+                            showPayload = false
+                        }
+                        NavTab.PROFILE -> {
+                            showSavedSlips = false
+                            showCapture = false
+                            showPayload = false
+                            showAnalytics = false
+                        }
+                    }
+                }
+            )
+        }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(bottom = paddingValues.calculateBottomPadding())) {
         if (showPayload) {

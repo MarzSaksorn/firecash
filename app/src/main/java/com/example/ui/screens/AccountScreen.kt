@@ -1,11 +1,15 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,12 +29,14 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -41,6 +47,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.activity.compose.BackHandler
@@ -49,6 +58,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.example.data.model.VerificationStatus
 import androidx.compose.ui.Alignment
@@ -63,11 +73,17 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.model.SavedSlip
 import com.example.ui.theme.FireCashBackground
+import com.example.ui.theme.FireCashError
+import com.example.ui.theme.FireCashOnPrimaryContainer
 import com.example.ui.theme.FireCashOnSecondaryContainer
 import com.example.ui.theme.FireCashOnSurface
 import com.example.ui.theme.FireCashOnSurfaceVariant
 import com.example.ui.theme.FireCashPrimary
+import com.example.ui.theme.FireCashPrimaryContainer
+import com.example.ui.theme.FireCashSecondary
 import com.example.ui.theme.FireCashSecondaryContainer
+import com.example.ui.theme.FireCashSurfaceContainerHigh
+import com.example.ui.theme.FireCashSurfaceContainerHighest
 import com.example.ui.theme.FireCashSurfaceContainerLow
 import java.util.Locale
 
@@ -231,7 +247,7 @@ fun AccountScreen(
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Delete selected",
-                            tint = Color(0xFFEF5350)
+                            tint = FireCashError
                         )
                     }
                 }
@@ -260,6 +276,62 @@ fun AccountScreen(
                         fontSize = 26.sp
                     )
                 }
+                // Bank/Cash toggle pill — Figma style
+                Box(
+                    modifier = Modifier
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(FireCashSurfaceContainerLow)
+                        .clickable {
+                            selectedWallet = if (selectedWallet == "cash") null else "cash"
+                        }
+                        .padding(horizontal = 2.dp, vertical = 2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(0.dp)
+                    ) {
+                        // Bank option
+                        Box(
+                            modifier = Modifier
+                                .height(28.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(
+                                    if (selectedWallet != "cash") FireCashSurfaceContainerHighest
+                                    else Color.Transparent
+                                )
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Bank",
+                                color = if (selectedWallet != "cash") Color.White else FireCashOnSurfaceVariant.copy(alpha = 0.6f),
+                                fontSize = 12.sp,
+                                fontWeight = if (selectedWallet != "cash") FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        }
+                        // Cash option
+                        Box(
+                            modifier = Modifier
+                                .height(28.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(
+                                    if (selectedWallet == "cash") FireCashSurfaceContainerHighest
+                                    else Color.Transparent
+                                )
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Cash",
+                                color = if (selectedWallet == "cash") Color.White else FireCashOnSurfaceVariant.copy(alpha = 0.6f),
+                                fontSize = 12.sp,
+                                fontWeight = if (selectedWallet == "cash") FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
                 IconButton(onClick = onOpenSettings) {
                     Icon(
                         imageVector = Icons.Default.Settings,
@@ -267,148 +339,268 @@ fun AccountScreen(
                         tint = FireCashPrimary
                     )
                 }
-                // Wallet toggle: Bank / Cash
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .background(
-                            if (selectedWallet == "cash") FireCashSecondaryContainer else FireCashSurfaceContainerLow,
-                            CircleShape
-                        )
-                        .clickable {
-                            selectedWallet = if (selectedWallet == "cash") null else "cash"
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (selectedWallet == "cash") Icons.Default.Add else Icons.Default.AccountBalance,
-                        contentDescription = if (selectedWallet == "cash") "Switch to Bank" else "Switch to Cash",
-                        tint = if (selectedWallet == "cash") FireCashOnSecondaryContainer else FireCashOnSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Balance card - Stitch design
+        // Balance card — Figma-adapted dark theme design with live drag tracking
+        val cardOffset = remember { Animatable(0f) }
+        val scope = rememberCoroutineScope()
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(FireCashSecondaryContainer, RoundedCornerShape(24.dp))
-                .padding(24.dp)
-        ) {
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            scope.launch {
+                                val threshold = 120f
+                                if (cardOffset.value > threshold) {
+                                    selectedWallet = null
+                                } else if (cardOffset.value < -threshold) {
+                                    selectedWallet = "cash"
+                                }
+                                cardOffset.animateTo(0f)
+                            }
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            scope.launch {
+                                cardOffset.snapTo(
+                                    (cardOffset.value + dragAmount).coerceIn(-300f, 300f)
+                                )
+                            }
+                        }
+                    )
+                }
+                .graphicsLayer {
+                    translationX = cardOffset.value
+                }
+                .background(
+                        brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFF1A2744),
+                                Color(0xFF1E3058),
+                                Color(0xFF1A3D5C),
+                                Color(0xFF184A5E)
+                            ),
+                            start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                            end = androidx.compose.ui.geometry.Offset.Infinite
+                        ),
+                        RoundedCornerShape(24.dp)
+                    )
+                    .padding(24.dp)
+            ) {
             Column {
-                // Current Balance label
+                // Total Balance section
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
                         Text(
                             text = "Total Balance",
-                            color = FireCashOnSurfaceVariant,
-                            fontSize = 14.sp
+                            color = Color(0xFFcbd5e1),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "THB %.2f".format(Locale.US, balance),
                             color = Color.White,
-                            fontSize = 36.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = (-0.8).sp
                         )
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Analytics button
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(Color.White.copy(alpha = 0.15f), CircleShape)
-                                .clickable { onOpenAnalytics(selectedWallet) },
-                            contentAlignment = Alignment.Center
+                    // Eye toggle placeholder
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(Color.White.copy(alpha = 0.1f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "👁",
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                // Trend indicator
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF17D982).copy(alpha = 0.2f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "▲",
+                        color = Color(0xFF40f1a4),
+                        fontSize = 10.sp
+                    )
+                    Text(
+                        text = "+3.4% this month",
+                        color = Color(0xFF40f1a4),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+                // Card action buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Scan Slip button
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.1f))
+                            .clickable {
+                                if (selectedWallet == "cash") showAddManualDialog = true
+                                else onOpenCamera()
+                            }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.QrCodeScanner,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Scan Slip",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    // Analytics button
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.1f))
+                            .clickable { onOpenAnalytics(selectedWallet) }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.TrendingUp,
-                                contentDescription = "Analytics",
+                                contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(16.dp)
                             )
-                        }
-                        // Camera / Plus button
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(Color.White.copy(alpha = 0.15f), CircleShape)
-                                .clickable {
-                                    if (selectedWallet == "cash") showAddManualDialog = true
-                                    else onOpenCamera()
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (selectedWallet == "cash") Icons.Default.Add else Icons.Default.PhotoCamera,
-                                contentDescription = if (selectedWallet == "cash") "Add cash" else "Scan slip",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
+                            Text(
+                                text = "Analytics",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(20.dp))
-                // Money In / Out row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Money In
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowDownward,
-                                contentDescription = null,
-                                tint = Color(0xFF66BB6A),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Income",
-                                color = FireCashOnSurfaceVariant,
-                                fontSize = 12.sp
-                            )
-                        }
-                        Text(
-                            text = "THB %.2f".format(Locale.US, moneyIn),
-                            color = Color(0xFF66BB6A),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    // Money Out
-                    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Spent",
-                                color = FireCashOnSurfaceVariant,
-                                fontSize = 12.sp
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(
-                                imageVector = Icons.Default.ArrowUpward,
-                                contentDescription = null,
-                                tint = Color(0xFFEF5350),
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                        Text(
-                            text = "THB %.2f".format(Locale.US, moneyOut),
-                            color = Color(0xFFEF5350),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+            }
+        }
+        // Page indicator dots — Bank / Cash
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val isBank = selectedWallet == null
+            val isCash = selectedWallet == "cash"
+            // Dot 1 — Bank
+            Box(
+                modifier = Modifier
+                    .size(if (isBank) 8.dp else 6.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isBank) Color.White.copy(alpha = 0.9f)
+                        else Color.White.copy(alpha = 0.3f)
+                    )
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            // Dot 2 — Cash
+            Box(
+                modifier = Modifier
+                    .size(if (isCash) 8.dp else 6.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isCash) Color.White.copy(alpha = 0.9f)
+                        else Color.White.copy(alpha = 0.3f)
+                    )
+            )
+        }
+        // Income/Spent row — separate card below
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(FireCashSurfaceContainerLow, RoundedCornerShape(16.dp))
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDownward,
+                        contentDescription = null,
+                        tint = FireCashSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Income",
+                        color = FireCashOnSurfaceVariant,
+                        fontSize = 12.sp
+                    )
                 }
+                Text(
+                    text = "THB %.2f".format(Locale.US, moneyIn),
+                    color = FireCashSecondary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Spent",
+                        color = FireCashOnSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.ArrowUpward,
+                        contentDescription = null,
+                        tint = FireCashError,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Text(
+                    text = "THB %.2f".format(Locale.US, moneyOut),
+                    color = FireCashError,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
 
@@ -513,49 +705,67 @@ fun AccountScreen(
             )
             chips.forEach { (key, label) ->
                 val selected = filterCategory == key
-                TextButton(
-                    onClick = { filterCategory = key },
-                    colors = ButtonDefaults.textButtonColors(
-                        containerColor = if (selected) FireCashSecondaryContainer else FireCashSurfaceContainerLow
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    modifier = Modifier.height(32.dp)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(9999.dp))
+                        .background(if (selected) FireCashSurfaceContainerHighest else FireCashSurfaceContainerLow)
+                        .clickable { filterCategory = key }
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
                     Text(
                         text = label,
-                        color = if (selected) FireCashOnSecondaryContainer else FireCashOnSurfaceVariant,
+                        color = if (selected) FireCashPrimary else FireCashOnSurfaceVariant.copy(alpha = 0.7f),
                         fontSize = 12.sp,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                     )
                 }
             }
         }
         if (isSearchActive) {
             Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Search date, title, amount, or exact QR payload", fontSize = 13.sp, color = FireCashOnSurfaceVariant) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = androidx.compose.ui.text.TextStyle(color = com.example.ui.theme.FireCashOnSurface, fontSize = 13.sp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = FireCashPrimary,
-                    unfocusedBorderColor = FireCashOnSurfaceVariant.copy(alpha = 0.4f),
-                    focusedContainerColor = FireCashSurfaceContainerLow,
-                    unfocusedContainerColor = FireCashSurfaceContainerLow,
-                    cursorColor = FireCashPrimary
-                ),
-                shape = RoundedCornerShape(10.dp),
-                trailingIcon = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(FireCashSurfaceContainerLow.copy(alpha = 0.9f)),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search",
+                        tint = FireCashOnSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search transactions, merchant...", fontSize = 14.sp, color = FireCashOnSurfaceVariant.copy(alpha = 0.7f)) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        textStyle = TextStyle(color = FireCashOnSurface, fontSize = 14.sp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            cursorColor = FireCashPrimary
+                        )
+                    )
                     if (searchQuery.isNotBlank()) {
                         IconButton(onClick = { searchQuery = "" }) {
                             Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = FireCashOnSurfaceVariant, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
-            )
+            }
         }
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -669,7 +879,7 @@ fun AccountScreen(
                             selectedKeys = emptySet()
                             showDeleteMultiDialog = false
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350))
+                        colors = ButtonDefaults.buttonColors(containerColor = FireCashError)
                     ) { Text("Delete", color = Color.White) }
                 },
                 dismissButton = {
@@ -694,23 +904,23 @@ fun AccountScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(48.dp)
-                                    .background(if (manualIsIn) Color(0xFF66BB6A).copy(alpha = 0.2f) else FireCashSurfaceContainerLow, RoundedCornerShape(12.dp))
-                                    .border(1.5.dp, if (manualIsIn) Color(0xFF66BB6A) else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                    .background(if (manualIsIn) FireCashSecondary.copy(alpha = 0.2f) else FireCashSurfaceContainerLow, RoundedCornerShape(12.dp))
+                                    .border(1.5.dp, if (manualIsIn) FireCashSecondary else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                                     .clickable { manualIsIn = true },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("Money In", color = if (manualIsIn) Color(0xFF66BB6A) else FireCashOnSurfaceVariant, fontWeight = if (manualIsIn) FontWeight.Bold else FontWeight.Normal)
+                                Text("Money In", color = if (manualIsIn) FireCashSecondary else FireCashOnSurfaceVariant, fontWeight = if (manualIsIn) FontWeight.Bold else FontWeight.Normal)
                             }
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(48.dp)
-                                    .background(if (!manualIsIn) Color(0xFFEF5350).copy(alpha = 0.2f) else FireCashSurfaceContainerLow, RoundedCornerShape(12.dp))
-                                    .border(1.5.dp, if (!manualIsIn) Color(0xFFEF5350) else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                    .background(if (!manualIsIn) FireCashError.copy(alpha = 0.2f) else FireCashSurfaceContainerLow, RoundedCornerShape(12.dp))
+                                    .border(1.5.dp, if (!manualIsIn) FireCashError else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                                     .clickable { manualIsIn = false },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("Money Out", color = if (!manualIsIn) Color(0xFFEF5350) else FireCashOnSurfaceVariant, fontWeight = if (!manualIsIn) FontWeight.Bold else FontWeight.Normal)
+                                Text("Money Out", color = if (!manualIsIn) FireCashError else FireCashOnSurfaceVariant, fontWeight = if (!manualIsIn) FontWeight.Bold else FontWeight.Normal)
                             }
                         }
                         OutlinedTextField(
@@ -791,8 +1001,8 @@ private fun TransactionRow(
     }
     val color = when {
         isSelf -> Color(0xFF9E9E9E)
-        isIn -> Color(0xFF66BB6A)
-        else -> Color(0xFFEF5350)
+        isIn -> FireCashSecondary
+        else -> FireCashError
     }
     val title = when {
         isSelf -> "Transfer"
@@ -809,16 +1019,11 @@ private fun TransactionRow(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                if (isSelected) FireCashPrimary.copy(alpha = 0.12f) else FireCashSurfaceContainerLow,
-                RoundedCornerShape(16.dp)
-            )
-            .border(
-                if (isSelected) 1.5.dp else 1.dp,
-                if (isSelected) FireCashPrimary else Color.Gray.copy(alpha = 0.3f),
+                if (isSelected) FireCashPrimary.copy(alpha = 0.12f) else Color.Transparent,
                 RoundedCornerShape(16.dp)
             )
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(14.dp),
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (isSelectionMode) {
@@ -843,62 +1048,62 @@ private fun TransactionRow(
             }
             Spacer(modifier = Modifier.width(10.dp))
         }
-        // Category icon
+        // Category icon — Figma style: solid brand color circle
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .background(color.copy(alpha = 0.15f), CircleShape),
+                .background(color, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = arrow,
                 contentDescription = null,
-                tint = color,
+                tint = Color.White,
                 modifier = Modifier.size(20.dp)
             )
         }
         Spacer(modifier = Modifier.width(12.dp))
-        // Merchant + category + time
+        // Merchant + category
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 color = Color.White,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = category,
+                color = FireCashOnSurfaceVariant,
+                fontSize = 11.sp
+            )
+        }
+        // Amount + time column (right-aligned)
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = if (isSelf) "THB %.2f".format(Locale.US, slip.amount ?: 0.0)
+                else "${if (isIn) "+" else "-"}THB %.2f".format(Locale.US, slip.amount ?: 0.0),
+                color = color,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+            if (!slip.time.isNullOrBlank()) {
                 Text(
-                    text = category,
+                    text = slip.time,
                     color = FireCashOnSurfaceVariant,
-                    fontSize = 12.sp
+                    fontSize = 10.sp
                 )
-                if (!slip.time.isNullOrBlank()) {
-                    Text(
-                        text = " • ${slip.time}",
-                        color = FireCashOnSurfaceVariant,
-                        fontSize = 11.sp
-                    )
-                }
             }
         }
-        // Amount
-        Text(
-            text = if (isSelf) "THB %.2f".format(Locale.US, slip.amount ?: 0.0)
-            else "${if (isIn) "+" else "-"}THB %.2f".format(Locale.US, slip.amount ?: 0.0),
-            color = color,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold
-        )
     }
 }
 
 @Composable
 private fun DateHeader(date: String, count: Int, total: Double) {
     val totalColor = when {
-        total > 0.0 -> Color(0xFF66BB6A)
-        total < 0.0 -> Color(0xFFEF5350)
+        total > 0.0 -> FireCashSecondary
+        total < 0.0 -> FireCashError
         else -> FireCashOnSurfaceVariant
     }
     Row(
@@ -929,3 +1134,4 @@ private fun DateHeader(date: String, count: Int, total: Double) {
         )
     }
 }
+

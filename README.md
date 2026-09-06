@@ -12,6 +12,9 @@ FireCash is an offline-first Android app (Jetpack Compose, Material 3 dark theme
 **Account (homepage)**
 - Balance card: Money In / Money Out, camera shortcut at top-right, in-app logo + FireCash title
 - Slip list scrolls bottom → top, grouped by day with **daily net total** in the date header; time shown above each amount
+- **Bank/Cash wallet tabs**: filter the slip list by wallet (Bank = default, Cash = separate tracking); balance card shows totals for the active wallet; camera button becomes a plus button on the Cash tab
+- **Filter chips**: All / Income / Expense / Transfer — quickly filter the slip list by transaction type
+- **Manual override**: tap the classification toggle on any slip detail screen to override auto-detection (Income/Expense/Transfer or reset to auto)
 - Search slips by date, title, or amount — **exact match** for QR payload / transaction ref
 - Long-press to multi-select and delete unknown/invalid slips only
 - Manual income/expense entry (amount + note)

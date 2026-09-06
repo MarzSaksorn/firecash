@@ -48,9 +48,11 @@ import coil.compose.AsyncImage
 import com.example.data.easyslip.VerifySlipResponse
 import com.example.data.model.VerificationStatus
 import com.example.ui.theme.FireCashBackground
+import com.example.ui.theme.FireCashError
 import com.example.ui.theme.FireCashOnSurface
 import com.example.ui.theme.FireCashOnSurfaceVariant
 import com.example.ui.theme.FireCashPrimary
+import com.example.ui.theme.FireCashSecondary
 import com.example.ui.theme.FireCashSurfaceContainerLow
 import java.io.File
 import java.util.Locale
@@ -123,7 +125,7 @@ fun QrPayloadScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, if (payloadCopied) Color(0xFF66BB6A) else Color.Gray, RoundedCornerShape(8.dp))
+                    .border(1.dp, if (payloadCopied) FireCashSecondary else Color.Gray, RoundedCornerShape(8.dp))
                     .clickable(enabled = payload.isNotBlank()) {
                         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         cm.setPrimaryClip(ClipData.newPlainText("QR Payload", payload))
@@ -138,7 +140,7 @@ fun QrPayloadScreen(
                         else -> payload
                     },
                     style = MaterialTheme.typography.bodyLarge,
-                    color = if (payloadCopied) Color(0xFF66BB6A) else Color.White
+                    color = if (payloadCopied) FireCashSecondary else Color.White
                 )
             }
 
@@ -149,7 +151,7 @@ fun QrPayloadScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                        .background(FireCashError.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -157,11 +159,11 @@ fun QrPayloadScreen(
                     Icon(
                         imageVector = Icons.Default.ErrorOutline,
                         contentDescription = null,
-                        tint = Color(0xFFEF5350)
+                        tint = FireCashError
                     )
                     Text(
                         text = "Amount mismatch — the amount on this slip photo differs from the QR/bank amount. Possible tampered slip!",
-                        color = Color(0xFFEF5350),
+                        color = FireCashError,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -173,7 +175,7 @@ fun QrPayloadScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFFEF5350).copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                        .background(FireCashError.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -181,11 +183,11 @@ fun QrPayloadScreen(
                     Icon(
                         imageVector = Icons.Default.ErrorOutline,
                         contentDescription = null,
-                        tint = Color(0xFFEF5350)
+                        tint = FireCashError
                     )
                     Text(
                         text = "Date mismatch — the date printed on this slip photo differs from the bank-verified date. Possible tampered slip!",
-                        color = Color(0xFFEF5350),
+                        color = FireCashError,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -359,12 +361,12 @@ private fun StatusBanner(slipData: VerifySlipResponse) {
         VerificationStatus.VERIFIED -> Triple(
             Icons.Default.CheckCircle,
             "Slip verified successfully",
-            Color(0xFF66BB6A)
+            FireCashSecondary
         )
         else -> Triple(
             Icons.Default.ErrorOutline,
             slipData.errorMessage ?: "Verification failed",
-            Color(0xFFEF5350)
+            FireCashError
         )
     }
 
@@ -412,7 +414,7 @@ private fun DetailRow(label: String, value: String) {
         )
         Text(
             text = if (copied) "Copied" else value,
-            color = if (copied) Color(0xFF66BB6A) else FireCashOnSurface,
+            color = if (copied) FireCashSecondary else FireCashOnSurface,
             style = MaterialTheme.typography.bodyMedium
         )
     }

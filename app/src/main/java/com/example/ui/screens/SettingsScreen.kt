@@ -86,6 +86,7 @@ import java.io.File
 import java.io.FileOutputStream
 import com.example.ui.components.FireCashTopBar
 import com.example.ui.theme.FireCashBackground
+import com.example.ui.theme.FireCashError
 import com.example.ui.theme.FireCashOnBackground
 import com.example.ui.theme.FireCashOnPrimary
 import com.example.ui.theme.FireCashOnSurface
@@ -598,7 +599,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFFEF5350).copy(alpha = 0.10f))
+                    .background(FireCashError.copy(alpha = 0.10f))
                     .padding(12.dp)
             ) {
             Row(
@@ -611,12 +612,12 @@ fun SettingsScreen(
                 Icon(
                     imageVector = if (dangerousExpanded) Icons.Default.ArrowDropDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = Color(0xFFEF5350)
+                    tint = FireCashError
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "Dangerous",
-                    color = Color(0xFFEF5350),
+                    color = FireCashError,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -1048,7 +1049,7 @@ fun SettingsScreen(
                                 Icon(
                                     imageVector = Icons.Default.QrCodeScanner,
                                     contentDescription = null,
-                                    tint = Color(0xFFEF5350),
+                                    tint = FireCashError,
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -1072,7 +1073,7 @@ fun SettingsScreen(
                             onCheckedChange = onToggleNotificationExpense,
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = FireCashOnPrimary,
-                                checkedTrackColor = Color(0xFFEF5350),
+                                checkedTrackColor = FireCashError,
                                 uncheckedThumbColor = FireCashOutline,
                                 uncheckedTrackColor = FireCashSurfaceVariant
                             ),
@@ -1325,7 +1326,7 @@ fun SettingsScreen(
                                 .background(FireCashSurfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = Color(0xFFEF5350), modifier = Modifier.size(22.dp))
+                            Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = FireCashError, modifier = Modifier.size(22.dp))
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(text = "Data Transfer", color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)

@@ -4,7 +4,7 @@
 
 **Project:** FireCash — Receipt Logging & PromptPay/EMVCo Slip Verification (Jetpack Compose + Room + EasySlip + ML Kit + NotificationListener)  
 **Repo:** `C:\Users\admin\Project\FireCash` • `namespace = com.example` • `applicationId = com.aistudio.firecash.qxrtv`  
-**Period:** 2026-08-25 (night) → 2026-08-28 (intensive) • Today is `Fri Aug 28 2026` (UTC)  
+**Period:** 2026-08-25 (night) → 2026-09-06 • Today is `Sun Sep 06 2026` (UTC)  
 **Model:** `opencode/muse-spark-1.2-contributor-free` via opencode harness from **Day 3 (2026-08-27)** (project kicked off **2026-08-25 night**)
 
 ---
@@ -388,4 +388,46 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 - **feat: Bank/Cash tab bar on account screen** (`91cf462`) — added a tab bar below the header to switch between Bank and Cash views. The slip list filters by the selected wallet. The camera button becomes a plus button on the Cash tab (opens the manual add dialog).
 - **revert: remove wallet breakdown from balance card** (`8d03464`) — the small Bank/Cash balance box inside the balance card was removed after the user said "no still there". The tab bar stayed.
 - **chore: move spending summary to a graph icon** (`936335b`) — the full-width "View Spending Summary" button was removed from below the balance card and replaced with a TrendingUp graph icon button beside the camera/plus button in the balance card header. Verified on device: graph icon opens the Spending Summary (Analytics) screen.
+
+---
+
+## Day 10 — 2026-09-06 — Stitch design application + Bank/Cash toggle refinement
+
+**Goal:** Apply the Stitch UI design system (bottom nav, filter chips, balance card, transaction row) and refine the Bank/Cash wallet toggle placement.
+
+- **feat: separate spending summary by wallet** (`3147c27`) — the spending summary chart now shows totals for the active wallet only, so Bank and Cash transactions are analyzed separately.
+- **feat: apply Stitch design — bottom nav bar, filter chips, balance card** (`3fa6c73`) — initial Stitch design pass: redesigned the bottom navigation bar with centered icons and labels, added filter chips (All/Income/Expense/Transfer) below the balance card, and restyled the balance card layout.
+- **feat: apply Stitch design — redesigned balance card** (`4b173aa`) — further Stitch refinement: balance card now shows "Total Balance" with large amount, "Income" and "Spent" sections below in accent colors (`#10B981` green for income, `#6366F1` indigo for spent), with a subtle dark card background.
+- **feat: apply Stitch design — transaction row, bottom nav, filter chips** (`91a238d`) — final Stitch design pass: styled transaction rows with merchant name, amount colored by type (green/red), and category chips; bottom nav bar icons and labels polished; filter chips with horizontal scroll and active state styling.
+- **feat: move Bank/Cash switch to a toggle beside settings button** (`17c3f56`) — the Bank/Cash tab bar was removed from below the header and replaced with a toggle button beside the settings gear icon in the top bar. This freed up vertical space and simplified the Account screen layout.
+
+**Design note:** The Stitch plan (`docs/firecash_ui_stitch_plan.md`) defined tokens `#121316` bg, `#FF6B00` primary, `#10B981`/`#6366F1` accents. The actual `Color.kt` still uses the original palette (`#131313` bg, `#B3C5FF` primary, `#0066FF` primary container). The Stitch application was visual/layout only — the accent colors from the plan (`#10B981`, `#6366F1`) were used in the balance card's Income/Spent labels but the core palette was not replaced.
+
+> The user's feedback was: "perfect" for the Bank/Cash toggle placement change. The Stitch design was applied incrementally over multiple commits, each addressing a specific component of the design system.
+
+---
+
+## Day 11 — 2026-09-06 — Stitch design completion, Figma spec, page indicator, live drag swipe
+
+**Goal:** Complete the Stitch design application across all screens, add page indicator dots for Bank/Cash, and make the balance card swipe gesture react instantly.
+
+### Figma Design Specification
+
+- **feat: add Figma design spec document** (`figma_design_spec.md`) — comprehensive design specification extracted from the Figma file `Firecash` (Key: `7Sh8y8Jb39DLSKL8fkkBOW`). Covers 3 screens: Klyro Banking Dashboard (home), Klyro Transactions & Analytics, and Klyro All Transactions. Includes full typography, color palette, spacing, layout, component hierarchy, and design decisions.
+
+### Stitch Design — Full Screen Application
+
+- **feat: apply Stitch design to all screens** — BottomNavBar redesigned with frosted glass dock (rounded-full, `SurfaceContainer` bg, centered icons + labels), spacing and icon sizes updated. AccountScreen transaction rows restyled with merchant name, colored amount, and category chips. Filter chips with horizontal scroll and active state. AnalyticsScreen chart restyled with legend, grid lines, and bar chart in theme colors. Color palette expanded with `FireCashSurfaceContainer`, `FireCashSecondaryContainer`, `FireCashOnSecondaryContainer`, `FireCashOnSurfaceVariant`, and darker accents. SettingsScreen, PhotoCaptureScreen, QrPayloadScreen updated for consistency (button styling, spacing, surfaces). README updated with screenshots, features, and tech stack.
+
+### Page Indicator Dots
+
+- **feat: add Bank/Cash page indicator dots below balance card** — two small dots (Bank/Cash) below the balance card show which wallet is active. Active dot is larger (8dp) with higher opacity (0.9), inactive dot is smaller (6dp) with lower opacity (0.3). Uses `CircleShape` clipping with white fill.
+
+### Live Drag Swipe Gesture
+
+- **feat: make balance card swipe track the user's finger in real-time** — replaced `AnimatedContent`-based swipe (only animated after drag end with threshold check) with live drag tracking using `Animatable` + `graphicsLayer { translationX }`. The card now follows the finger instantly via `snapTo()` during drag, and animates back to position 0 with `animateTo(0f)` on release. 120px threshold triggers wallet switch. Clamped to ±300px.
+
+### Dev Experience
+
+- **chore: save dev workflow instruction to team memory** — added `memory/team/always_update_dev_logs_and_commit.md` with the rule that after every change, the dev log must be updated and changes committed.
 

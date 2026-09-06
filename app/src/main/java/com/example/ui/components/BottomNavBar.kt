@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,10 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Leaderboard
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,8 +38,9 @@ import com.example.ui.theme.FireCashSurfaceContainer
 
 enum class NavTab {
     HOME,
-    ANALYTICS,
-    SETTINGS
+    CARDS,
+    SPENDING,
+    PROFILE
 }
 
 @Composable
@@ -47,34 +49,50 @@ fun FireCashBottomBar(
     onTabSelected: (NavTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(FireCashSurfaceContainer)
             .navigationBarsPadding()
-            .height(64.dp)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceAround,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        BottomNavItem(
-            icon = Icons.Default.Home,
-            label = "Home",
-            isSelected = currentTab == NavTab.HOME,
-            onClick = { onTabSelected(NavTab.HOME) }
-        )
-        BottomNavItem(
-            icon = Icons.Default.Leaderboard,
-            label = "Analytics",
-            isSelected = currentTab == NavTab.ANALYTICS,
-            onClick = { onTabSelected(NavTab.ANALYTICS) }
-        )
-        BottomNavItem(
-            icon = Icons.Default.Settings,
-            label = "Settings",
-            isSelected = currentTab == NavTab.SETTINGS,
-            onClick = { onTabSelected(NavTab.SETTINGS) }
-        )
+        // Frosted glass dock container
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .background(
+                    color = FireCashSurfaceContainer.copy(alpha = 0.85f),
+                    shape = RoundedCornerShape(32.dp)
+                )
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BottomNavItem(
+                icon = Icons.Default.Home,
+                label = "Home",
+                isSelected = currentTab == NavTab.HOME,
+                onClick = { onTabSelected(NavTab.HOME) }
+            )
+            BottomNavItem(
+                icon = Icons.Default.CreditCard,
+                label = "Cards",
+                isSelected = currentTab == NavTab.CARDS,
+                onClick = { onTabSelected(NavTab.CARDS) }
+            )
+            BottomNavItem(
+                icon = Icons.Default.Leaderboard,
+                label = "Spending",
+                isSelected = currentTab == NavTab.SPENDING,
+                onClick = { onTabSelected(NavTab.SPENDING) }
+            )
+            BottomNavItem(
+                icon = Icons.Default.Person,
+                label = "Profile",
+                isSelected = currentTab == NavTab.PROFILE,
+                onClick = { onTabSelected(NavTab.PROFILE) }
+            )
+        }
     }
 }
 
@@ -86,17 +104,17 @@ private fun BottomNavItem(
     onClick: () -> Unit
 ) {
     val bgColor by animateColorAsState(
-        targetValue = if (isSelected) FireCashSecondaryContainer else Color.Transparent,
+        targetValue = if (isSelected) FireCashSecondaryContainer.copy(alpha = 0.9f) else Color.Transparent,
         label = "nav_item_bg"
     )
     val contentColor by animateColorAsState(
-        targetValue = if (isSelected) FireCashOnSecondaryContainer else FireCashOnSurfaceVariant,
+        targetValue = if (isSelected) FireCashOnSecondaryContainer else FireCashOnSurfaceVariant.copy(alpha = 0.6f),
         label = "nav_item_content"
     )
 
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(bgColor)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 6.dp),

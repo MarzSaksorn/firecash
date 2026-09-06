@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,7 +28,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -38,8 +41,12 @@ import com.example.data.analytics.SpendingInsight
 import com.example.data.model.Expense
 import com.example.data.model.SavedSlip
 import com.example.ui.theme.FireCashBackground
+import com.example.ui.theme.FireCashError
 import com.example.ui.theme.FireCashOnSurfaceVariant
 import com.example.ui.theme.FireCashPrimary
+import com.example.ui.theme.FireCashSecondary
+import com.example.ui.theme.FireCashSurfaceContainerHigh
+import com.example.ui.theme.FireCashSurfaceContainerHighest
 import com.example.ui.theme.FireCashSurfaceContainerLow
 import java.time.LocalDate
 import java.time.YearMonth
@@ -139,6 +146,15 @@ fun AnalyticsScreen(
         availableMonths.filter { it.key in comparedKeys }.sortedByDescending { it.key }
     }
 
+    val activeMonth = remember(availableMonths) {
+        availableMonths.firstOrNull()
+    }
+    val incomeTotal = activeMonth?.income ?: 0.0
+    val expenseTotal = activeMonth?.expense ?: 0.0
+    val maxBarValue = remember(incomeTotal, expenseTotal) {
+        (maxOf(incomeTotal, expenseTotal) * 1.3).coerceAtLeast(1.0)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -158,7 +174,7 @@ fun AnalyticsScreen(
                 )
             }
             Text(
-                text = "Spending Summary",
+                text = "Transactions",
                 style = MaterialTheme.typography.headlineSmall,
                 color = Color.White,
                 modifier = Modifier.weight(1f)
@@ -184,83 +200,151 @@ fun AnalyticsScreen(
             StatCard(
                 title = "vs Last",
                 value = "%+.1f%%".format(Locale.US, changePct),
-                valueColor = if (changePct >= 0) Color(0xFFEF5350) else Color(0xFF66BB6A),
+                valueColor = if (changePct >= 0) FireCashError else FireCashSecondary,
                 modifier = Modifier.weight(1f)
             )
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Income vs Spending",
-                    color = FireCashOnSurfaceVariant,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = monthLabel,
-                        color = FireCashPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    TextButton(
-                        onClick = { showCompareDialog = true },
-                        contentPadding = PaddingValues(horizontal = 8.dp)
-                    ) {
-                        Text("Compare", color = FireCashPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            if (pieMonths.any { it.income + it.expense > 0 }) {
-                PieChart(
-                    months = pieMonths,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(240.dp)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                pieMonths.forEach { m ->
-                    if (m.income + m.expense <= 0) return@forEach
-                    LegendRow(
-                        color = Color(0xFF66BB6A),
-                        label = if (pieMonths.size == 1) "Money In" else "${m.label.substringBefore(' ')} · In",
-                        amount = m.income,
-                        total = m.income + m.expense
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LegendRow(
-                        color = Color(0xFFFF6B00),
-                        label = if (pieMonths.size == 1) "Money Out" else "${m.label.substringBefore(' ')} · Out",
-                        amount = m.expense,
-                        total = m.income + m.expense
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp),
-                    contentAlignment = Alignment.Center
+        // Transaction Overview Card
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(FireCashSurfaceContainerLow, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
+            Column {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (availableMonths.isEmpty()) "No dated transactions yet" else "No transactions in this month",
-                        color = FireCashOnSurfaceVariant,
-                        fontSize = 12.sp
+                        text = "Transaction Overview",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = activeMonth?.label?.substringBefore(' ') ?: "",
+                            color = FireCashOnSurfaceVariant,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        TextButton(
+                            onClick = { showCompareDialog = true },
+                            contentPadding = PaddingValues(horizontal = 8.dp)
+                        ) {
+                            Text("Compare", color = FireCashPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Legend tabs
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(FireCashSurfaceContainerHigh.copy(alpha = 0.5f))
+                        .padding(2.dp)
+                ) {
+                    listOf("Week", "Month", "Year").forEach { tab ->
+                        val isActive = tab == "Month"
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isActive) FireCashSurfaceContainerHighest else Color.Transparent)
+                                .clickable { /* Month is default */ }
+                                .padding(horizontal = 16.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = tab,
+                                color = if (isActive) Color.White else FireCashOnSurfaceVariant,
+                                fontSize = 12.sp,
+                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Legend indicators
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF2B66FF))
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Income", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF7DD3FC))
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Outcome", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Bar chart
+                if (incomeTotal + expenseTotal > 0) {
+                    BarChart(
+                        income = incomeTotal,
+                        expense = expenseTotal,
+                        maxValue = maxBarValue,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (availableMonths.isEmpty()) "No dated transactions yet" else "No transactions in this month",
+                            color = FireCashOnSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Legend rows
+                if (incomeTotal + expenseTotal > 0) {
+                    LegendRow(
+                        color = Color(0xFF2B66FF),
+                        label = "Income · ${activeMonth?.label?.substringBefore(' ') ?: ""}",
+                        amount = incomeTotal,
+                        total = incomeTotal + expenseTotal
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LegendRow(
+                        color = Color(0xFF7DD3FC),
+                        label = "Outcome · ${activeMonth?.label?.substringBefore(' ') ?: ""}",
+                        amount = expenseTotal,
+                        total = incomeTotal + expenseTotal
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(20.dp))
         }
+
+        Spacer(modifier = Modifier.height(20.dp))
 
         if (insights.isNotEmpty()) {
             Text(
@@ -393,96 +477,91 @@ private data class MonthTotals(
 )
 
 @Composable
-private fun PieChart(
-    months: List<MonthTotals>,
+private fun BarChart(
+    income: Double,
+    expense: Double,
+    maxValue: Double,
     modifier: Modifier = Modifier
 ) {
-    if (months.isEmpty()) return
-    val current = months.first()
-    val net = current.income - current.expense
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+    val barCount = 6
+    val labels = listOf("JAN", "MAR", "MAY", "JUL", "AUG", "DEC")
+    val gridLines = listOf(0.0, 0.25, 0.5, 0.75, 1.0)
+
+    Box(modifier = modifier) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val d = minOf(size.width, size.height)
-            val center = Offset(size.width / 2f, size.height / 2f)
-            val ringWidth = 36.dp.toPx()
-            val r = d / 2f - ringWidth / 2f - 2.dp.toPx()
-            val topLeft = Offset(center.x - r, center.y - r)
-            val arcSize = Size(r * 2f, r * 2f)
-            if (months.size == 1) {
-                val m = months.first()
-                val total = m.income + m.expense
-                if (total > 0) {
-                    val inSweep = ((m.income / total).coerceIn(0.0, 1.0) * 360f).toFloat()
-                    if (inSweep > 0f) {
-                        drawArc(
-                            color = Color(0xFF66BB6A),
-                            startAngle = -90f,
-                            sweepAngle = inSweep,
-                            useCenter = false,
-                            topLeft = topLeft,
-                            size = arcSize,
-                            style = Stroke(width = ringWidth)
-                        )
-                    }
-                    if (inSweep < 360f) {
-                        drawArc(
-                            color = Color(0xFFFF6B00),
-                            startAngle = -90f + inSweep,
-                            sweepAngle = 360f - inSweep,
-                            useCenter = false,
-                            topLeft = topLeft,
-                            size = arcSize,
-                            style = Stroke(width = ringWidth)
-                        )
-                    }
+            val chartLeft = 0f
+            val chartRight = size.width
+            val chartTop = 0f
+            val chartBottom = size.height - 20.dp.toPx()
+            val chartHeight = chartBottom - chartTop
+
+            // Horizontal grid lines
+            gridLines.forEach { fraction ->
+                val y = chartBottom - (chartHeight * fraction).toFloat()
+                drawLine(
+                    color = Color(0xFF2A2D35),
+                    start = Offset(chartLeft, y),
+                    end = Offset(chartRight, y),
+                    strokeWidth = 1f
+                )
+            }
+
+            // Bar dimensions
+            val barWidth = (chartRight - chartLeft) / barCount * 0.5f
+            val gap = (chartRight - chartLeft) / barCount
+            val barStartX = chartLeft + gap * 0.25f
+
+            // X-axis labels + percentage labels via drawIntoCanvas
+            drawIntoCanvas { canvas ->
+                val nativeCanvas = canvas.nativeCanvas
+                gridLines.forEach { fraction ->
+                    val y = chartBottom - (chartHeight * fraction).toFloat()
+                    val pctLabel = "${(fraction * 100).toInt()}%"
+                    nativeCanvas.drawText(
+                        pctLabel,
+                        chartLeft + 4.dp.toPx(),
+                        y - 4.dp.toPx(),
+                        android.graphics.Paint().apply {
+                            color = 0xFF6B7280.toInt()
+                            textSize = 9.sp.toPx()
+                            textAlign = android.graphics.Paint.Align.LEFT
+                        }
+                    )
                 }
-            } else {
-                val n = months.size
-                val sector = 360f / n
-                val gap = 2f
-                months.forEachIndexed { index, m ->
-                    val total = m.income + m.expense
-                    if (total <= 0) return@forEachIndexed
-                    val start = -90f + index * sector + gap / 2f
-                    val sweep = sector - gap
-                    val inSweep = sweep * (m.income / total).coerceIn(0.0, 1.0).toFloat()
-                    if (inSweep > 0f) {
-                        drawArc(
-                            color = Color(0xFF66BB6A),
-                            startAngle = start,
-                            sweepAngle = inSweep,
-                            useCenter = false,
-                            topLeft = topLeft,
-                            size = arcSize,
-                            style = Stroke(width = ringWidth)
-                        )
-                    }
-                    if (inSweep < sweep) {
-                        drawArc(
-                            color = Color(0xFFFF6B00),
-                            startAngle = start + inSweep,
-                            sweepAngle = sweep - inSweep,
-                            useCenter = false,
-                            topLeft = topLeft,
-                            size = arcSize,
-                            style = Stroke(width = ringWidth)
-                        )
-                    }
+
+                // X-axis labels
+                labels.forEachIndexed { index, label ->
+                    val x = barStartX + index * gap + barWidth
+                    nativeCanvas.drawText(
+                        label,
+                        x,
+                        size.height - 2.dp.toPx(),
+                        android.graphics.Paint().apply {
+                            color = if (label == "AUG") 0xFF2B66FF.toInt() else 0xFF6B7280.toInt()
+                            textSize = 9.sp.toPx()
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            isFakeBoldText = label == "AUG"
+                        }
+                    )
                 }
             }
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "Net · ${current.label.substringBefore(' ')}",
-                color = FireCashOnSurfaceVariant,
-                fontSize = 11.sp
+
+            // Income bars (blue #2B66FF)
+            val incomeHeight = (chartHeight * (income / maxValue)).toFloat().coerceAtMost(chartHeight)
+            drawRect(
+                color = Color(0xFF2B66FF),
+                topLeft = Offset(barStartX, chartBottom - incomeHeight),
+                size = Size(barWidth, incomeHeight),
+                style = Fill
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "THB %.2f".format(Locale.US, net),
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
+
+            // Expense bars (light blue #7DD3FC)
+            val expenseHeight = (chartHeight * (expense / maxValue)).toFloat().coerceAtMost(chartHeight)
+            drawRect(
+                color = Color(0xFF7DD3FC),
+                topLeft = Offset(barStartX + gap, chartBottom - expenseHeight),
+                size = Size(barWidth, expenseHeight),
+                style = Fill
             )
         }
     }
@@ -574,8 +653,8 @@ private fun InsightRow(insight: SpendingInsight) {
             contentDescription = null,
             tint = when (insight.type) {
                 InsightType.TREND -> Color(0xFF6366F1)
-                InsightType.ANOMALY -> Color(0xFFEF5350)
-                InsightType.RECURRING -> Color(0xFF66BB6A)
+                InsightType.ANOMALY -> FireCashError
+                InsightType.RECURRING -> FireCashSecondary
                 InsightType.BUDGET -> FireCashPrimary
             },
             modifier = Modifier.size(20.dp)

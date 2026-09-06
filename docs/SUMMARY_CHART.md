@@ -12,6 +12,8 @@
 | **Smart Detection** | My Names auto-detection (sender/receiver/self) | ✅ | Retroactive via `effectiveIsMoneyIn` and `isSelfTransfer` |
 | | Notification Income/Expense detection | ✅ | Per-app prefix whitelists, multiple prefixes per app |
 | | Manual income/expense entry | ✅ | `+` button → dialog with amount/note |
+| | Manual override (income/expense/transfer) | ✅ | `manualCategory` field on `SavedSlip` overrides auto-detection |
+| | Wallet categories (Bank/Cash) | ✅ | `wallet` field on each slip; Bank/Cash tab bar filters the list |
 | **Analytics** | Spending summary with AI insights | ✅ | Vertical stick chart (Day/Week/Month), trend detection |
 | **Settings** | Unified Safe/Dangerous categories | ✅ | Dangerous section collapsible, red background |
 | | Data Transfer (JSON export/import) | ✅ | Full state transfer between phones |
@@ -24,4 +26,4 @@
 
 ---
 
-*Generated from `git log --oneline` + `app/src/main/java` on `2026-08-29`. Run `git log --oneline` to replay.*
+*Generated from `git log --oneline` + `app/src/main/java` on `2026-09-06`. Run `git log --oneline` to replay.*

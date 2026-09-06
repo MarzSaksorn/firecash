@@ -2,6 +2,8 @@
 
 FireCash is an offline-first Android app (Jetpack Compose, Material 3 dark theme) for logging Thai bank transfer slips and tracking income/expense. Scan a PromptPay/bank-slip QR, verify it with EasySlip when configured, and keep everything locally — no account required.
 
+> **Design**: FireCash uses the **Stitch design system** — a custom dark theme with `#121316` background, `#FF6B00` primary accent, `#10B981` (income) and `#6366F1` (expense) semantic colors. See [`docs/figma_design_spec.md`](docs/figma_design_spec.md) for the complete Figma specification.
+
 ## Features
 
 **Capture & OCR**
@@ -10,9 +12,11 @@ FireCash is an offline-first Android app (Jetpack Compose, Material 3 dark theme
 - Slip verification with **multiple providers** — EasySlip, ThunderAPI, or Slip2Go (choose in Settings, per-provider API key, offline fallback): unverified slips show unknown data and a **Sync unverified** button once a key is set
 
 **Account (homepage)**
-- Balance card: Money In / Money Out, camera shortcut at top-right, in-app logo + FireCash title
+- Balance card: **Total Balance** (large), Income / Spent breakdown, camera shortcut at top-right, in-app logo + FireCash title
+- **Live drag card swipe**: drag the balance card left/right to switch between Bank/Cash wallets — card follows your finger in real time with a 120px threshold
+- **Page indicator dots**: animated dots below the card show the active wallet (Bank/Cash)
+- **Bank/Cash wallet toggle**: compact toggle beside the settings button switches between Bank and Cash wallet views; the slip list and balance card filter by the active wallet; camera button becomes a plus button on the Cash tab
 - Slip list scrolls bottom → top, grouped by day with **daily net total** in the date header; time shown above each amount
-- **Bank/Cash wallet tabs**: filter the slip list by wallet (Bank = default, Cash = separate tracking); balance card shows totals for the active wallet; camera button becomes a plus button on the Cash tab
 - **Filter chips**: All / Income / Expense / Transfer — quickly filter the slip list by transaction type
 - **Manual override**: tap the classification toggle on any slip detail screen to override auto-detection (Income/Expense/Transfer or reset to auto)
 - Search slips by date, title, or amount — **exact match** for QR payload / transaction ref
@@ -50,4 +54,5 @@ Requires: Android SDK (compileSdk 36, minSdk 24). The debug build uses `debug.ke
 ## Docs
 
 - `docs/DEVELOPMENT_LOG.md` — day-by-day build journal
+- `docs/figma_design_spec.md` — Stitch design system Figma specification
 - `docs/firecash_full_plan.md`, `docs/firecash_ai_studio_systems_plan.md` — original planning docs

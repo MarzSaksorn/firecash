@@ -431,3 +431,9 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 
 - **chore: save dev workflow instruction to team memory** — added `memory/team/always_update_dev_logs_and_commit.md` with the rule that after every change, the dev log must be updated and changes committed.
 
+---
+
+## Day 12 — 2026-09-06 — README update
+
+- **docs: update README with Stitch design details** — added Stitch design system badge at the top describing the palette (`#121316` bg, `#FF6B00` primary, `#10B981`/`#6366F1` accents) with link to `docs/figma_design_spec.md`. Updated Account section with live drag swipe, page indicator dots, Bank/Cash toggle, and Total Balance card. Added `docs/figma_design_spec.md` to the docs list.
+

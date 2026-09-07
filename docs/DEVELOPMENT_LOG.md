@@ -4,7 +4,7 @@
 
 **Project:** FireCash — Receipt Logging & PromptPay/EMVCo Slip Verification (Jetpack Compose + Room + EasySlip + ML Kit + NotificationListener)  
 **Repo:** `C:\Users\admin\Project\FireCash` • `namespace = com.example` • `applicationId = com.aistudio.firecash.qxrtv`  
-**Period:** 2026-08-25 (night) → 2026-09-06 • Today is `Sun Sep 06 2026` (UTC)  
+**Period:** 2026-08-25 (night) → 2026-09-07 • Today is `Mon Sep 07 2026` (UTC)  
 **Model:** `opencode/muse-spark-1.2-contributor-free` via opencode harness from **Day 3 (2026-08-27)** (project kicked off **2026-08-25 night**)
 
 ---
@@ -436,4 +436,19 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 ## Day 12 — 2026-09-06 — README update
 
 - **docs: update README with Stitch design details** — added Stitch design system badge at the top describing the palette (`#121316` bg, `#FF6B00` primary, `#10B981`/`#6366F1` accents) with link to `docs/figma_design_spec.md`. Updated Account section with live drag swipe, page indicator dots, Bank/Cash toggle, and Total Balance card. Added `docs/figma_design_spec.md` to the docs list.
+
+---
+
+## Day 13 — 2026-09-07 — Seamless dual-card swipe animation
+
+**Goal:** Make the balance card swipe feel seamless by preparing the other wallet's card behind the current one, so dragging reveals the next card sliding in from the edge.
+
+### Implementation
+
+- **feat: extract BalanceCardBody composable** — moved the card content (balance text, trend indicator, action buttons) into a reusable `BalanceCardBody` composable to avoid duplicating ~125 lines of UI code for the dual-card setup.
+
+- **feat: dual-card swipe with clipToBounds** — replaced the single draggable card with a clipped `Box` containing two cards stacked via Z-order:
+  - **Back card** (other wallet): positioned off-screen on the opposite side (e.g., `+cardWidth` for Cash when Bank is active), slides in as the front card slides out. Renders the other wallet's balance (`bankBalance`/`cashBalance`).
+  - **Front card** (current wallet): draggable on top with `pointerInput` + `detectHorizontalDragGestures`. The `coerceIn` range expanded from `±300px` to `±cardWidth` so the card can slide fully off-screen. Threshold changed from fixed 120px to `25%` of card width (min 80px) for proportional feel. `animateTo(0f, tween(300))` for a smooth snap-back animation on release.
+  - Outer `Box` uses `clipToBounds()` so the back card is hidden when off-screen, only appearing as the user drags.
 

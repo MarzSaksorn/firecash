@@ -64,6 +64,8 @@ import com.example.data.model.VerificationStatus
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -125,6 +127,141 @@ private fun isDeletable(slip: SavedSlip): Boolean {
     return slip.verificationStatus == VerificationStatus.UNVERIFIED ||
         slip.transRef.isNullOrBlank() ||
         slip.amount == null
+}
+
+@Composable
+private fun BalanceCardBody(
+    balance: Double,
+    selectedWallet: String?,
+    onOpenCamera: () -> Unit,
+    onOpenAnalytics: (String?) -> Unit,
+    onAddManualEntry: () -> Unit
+) {
+    Column {
+        // Total Balance section
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Total Balance",
+                    color = Color(0xFFcbd5e1),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "THB %.2f".format(Locale.US, balance),
+                    color = Color.White,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.8).sp
+                )
+            }
+            // Eye toggle placeholder
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .background(Color.White.copy(alpha = 0.1f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "👁",
+                    fontSize = 14.sp
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        // Trend indicator
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF17D982).copy(alpha = 0.2f))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = "▲",
+                color = Color(0xFF40f1a4),
+                fontSize = 10.sp
+            )
+            Text(
+                text = "+3.4% this month",
+                color = Color(0xFF40f1a4),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        Spacer(modifier = Modifier.height(20.dp))
+        // Card action buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Scan Slip button
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White.copy(alpha = 0.1f))
+                    .clickable {
+                        if (selectedWallet == "cash") onAddManualEntry()
+                        else onOpenCamera()
+                    }
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.QrCodeScanner,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "Scan Slip",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            // Analytics button
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White.copy(alpha = 0.1f))
+                    .clickable { onOpenAnalytics(selectedWallet) }
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.TrendingUp,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "Analytics",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -344,39 +481,26 @@ fun AccountScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Balance card — Figma-adapted dark theme design with live drag tracking
+        // Balance card — seamless dual-card swipe (other wallet prepared behind)
         val cardOffset = remember { Animatable(0f) }
         val scope = rememberCoroutineScope()
+        var cardWidthPx by remember { mutableStateOf(0) }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .pointerInput(Unit) {
-                    detectHorizontalDragGestures(
-                        onDragEnd = {
-                            scope.launch {
-                                val threshold = 120f
-                                if (cardOffset.value > threshold) {
-                                    selectedWallet = null
-                                } else if (cardOffset.value < -threshold) {
-                                    selectedWallet = "cash"
-                                }
-                                cardOffset.animateTo(0f)
-                            }
-                        },
-                        onHorizontalDrag = { change, dragAmount ->
-                            change.consume()
-                            scope.launch {
-                                cardOffset.snapTo(
-                                    (cardOffset.value + dragAmount).coerceIn(-300f, 300f)
-                                )
-                            }
-                        }
-                    )
-                }
-                .graphicsLayer {
-                    translationX = cardOffset.value
-                }
-                .background(
+                .clipToBounds()
+                .onSizeChanged { cardWidthPx = it.width }
+        ) {
+            val isBankActive = selectedWallet == null
+            // Back card (other wallet) — prepared behind, slides in from the opposite side
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        translationX = if (isBankActive) cardWidthPx + cardOffset.value
+                                       else -cardWidthPx + cardOffset.value
+                    }
+                    .background(
                         brush = androidx.compose.ui.graphics.Brush.linearGradient(
                             colors = listOf(
                                 Color(0xFF1A2744),
@@ -391,130 +515,66 @@ fun AccountScreen(
                     )
                     .padding(24.dp)
             ) {
-            Column {
-                // Total Balance section
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Total Balance",
-                            color = Color(0xFFcbd5e1),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "THB %.2f".format(Locale.US, balance),
-                            color = Color.White,
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = (-0.8).sp
-                        )
-                    }
-                    // Eye toggle placeholder
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .background(Color.White.copy(alpha = 0.1f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "👁",
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                // Trend indicator
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF17D982).copy(alpha = 0.2f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "▲",
-                        color = Color(0xFF40f1a4),
-                        fontSize = 10.sp
-                    )
-                    Text(
-                        text = "+3.4% this month",
-                        color = Color(0xFF40f1a4),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                Spacer(modifier = Modifier.height(20.dp))
-                // Card action buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Scan Slip button
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.1f))
-                            .clickable {
-                                if (selectedWallet == "cash") showAddManualDialog = true
-                                else onOpenCamera()
+                BalanceCardBody(
+                    balance = if (isBankActive) cashBalance else bankBalance,
+                    selectedWallet = if (isBankActive) "cash" else null,
+                    onOpenCamera = onOpenCamera,
+                    onOpenAnalytics = onOpenAnalytics,
+                    onAddManualEntry = { showAddManualDialog = true }
+                )
+            }
+            // Front card (current wallet) — draggable on top
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                scope.launch {
+                                    val threshold = (cardWidthPx * 0.25f).coerceAtLeast(80f)
+                                    if (cardOffset.value > threshold) {
+                                        selectedWallet = null
+                                    } else if (cardOffset.value < -threshold) {
+                                        selectedWallet = "cash"
+                                    }
+                                    cardOffset.animateTo(0f, tween(300))
+                                }
+                            },
+                            onHorizontalDrag = { change, dragAmount ->
+                                change.consume()
+                                scope.launch {
+                                    cardOffset.snapTo(
+                                        (cardOffset.value + dragAmount).coerceIn(-cardWidthPx.toFloat(), cardWidthPx.toFloat())
+                                    )
+                                }
                             }
-                            .padding(vertical = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.QrCodeScanner,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Scan Slip",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                        )
                     }
-                    // Analytics button
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.1f))
-                            .clickable { onOpenAnalytics(selectedWallet) }
-                            .padding(vertical = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.TrendingUp,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "Analytics",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                    .graphicsLayer {
+                        translationX = cardOffset.value
                     }
-                }
+                    .background(
+                        brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFF1A2744),
+                                Color(0xFF1E3058),
+                                Color(0xFF1A3D5C),
+                                Color(0xFF184A5E)
+                            ),
+                            start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                            end = androidx.compose.ui.geometry.Offset.Infinite
+                        ),
+                        RoundedCornerShape(24.dp)
+                    )
+                    .padding(24.dp)
+            ) {
+                BalanceCardBody(
+                    balance = balance,
+                    selectedWallet = selectedWallet,
+                    onOpenCamera = onOpenCamera,
+                    onOpenAnalytics = onOpenAnalytics,
+                    onAddManualEntry = { showAddManualDialog = true }
+                )
             }
         }
         // Page indicator dots — Bank / Cash

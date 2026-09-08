@@ -65,8 +65,6 @@ fun MainApp(modifier: Modifier = Modifier) {
     // Seed default notification whitelist presets on first launch (no-op once seeded / user-customized)
     com.example.service.NotificationPresets.seedIfNeeded(prefs)
     var backgroundListening by remember { mutableStateOf(prefs.getBoolean("background_listening", false)) }
-    // App mode: "personal" (manual entry button on home card) or "shop" (camera button on home card)
-    var appMode by remember { mutableStateOf(prefs.getString("app_mode", "personal") ?: "personal") }
 
     // Refresh statuses whenever the activity resumes (e.g. returning from system settings)
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
@@ -195,7 +193,6 @@ fun MainApp(modifier: Modifier = Modifier) {
     }
 
     suspend fun verifyWithEasySlip(payload: String): VerifySlipResponse? {
-        if (appMode == "personal") return null // personal mode never calls the verification API
         if (!easySlipEnabled || apiKey.isBlank()) {
             slipWarning = if (easySlipEnabled) {
                 "No API key set — add your ${verificationProvider.label} API key in Settings to verify this slip."
@@ -483,6 +480,36 @@ fun MainApp(modifier: Modifier = Modifier) {
     }
 
     // Export everything (slips + settings + prefs) to a JSON file and share it
+    fun clearAppData() {
+        prefs.edit().clear().apply()
+        savedSlips.clear()
+        seenPayloads.clear()
+        processedFiles.clear()
+        trackedFolderUris = emptyList()
+        knownNames = emptyList()
+        notificationWhitelist = emptyList()
+        notificationExpenseWhitelist = emptyList()
+        disabledIncomePresets = emptySet()
+        disabledExpensePresets = emptySet()
+        easySlipEnabled = false
+        verificationProvider = VerificationProvider.EASYSLIP
+        apiKey = ""
+        checkDuplicates = false
+        notificationIncomeEnabled = false
+        notificationExpenseEnabled = false
+        backgroundListening = false
+                // Stop background listener if running
+                runCatching { context.stopService(Intent(context, BackgroundListenerService::class.java)) }
+                // Re-seed notification presets on next launch
+                prefs.edit().remove("notification_presets_seeded").apply()
+        Toast.makeText(context, "All data cleared", Toast.LENGTH_SHORT).show()
+        // Force recomposition: navigate back to Account
+        showSavedSlips = true
+        showCapture = false
+        showPayload = false
+        showAnalytics = false
+    }
+
     fun exportAllData() {
         try {
             val root = JSONObject()
@@ -517,8 +544,7 @@ fun MainApp(modifier: Modifier = Modifier) {
             settings.put("notification_income_enabled", notificationIncomeEnabled)
             settings.put("notification_expense_enabled", notificationExpenseEnabled)
             settings.put("background_listening", backgroundListening)
-            settings.put("app_mode", appMode)
-            root.put("settings", settings)
+                        root.put("settings", settings)
 
             val dir = context.getExternalFilesDir(null) ?: context.filesDir
             val file = File(dir, "FireCash_Backup_${System.currentTimeMillis()}.json")
@@ -595,8 +621,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                 notificationIncomeEnabled = s.optBoolean("notification_income_enabled", false); prefs.edit().putBoolean("notification_income_enabled", notificationIncomeEnabled).apply()
                 notificationExpenseEnabled = s.optBoolean("notification_expense_enabled", false); prefs.edit().putBoolean("notification_expense_enabled", notificationExpenseEnabled).apply()
                 backgroundListening = s.optBoolean("background_listening", false); prefs.edit().putBoolean("background_listening", backgroundListening).apply()
-                appMode = s.optString("app_mode", appMode); prefs.edit().putString("app_mode", appMode).apply()
-            }
+                            }
 
             if (backgroundListening) {
                 runCatching { context.startForegroundService(Intent(context, BackgroundListenerService::class.java)) }
@@ -617,24 +642,16 @@ fun MainApp(modifier: Modifier = Modifier) {
     }
 
     fun importSlips(paths: List<String>) {
-        if (paths.isEmpty()) return
-        isLoading = true
-        scope.launch {
-            for (path in paths) {
-                if (appMode == "personal") {
-                    // Personal mode: extract text from the photo, no QR payload / no server
+            if (paths.isEmpty()) return
+            isLoading = true
+            scope.launch {
+                for (path in paths) {
                     val ocrText = readSlipText(path)
                     if (ocrText.isNotBlank()) addOcrSlip(ocrText, photoPath = path)
-                } else {
-                    val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
-                    if (payload.isNotBlank()) {
-                        addSlip(payload, photoPath = path)
-                    }
                 }
+                isLoading = false
             }
-            isLoading = false
         }
-    }
 
     suspend fun scanFolder(uriStr: String) {
         val root = runCatching {
@@ -661,22 +678,11 @@ fun MainApp(modifier: Modifier = Modifier) {
             }.getOrDefault(false)
             if (!copied) continue
 
-            if (appMode == "personal") {
-                // Personal mode: text first, offline QR fallback for unreadable slips
-                val ocrText = readSlipText(tempFile.absolutePath)
-                if (ocrText.isNotBlank()) {
-                    addOcrSlip(ocrText, photoPath = file.uri.toString())
-                }
-            } else {
-                val payload = OcrProcessor(context)
-                    .processReceipt(tempFile.absolutePath, scanCenterOnly = false)
-                    .rawText
-                if (payload.isNotBlank() && payload !in seenPayloads) {
-                    seenPayloads.add(payload)
-                    // store the original content:// uri so the slip links to the real photo on device
-                    addSlip(payload, photoPath = file.uri.toString())
-                }
-            }
+            // Text recognition first, offline QR fallback for unreadable slips
+                        val ocrText = readSlipText(tempFile.absolutePath)
+                        if (ocrText.isNotBlank()) {
+                            addOcrSlip(ocrText, photoPath = file.uri.toString())
+                        }
             // Mark processed (even blank OCR) so future opens only handle genuinely new files
             processedFiles.add(fileKey)
             saveProcessedFiles(prefs, processedFiles)
@@ -768,8 +774,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     }
 
     fun resyncUnverifiedSlips() {
-        if (appMode == "personal") return // personal mode never verifies via API
-        if (!easySlipEnabled || apiKey.isBlank()) return
+                if (!easySlipEnabled || apiKey.isBlank()) return
         if (isLoading || isBackgroundSyncing) return
         val unverified = savedSlips.filter {
             it.verificationStatus == VerificationStatus.UNVERIFIED &&
@@ -857,8 +862,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                 slipData = slipData,
                 warning = slipWarning,
                 photoPath = qrPhotoPath,
-                showVerification = appMode != "personal",
-                amountMismatch = slipMismatch,
+                                amountMismatch = slipMismatch,
                 onBack = {
                     showPayload = false
                     showSavedSlips = true
@@ -868,55 +872,40 @@ fun MainApp(modifier: Modifier = Modifier) {
         } else if (showCapture) {
             PhotoCaptureScreen(
                 onPhotoCaptured = { path ->
-                    scope.launch {
-                        if (appMode == "personal") {
-                            // Personal mode: read the slip text from the photo, no verification API
-                            isLoading = true
-                            val ocrText = readSlipText(path)
-                            isLoading = false
-                            if (ocrText.isBlank()) {
-                                Toast.makeText(context, "Couldn't read text from the slip photo", Toast.LENGTH_SHORT).show()
-                            } else {
-                                addOcrSlip(ocrText, photoPath = path)
-                            }
-                            showCapture = false
-                            showSavedSlips = true
-                        } else {
-                            // Shop mode: cross-check the slip photo text against the QR/bank amount
-                            val ocrText = OcrProcessor(context).recognizeText(path)
-                            val payload = OcrProcessor(context).processReceipt(path).rawText
-                            handlePayload(payload, photoPath = path, ocrText = ocrText)
-                        }
-                    }
-                },
+                                    scope.launch {
+                                        // Read the slip text from the photo, no verification API
+                                        isLoading = true
+                                        val ocrText = readSlipText(path)
+                                        isLoading = false
+                                        if (ocrText.isBlank()) {
+                                            Toast.makeText(context, "Couldn't read text from the slip photo", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            addOcrSlip(ocrText, photoPath = path)
+                                        }
+                                        showCapture = false
+                                        showSavedSlips = true
+                                    }
+                                },
                 onFileSelected = { /* unused – picker handled inside PhotoCaptureScreen */ },
                 onImageSelected = { path ->
-                    scope.launch {
-                        if (appMode == "personal") {
-                            isLoading = true
-                            val ocrText = readSlipText(path)
-                            isLoading = false
-                            if (ocrText.isBlank()) {
-                                Toast.makeText(context, "Couldn't read text from the slip photo", Toast.LENGTH_SHORT).show()
-                            } else {
-                                addOcrSlip(ocrText, photoPath = path)
-                            }
-                            showCapture = false
-                            showSavedSlips = true
-                        } else {
-                            val ocrText = OcrProcessor(context).recognizeText(path, scanCenterOnly = false)
-                            val payload = OcrProcessor(context).processReceipt(path, scanCenterOnly = false).rawText
-                            handlePayload(payload, photoPath = path, ocrText = ocrText)
-                        }
-                    }
-                },
-                onQrDetected = { payload ->
-                    if (appMode == "personal") {
-                        // Personal mode never verifies via API; only the photo-text path is used
-                    } else {
-                        handlePayload(payload)
-                    }
-                },
+                                    scope.launch {
+                                        // Read the slip text from the photo, no verification API
+                                        isLoading = true
+                                        val ocrText = readSlipText(path)
+                                        isLoading = false
+                                        if (ocrText.isBlank()) {
+                                            Toast.makeText(context, "Couldn't read text from the slip photo", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            addOcrSlip(ocrText, photoPath = path)
+                                        }
+                                        showCapture = false
+                                        showSavedSlips = true
+                                    }
+                                },
+                                onQrDetected = { payload ->
+                                    // QR auto-detect: always handle the payload
+                                    handlePayload(payload)
+                                },
                 isLoading = isLoading,
                 onNavigateToSettings = {
                     showCapture = false
@@ -981,8 +970,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                     showSavedSlips = false
                     showCapture = true
                 },
-                appMode = appMode,
-                onAddManual = { amount, isMoneyIn, note ->
+                                onAddManual = { amount, isMoneyIn, note ->
                     addManualSlip(amount, isMoneyIn, note)
                 },
                 onAutoSync = { syncTrackedFolderInBackground() },
@@ -1001,12 +989,7 @@ fun MainApp(modifier: Modifier = Modifier) {
             )
         } else {
             SettingsScreen(
-    rules = emptyList(),
-    appMode = appMode,
-    onSetAppMode = { mode ->
-        appMode = mode
-        prefs.edit().putString("app_mode", mode).apply()
-    },
+                rules = emptyList(),
     easySlipEnabled = easySlipEnabled,
     apiKey = apiKey,
     verificationProvider = verificationProvider,
@@ -1055,7 +1038,8 @@ fun MainApp(modifier: Modifier = Modifier) {
                     onForceSyncAll = { forceSyncTrackedFolders() },
                     onImportSlips = { paths -> importSlips(paths) },
                     onExportData = { exportAllData() },
-                    onImportData = { path -> importAllData(path) },
+                                        onImportData = { path -> importAllData(path) },
+                                        onClearAppData = { clearAppData() },
                     notificationIncomeEnabled = notificationIncomeEnabled,
                     notificationExpenseEnabled = notificationExpenseEnabled,
                     notificationWhitelist = notificationWhitelist,

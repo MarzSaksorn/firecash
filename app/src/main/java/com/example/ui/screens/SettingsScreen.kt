@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowRightAlt
+import androidx.compose.material.icons.filled.Delete
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -112,9 +113,7 @@ fun SettingsScreen(
     checkDuplicates: Boolean,
     knownNames: List<String> = emptyList(),
     unverifiedCount: Int = 0,
-    appMode: String = "personal",
-    onSetAppMode: (String) -> Unit = {},
-    notificationIncomeEnabled: Boolean = false,
+        notificationIncomeEnabled: Boolean = false,
     notificationExpenseEnabled: Boolean = false,
     notificationWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
     notificationExpenseWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
@@ -151,14 +150,16 @@ fun SettingsScreen(
     onForceSyncAll: () -> Unit = {},
     onImportSlips: (List<String>) -> Unit = {},
     onExportData: () -> Unit = {},
-    onImportData: (String) -> Unit = {},
-    onAddRule: (keyword: String, category: String) -> Unit,
+        onImportData: (String) -> Unit = {},
+        onClearAppData: () -> Unit = {},
+        onAddRule: (keyword: String, category: String) -> Unit,
     onRemoveRule: (KeywordRule) -> Unit,
     onBack: () -> Unit, onNavigateToCapture: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var dangerousExpanded by remember { mutableStateOf(false) }
     var showAddRuleDialog by remember { mutableStateOf(false) }
+    var showClearDataDialog by remember { mutableStateOf(false) }
     var newKeyword by remember { mutableStateOf("") }
     var newCategory by remember { mutableStateOf("Travel") }
 
@@ -239,86 +240,6 @@ fun SettingsScreen(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(start = 4.dp)
             )
-            // Card: App Mode (homepage primary action: manual entry vs camera)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(FireCashSurfaceContainerLow)
-                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                    .padding(16.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(FireCashSurfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Storefront,
-                                contentDescription = null,
-                                tint = FireCashPrimary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "App Mode",
-                                color = FireCashOnSurface,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Personal = manual entry button on the home card • Shop = camera button on the home card",
-                                color = FireCashOnSurfaceVariant,
-                                fontSize = 12.sp,
-                                lineHeight = 16.sp
-                            )
-                        }
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp)
-                                .background(if (appMode == "personal") FireCashPrimary.copy(alpha = 0.2f) else FireCashSurfaceVariant, RoundedCornerShape(12.dp))
-                                .border(1.5.dp, if (appMode == "personal") FireCashPrimary else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                                .clickable { onSetAppMode("personal") },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Personal",
-                                color = if (appMode == "personal") FireCashPrimary else FireCashOnSurfaceVariant,
-                                fontWeight = if (appMode == "personal") FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp)
-                                .background(if (appMode == "shop") FireCashPrimary.copy(alpha = 0.2f) else FireCashSurfaceVariant, RoundedCornerShape(12.dp))
-                                .border(1.5.dp, if (appMode == "shop") FireCashPrimary else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                                .clickable { onSetAppMode("shop") },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Shop operator",
-                                color = if (appMode == "shop") FireCashPrimary else FireCashOnSurfaceVariant,
-                                fontWeight = if (appMode == "shop") FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
-                }
-            }
             // Card: My Names (auto income / transfer detection)
             Box(
                 modifier = Modifier
@@ -854,7 +775,7 @@ fun SettingsScreen(
                                     )
                                 )
                             }
-                            if (appMode != "personal" && unverifiedCount > 0) {
+                            if (unverifiedCount > 0) {
                                 Button(
                                     onClick = onSyncUnverified,
                                     enabled = apiKey.isNotBlank(),
@@ -1388,110 +1309,197 @@ fun SettingsScreen(
             }
 
             // Card: Data Transfer (export/import JSON between phones)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(FireCashSurfaceContainerLow)
-                    .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                    .padding(16.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
                         Box(
                             modifier = Modifier
-                                .size(42.dp)
-                                .clip(CircleShape)
-                                .background(FireCashSurfaceVariant),
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(FireCashSurfaceContainerLow)
+                                .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                                .padding(16.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = Color(0xFFEF5350), modifier = Modifier.size(22.dp))
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Data Transfer", color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text(text = "Export everything (slips, API key, options) as JSON — import on another phone", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
-                        }
-                    }
-                    Button(
-                        onClick = onExportData,
-                        modifier = Modifier.fillMaxWidth().testTag("export_data_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = FireCashPrimary)
-                    ) {
-                        Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = FireCashOnPrimary, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Export Data (JSON)", color = FireCashOnPrimary)
-                    }
-                    OutlinedButton(
-                        onClick = { importJsonLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
-                        modifier = Modifier.fillMaxWidth().testTag("import_data_button")
-                    ) {
-                        Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Import Data (JSON)", color = FireCashPrimary)
-                    }
-                    Text(text = "Import replaces current data with the exported one (same format as Export).", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
-                }
-            }
-                }
-            }
-            }
-
-            Spacer(modifier = Modifier.height(30.dp))
-        }
-
-        // Add Rule Dialog
-        if (showAddRuleDialog) {
-            AlertDialog(
-                onDismissRequest = { showAddRuleDialog = false },
-                title = {
-                    Text(
-                        text = "Add Keyword Mapping",
-                        color = FireCashOnSurface,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedTextField(
-                            value = newKeyword,
-                            onValueChange = { newKeyword = it },
-                            label = { Text("Merchant / Keyword") },
-                            placeholder = { Text("e.g. Uber, Netflix, Starbucks, PromptPay") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        OutlinedTextField(
-                            value = newCategory,
-                            onValueChange = { newCategory = it },
-                            label = { Text("Map To Category") },
-                            placeholder = { Text("e.g. Travel, Software, Food & Dining") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            if (newKeyword.isNotBlank()) {
-                                onAddRule(newKeyword, newCategory)
-                                newKeyword = ""
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .clip(CircleShape)
+                                            .background(FireCashSurfaceVariant),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = Color(0xFFEF5350), modifier = Modifier.size(22.dp))
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = "Data Transfer", color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(text = "Export everything (slips, API key, options) as JSON — import on another phone", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                                    }
+                                }
+                                Button(
+                                    onClick = onExportData,
+                                    modifier = Modifier.fillMaxWidth().testTag("export_data_button"),
+                                    colors = ButtonDefaults.buttonColors(containerColor = FireCashPrimary)
+                                ) {
+                                    Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = FireCashOnPrimary, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Export Data (JSON)", color = FireCashOnPrimary)
+                                }
+                                OutlinedButton(
+                                    onClick = { importJsonLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                                    modifier = Modifier.fillMaxWidth().testTag("import_data_button")
+                                ) {
+                                    Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Import Data (JSON)", color = FireCashPrimary)
+                                }
+                                Text(text = "Import replaces current data with the exported one (same format as Export).", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
                             }
-                            showAddRuleDialog = false
                         }
-                    ) {
-                        Text("Add Rule")
+
+                        // Card: Clear App Data (debug)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(FireCashSurfaceContainerLow)
+                                .border(1.dp, Color(0xFFEF5350).copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                                .padding(16.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .clip(CircleShape)
+                                            .background(FireCashSurfaceVariant),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF5350), modifier = Modifier.size(22.dp))
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = "Clear App Data", color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(text = "Reset all slips, settings, and whitelists — app starts fresh", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                                    }
+                                }
+                                Button(
+                                    onClick = { showClearDataDialog = true },
+                                    modifier = Modifier.fillMaxWidth().testTag("clear_app_data_button"),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350))
+                                ) {
+                                    Icon(imageVector = Icons.Default.Delete, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Clear All Data", color = Color.White)
+                                }
+                            }
+                        }
+                            }
+                        }
                     }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showAddRuleDialog = false }) {
-                        Text("Cancel")
+
+                    Spacer(modifier = Modifier.height(30.dp))
                     }
-                },
-                containerColor = FireCashSurfaceContainerHighest
-            )
-        }
-    }
-}
+
+                    // Add Rule Dialog
+                    if (showAddRuleDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showAddRuleDialog = false },
+                            title = {
+                                Text(
+                                    text = "Add Keyword Mapping",
+                                    color = FireCashOnSurface,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    OutlinedTextField(
+                                        value = newKeyword,
+                                        onValueChange = { newKeyword = it },
+                                        label = { Text("Merchant / Keyword") },
+                                        placeholder = { Text("e.g. Uber, Netflix, Starbucks, PromptPay") },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    OutlinedTextField(
+                                        value = newCategory,
+                                        onValueChange = { newCategory = it },
+                                        label = { Text("Map To Category") },
+                                        placeholder = { Text("e.g. Travel, Software, Food & Dining") },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        if (newKeyword.isNotBlank()) {
+                                            onAddRule(newKeyword, newCategory)
+                                            newKeyword = ""
+                                        }
+                                        showAddRuleDialog = false
+                                    }
+                                ) {
+                                    Text("Add Rule")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showAddRuleDialog = false }) {
+                                    Text("Cancel")
+                                }
+                            },
+                            containerColor = FireCashSurfaceContainerHighest
+                        )
+                    }
+
+                    // Clear App Data confirmation dialog
+                    if (showClearDataDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showClearDataDialog = false },
+                            title = {
+                                Text(
+                                    text = "Clear All Data?",
+                                    color = Color.White,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(
+                                        text = "This will permanently delete all slips, settings, whitelists, names, and tracked folders. The app will restart fresh.",
+                                        color = FireCashOnSurfaceVariant,
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = "This cannot be undone!",
+                                        color = Color(0xFFEF5350),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        showClearDataDialog = false
+                                        onClearAppData()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350))
+                                ) {
+                                    Text("Clear Everything", color = Color.White)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showClearDataDialog = false }) {
+                                    Text("Cancel", color = FireCashOnSurfaceVariant)
+                                }
+                            },
+                            containerColor = FireCashSurfaceContainerHighest
+                        )
+                    }
+                }
+            }

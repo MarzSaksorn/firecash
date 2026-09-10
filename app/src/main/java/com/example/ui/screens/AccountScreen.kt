@@ -629,61 +629,6 @@ fun AccountScreen(
                     )
             )
         }
-        // Income/Spent row — separate card below
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(FireCashSurfaceContainerLow, RoundedCornerShape(16.dp))
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowDownward,
-                        contentDescription = null,
-                        tint = FireCashSecondary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Income",
-                        color = FireCashOnSurfaceVariant,
-                        fontSize = 12.sp
-                    )
-        }
-                Text(
-                    text = "THB %.2f".format(Locale.US, moneyIn),
-                    color = FireCashSecondary,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Spent",
-                        color = FireCashOnSurfaceVariant,
-                        fontSize = 12.sp
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.ArrowUpward,
-                        contentDescription = null,
-                        tint = FireCashError,
-                        modifier = Modifier.size(16.dp)
-                    )
-        }
-                Text(
-                    text = "THB %.2f".format(Locale.US, moneyOut),
-                    color = FireCashError,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-
 
 
         Row(

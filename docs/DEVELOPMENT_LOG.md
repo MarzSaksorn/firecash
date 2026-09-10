@@ -467,3 +467,5 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 
 - **fix: manual transactions not live-refreshing** — replaced `remember(slips, ...)` with `derivedStateOf` for all computed values in `AccountScreen` (`walletSlips`, `moneyIn`, `moneyOut`, `balance`, `bankBalance`, `cashBalance`, `selectedSlips`, `deletableSelected`, `filteredSlips`). `remember` with `slips` as key only triggers on reference change, but `SnapshotStateList` keeps the same reference when items are added — so new manual slips never recomputed the list/dashboard. `derivedStateOf` tracks snapshot reads and invalidates on content changes.
 
+- **chore: remove Income/Spent bar below balance card** — removed the separate card showing Income (green) and Spent (red) totals below the page indicator dots, as the balance card itself already shows the net balance.
+

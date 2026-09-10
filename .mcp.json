@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "figma": {
+      "command": "C:\\Users\\admin\\.bun\\bin\\figma-mcp-server",
+      "args": [],
+      "env": {
+        "FIGMA_API_KEY": "",
+        "PATH": "${PATH};C:\\Users\\admin\\.bun\\bin;C:\\Users\\admin\\AppData\\Roaming\\npm\\node_modules\\bun\\bin"
+      }
+    }
+  }
+}

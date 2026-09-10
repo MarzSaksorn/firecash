@@ -465,3 +465,5 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 - **fix: gesture overlay was blocking card buttons** — removed the transparent `Box(pointerInput)` overlay on top of both cards. Moved `pointerInput` with `detectHorizontalDragGestures` to the parent clipping `Box` instead, so taps fall through to children's `clickable` modifiers.
 - **style: distinct Cash card gradient** — Cash card uses an emerald gradient (`#065F46` → `#10B981`) visually distinct from Bank's navy gradient.
 
+- **fix: manual transactions not live-refreshing** — replaced `remember(slips, ...)` with `derivedStateOf` for all computed values in `AccountScreen` (`walletSlips`, `moneyIn`, `moneyOut`, `balance`, `bankBalance`, `cashBalance`, `selectedSlips`, `deletableSelected`, `filteredSlips`). `remember` with `slips` as key only triggers on reference change, but `SnapshotStateList` keeps the same reference when items are added — so new manual slips never recomputed the list/dashboard. `derivedStateOf` tracks snapshot reads and invalidates on content changes.
+

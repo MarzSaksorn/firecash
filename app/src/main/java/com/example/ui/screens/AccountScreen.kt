@@ -58,6 +58,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -290,24 +291,28 @@ fun AccountScreen(
         onAutoSync()
     }
     var selectedWallet by remember { mutableStateOf<String?>(null) } // null = Bank, "cash" = Cash
-    val walletSlips = remember(slips, selectedWallet) {
-        when (selectedWallet) {
-            "cash" -> slips.filter { it.wallet == "cash" }
-            else -> slips.filter { it.wallet != "cash" }
-        }
-    }
-    val moneyIn = walletSlips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null }.sumOf { it.amount!! }
-    val moneyOut = walletSlips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null }.sumOf { it.amount!! }
-    val balance = moneyIn - moneyOut
-    val bankBalance = slips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null && (it.wallet == null || it.wallet == "bank") }.sumOf { it.amount!! } -
+    val walletSlips by remember { derivedStateOf {
+            when (selectedWallet) {
+                "cash" -> slips.filter { it.wallet == "cash" }
+                else -> slips.filter { it.wallet != "cash" }
+            }
+        } }
+    val moneyIn by remember { derivedStateOf { walletSlips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null }.sumOf { it.amount!! } } }
+    val moneyOut by remember { derivedStateOf { walletSlips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null }.sumOf { it.amount!! } } }
+    val balance by remember { derivedStateOf { moneyIn - moneyOut } }
+    val bankBalance by remember { derivedStateOf {
+        slips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null && (it.wallet == null || it.wallet == "bank") }.sumOf { it.amount!! } -
         slips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null && (it.wallet == null || it.wallet == "bank") }.sumOf { it.amount!! }
-    val cashBalance = slips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null && it.wallet == "cash" }.sumOf { it.amount!! } -
+    } }
+    val cashBalance by remember { derivedStateOf {
+        slips.filter { effectiveIsMoneyIn(it, knownNames) == true && it.amount != null && it.wallet == "cash" }.sumOf { it.amount!! } -
         slips.filter { effectiveIsMoneyIn(it, knownNames) == false && it.amount != null && it.wallet == "cash" }.sumOf { it.amount!! }
+    } }
     var selectedKeys by remember { mutableStateOf(setOf<Long>()) }
     var showDeleteMultiDialog by remember { mutableStateOf(false) }
     val isSelectionMode = selectedKeys.isNotEmpty()
-    val selectedSlips = remember(slips, selectedKeys) { slips.filter { it.savedAt in selectedKeys } }
-    val deletableSelected = remember(selectedSlips) { selectedSlips.filter { isDeletable(it) } }
+    val selectedSlips by remember { derivedStateOf { slips.filter { it.savedAt in selectedKeys } } }
+    val deletableSelected by remember { derivedStateOf { selectedSlips.filter { isDeletable(it) } } }
 
     var searchQuery by remember { mutableStateOf("") }
     var isSearchActive by remember { mutableStateOf(false) }
@@ -316,7 +321,7 @@ fun AccountScreen(
     var manualIsIn by remember { mutableStateOf(true) }
     var manualNote by remember { mutableStateOf("") }
     var filterCategory by remember { mutableStateOf<String?>(null) } // null=All, "income", "expense", "transfer"
-    val filteredSlips = remember(walletSlips, searchQuery, knownNames, filterCategory) {
+    val filteredSlips by remember { derivedStateOf {
         val categoryFiltered = if (filterCategory != null) {
             walletSlips.filter { slip ->
                 when (filterCategory) {
@@ -344,8 +349,9 @@ fun AccountScreen(
                 val payloadExact = slip.payload == q
                 val transRefExact = slip.transRef == q
                 dateMatch || titleMatch || amountMatch || payloadExact || transRefExact
-            }
-        }
+    }
+    }
+    }
     }
 
     BackHandler(enabled = isSelectionMode) {

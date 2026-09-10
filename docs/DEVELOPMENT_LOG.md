@@ -469,3 +469,21 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 
 - **chore: remove Income/Spent bar below balance card** — removed the separate card showing Income (green) and Spent (red) totals below the page indicator dots, as the balance card itself already shows the net balance.
 
+---
+
+## Day 15 — 2026-09-10 — Diagnose slip import failure: QR empty on cropped image
+
+**Goal:** Fix gallery pick + tracked-folder import producing no slips (spinner clears, nothing added). Only 1 of 38 folder images was importing; gallery pick showed `recognizeText len=37-40` and no payload.
+
+**Diagnosis (ADB `FireCashOCR` logs):**
+- `flattenedCopy` missed the document quad → fell back to `cropToCenter` (center 60% square, 569×569 / 559×559). This is suspiciously small — QR at bottom of slip may be outside the center square.
+- `processReceipt` on the crop returned `rawText=""` (`barcode scan: found 0 codes` would confirm) → `onImageSelected` deleted the crop and silently did nothing (no user feedback, no log on blank path). Same for `scanFolder`: all 38 files hit `processedFiles` cache so `Sync Folder Now` appeared to do nothing on re-tap.
+- `recognizeText` len 37/40 confirms the crop contains little readable text as well.
+
+**Changes (diagnostic build, not yet final fix):**
+- **`OcrProcessor.kt` — verbose barcode logging:** log bitmap/scanImage dimensions, barcode count, each barcode's format/rawValueLen/rawValue, and exceptions in `processReceipt`. No behavior change.
+- **`MainApp.kt` — `onImageSelected` / `onPhotoCaptured` fallback:** after a blank payload on `workPath`, retry `processReceipt` on the original `path` (QR may be outside the center crop). If fallback succeeds, use the original as `photoPath`. Added `Log.d/w` for every branch (work path, ocrLen, payloadLen, fallback len, `NO payload` with OCR snippet). Keep crop on failure for inspection instead of deleting silently.
+- **`MainApp.kt` — `scanFolder` fallback + logging:** same crop→original fallback per-file, log `work/ocrLen/payloadLen` and `fallback orig payloadLen`. Detailed `NO payload` warning per file. `effectiveFlat/effectiveOcr` plumbing so `addSlip` uses the successful variant. Removed silent `if (payload.isBlank() && flatPath!=null) delete` in favor of explicit warning.
+- **`MainApp.kt` — `scanFolder` cache override (DIAG, revert after verification):** temporarily disabled `if (fileKey in processedFiles) continue` and force-re-scans all cached files with a `RE-SCANNING cached file` log, so the fallback fix can be tested against the existing 38 photos without clearing app data. `TODO remove after verified` marker in code.
+- **Build verified:** `assembleDebug` + `adb install -r` + `adb logcat -c` succeeded; next step is on-device re-test of gallery pick + `Sync Folder Now` and inspection of `barcode scan: found X` logs to decide if the crop heuristic or the barcode path is the root cause.
+

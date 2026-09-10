@@ -535,17 +535,23 @@ fun MainApp(modifier: Modifier = Modifier) {
     }
 
     suspend fun scanFolder(uriStr: String) {
-        val root = runCatching {
-            DocumentFile.fromTreeUri(context, Uri.parse(uriStr))
-        }.getOrNull()
-        val files = root?.listFiles()
-            ?.filter { it.isFile && it.type?.startsWith("image/") == true }
-            .orEmpty()
+            val root = runCatching {
+                DocumentFile.fromTreeUri(context, Uri.parse(uriStr))
+            }.getOrNull()
+            val files = root?.listFiles()
+                ?.filter { it.isFile && it.type?.startsWith("image/") == true }
+                .orEmpty()
 
-        for (file in files) {
-            val fileKey = file.uri.toString()
-            // Cache hit — already processed on a previous open, skip entirely
-            if (fileKey in processedFiles) continue
+            android.util.Log.d("FireCashOCR", "scanFolder: found ${files.size} image files, processedFiles=${processedFiles.size}")
+
+            for (file in files) {
+                val fileKey = file.uri.toString()
+                android.util.Log.d("FireCashOCR", "scanFolder: checking file=${file.name} key=${fileKey.takeLast(40)} inProcessed=${fileKey in processedFiles}")
+                // DIAG: temporarily force re-scan even if cached, to test fallback fix on existing files
+                // TODO remove after verified — restores cache skip
+                // if (fileKey in processedFiles) continue
+                val isCached = fileKey in processedFiles
+                if (isCached) android.util.Log.d("FireCashOCR", "scanFolder: RE-SCANNING cached file ${file.name} (diag override)")
 
             val tempFile = File(
                 context.cacheDir,
@@ -569,23 +575,40 @@ fun MainApp(modifier: Modifier = Modifier) {
             val flatPath = processor.flattenedCopy(tempFile.absolutePath, outName = cropName)
             val workPath = flatPath ?: tempFile.absolutePath
             val ocrText = processor.recognizeText(workPath, scanCenterOnly = false)
-            val payload = processor
+            var payload = processor
                 .processReceipt(workPath, scanCenterOnly = false)
                 .rawText
+            android.util.Log.d("FireCashOCR", "scanFolder: file=${file.name} work=$workPath ocrLen=${ocrText.length} payloadLen=${payload.length}")
+            // Fallback if crop lost QR
+            var effectiveFlat = flatPath
+            var effectiveOcr = ocrText
+            var effectiveWork = workPath
+            if (payload.isBlank() && flatPath != null) {
+                val fb = processor.processReceipt(tempFile.absolutePath, scanCenterOnly = false).rawText
+                android.util.Log.d("FireCashOCR", "scanFolder: fallback orig payloadLen=${fb.length} for ${file.name}")
+                if (fb.isNotBlank()) {
+                    runCatching { File(flatPath).delete() }
+                    effectiveFlat = null
+                    effectiveWork = tempFile.absolutePath
+                    effectiveOcr = processor.recognizeText(tempFile.absolutePath, scanCenterOnly = false)
+                    payload = fb
+                    android.util.Log.d("FireCashOCR", "scanFolder: fallback succeeded for ${file.name} len=${payload.length}")
+                }
+            }
             if (payload.isNotBlank() && payload !in seenPayloads) {
                 seenPayloads.add(payload)
                 // Prefer the persisted crop (it is what OCR/QR ran on); fall back to the
                 // content:// uri of the original photo when no slip region was found.
-                addSlip(payload, photoPath = flatPath ?: file.uri.toString(), ocrText = ocrText)
-            } else if (payload.isBlank() && flatPath != null) {
-                // Nothing worth logging — keep the user's photo in its folder, drop the crop
-                runCatching { File(flatPath).delete() }
-            } else if (flatPath != null) {
+                addSlip(payload, photoPath = effectiveFlat ?: file.uri.toString(), ocrText = effectiveOcr)
+            } else if (payload.isBlank()) {
+                android.util.Log.w("FireCashOCR", "scanFolder: NO payload for ${file.name} ocr='${effectiveOcr.take(80)}'")
+                if (effectiveFlat != null) runCatching { File(effectiveFlat).delete() }
+            } else if (effectiveFlat != null) {
                 // Payload already known — a re-scan upgraded the stored photo to the crop
                 // (deterministic name ⇒ the same file each time, so nothing piles up).
                 val idx = savedSlips.indexOfFirst { it.payload == payload }
-                if (idx >= 0 && savedSlips[idx].photoPath != flatPath) {
-                    savedSlips[idx] = savedSlips[idx].copy(photoPath = flatPath)
+                if (idx >= 0 && savedSlips[idx].photoPath != effectiveFlat) {
+                    savedSlips[idx] = savedSlips[idx].copy(photoPath = effectiveFlat)
                     saveSlips(prefs, savedSlips)
                 }
             }
@@ -842,20 +865,38 @@ fun MainApp(modifier: Modifier = Modifier) {
                         val processor = OcrProcessor(context)
                         val workPath = processor.flattenedCopy(path) ?: path
                         val ocrText = processor.recognizeText(workPath, scanCenterOnly = false)
-                        val payload = processor.processReceipt(workPath, scanCenterOnly = false).rawText
+                        var payload = processor.processReceipt(workPath, scanCenterOnly = false).rawText
+                        android.util.Log.d("FireCashOCR", "onPhotoCaptured: work=$workPath ocrLen=${ocrText.length} payloadLen=${payload.length}")
+                        if (payload.isBlank() && workPath != path) {
+                            val fbPayload = processor.processReceipt(path, scanCenterOnly = false).rawText
+                            android.util.Log.d("FireCashOCR", "onPhotoCaptured: fallback orig payloadLen=${fbPayload.length}")
+                            if (fbPayload.isNotBlank()) {
+                                runCatching { File(workPath).delete() }
+                                val fbOcr = processor.recognizeText(path, scanCenterOnly = false)
+                                payload = fbPayload
+                                qrPayload = payload
+                                qrPhotoPath = path
+                                android.util.Log.d("FireCashOCR", "onPhotoCaptured: fallback payload len=${payload.length}")
+                                addSlip(payload, photoPath = path, ocrText = fbOcr)
+                                showCapture = false
+                                showPayload = true
+                                isLoading = false
+                                return@launch
+                            }
+                        }
                         if (payload.isNotBlank()) {
-                            qrPayload = payload
-                            qrPhotoPath = workPath
-                            addSlip(payload, photoPath = workPath, ocrText = ocrText)
+                                                    qrPayload = payload
+                                                    qrPhotoPath = workPath
+                                                    android.util.Log.d("FireCashOCR", "onImageSelected: payload found len=${payload.length}, adding slip")
+                                                    addSlip(payload, photoPath = workPath, ocrText = ocrText)
                             if (workPath != path) {
                                 runCatching { File(path).delete() }
                                     .onFailure { android.util.Log.w("FireCashOCR", "could not delete full frame $path: ${it.message}") }
                             }
                             showCapture = false
                             showPayload = true
-                        } else if (workPath != path) {
-                            // Nothing worth logging — keep the full frame, drop the useless crop
-                            runCatching { File(workPath).delete() }
+                        } else {
+                            android.util.Log.w("FireCashOCR", "onPhotoCaptured: NO payload ocrLen=${ocrText.length} ocr='${ocrText.take(100)}'")
                         }
                         isLoading = false
                     }
@@ -869,20 +910,42 @@ fun MainApp(modifier: Modifier = Modifier) {
                         val processor = OcrProcessor(context)
                         val workPath = processor.flattenedCopy(path) ?: path
                         val ocrText = processor.recognizeText(workPath, scanCenterOnly = false)
-                        val payload = processor.processReceipt(workPath, scanCenterOnly = false).rawText
+                        var payload = processor.processReceipt(workPath, scanCenterOnly = false).rawText
+                        android.util.Log.d("FireCashOCR", "onImageSelected: work=$workPath ocrLen=${ocrText.length} payloadLen=${payload.length} isOrig=${workPath==path}")
+                        // Fallback: if crop lost the QR (center-crop fallback can cut off bottom QR), retry on original
+                        if (payload.isBlank() && workPath != path) {
+                            val fbPayload = processor.processReceipt(path, scanCenterOnly = false).rawText
+                            android.util.Log.d("FireCashOCR", "onImageSelected: fallback orig scan payloadLen=${fbPayload.length}")
+                            if (fbPayload.isNotBlank()) {
+                                // QR was outside crop — use original as stored photo
+                                runCatching { File(workPath).delete() }
+                                val fbOcr = processor.recognizeText(path, scanCenterOnly = false)
+                                payload = fbPayload
+                                qrPayload = payload
+                                qrPhotoPath = path
+                                android.util.Log.d("FireCashOCR", "onImageSelected: fallback payload found len=${payload.length}, adding slip from original")
+                                addSlip(payload, photoPath = path, ocrText = fbOcr)
+                                showCapture = false
+                                showPayload = true
+                                isLoading = false
+                                return@launch
+                            }
+                        }
                         if (payload.isNotBlank()) {
-                            qrPayload = payload
-                            qrPhotoPath = workPath
-                            addSlip(payload, photoPath = workPath, ocrText = ocrText)
+                                                    qrPayload = payload
+                                                    qrPhotoPath = workPath
+                                                    android.util.Log.d("FireCashOCR", "onImageSelected: payload found len=${payload.length}, adding slip")
+                                                    addSlip(payload, photoPath = workPath, ocrText = ocrText)
                             if (workPath != path) {
                                 runCatching { File(path).delete() }
                                     .onFailure { android.util.Log.w("FireCashOCR", "could not delete picked frame $path: ${it.message}") }
                             }
                             showCapture = false
                             showPayload = true
-                        } else if (workPath != path) {
-                            // Nothing worth logging — keep the full frame, drop the useless crop
-                            runCatching { File(workPath).delete() }
+                        } else {
+                            android.util.Log.w("FireCashOCR", "onImageSelected: NO payload (ocrLen=${ocrText.length} ocr='${ocrText.take(100)}'), keeping spinner off, crop kept at $workPath")
+                            // Keep crop for inspection — don't delete on failure during debug
+                            // if (workPath != path) runCatching { File(workPath).delete() }
                         }
                         isLoading = false
                     }

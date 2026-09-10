@@ -141,10 +141,15 @@ class OcrProcessor(private val context: Context? = null) {
 
                 // First try QR code detection (Barcode scanning)
                 val barcodeScanner = BarcodeScanning.getClient()
+                android.util.Log.d("FireCashOCR", "processReceipt: bmp=${bitmap?.width}x${bitmap?.height} scanCenterOnly=$scanCenterOnly scanBmp=${scanImage?.let { "${it.width}x${it.height}" } ?: "null"}")
                 val qrResult = if (scanImage != null) {
                     suspendCancellableCoroutine<String> { cont ->
                         barcodeScanner.process(scanImage)
                             .addOnSuccessListener { barcodes ->
+                                android.util.Log.d("FireCashOCR", "barcode scan: found ${barcodes.size} codes")
+                                for (b in barcodes) {
+                                    android.util.Log.d("FireCashOCR", "  barcode format=${b.format} rawBytes=${b.rawBytes?.size} rawValueLen=${b.rawValue?.length} value=${b.rawValue?.take(80)}")
+                                }
                                 if (barcodes.isNotEmpty() && barcodes[0].rawValue != null) {
                                     cont.resume(barcodes[0].rawValue!!)
                                 } else {
@@ -152,9 +157,13 @@ class OcrProcessor(private val context: Context? = null) {
                                     cont.resume("")
                                 }
                             }
-                            .addOnFailureListener { e -> cont.resumeWithException(e) }
+                            .addOnFailureListener { e ->
+                                android.util.Log.w("FireCashOCR", "barcode scan failed: ${e.message}", e)
+                                cont.resumeWithException(e)
+                            }
                     }
                 } else {
+                    android.util.Log.w("FireCashOCR", "processReceipt: scanImage null, skipping barcode")
                     ""
                 }
                 if (qrResult.isNotEmpty()) {
@@ -187,6 +196,7 @@ class OcrProcessor(private val context: Context? = null) {
                     isBankSlip = false
                 )
             } catch (e: Exception) {
+                android.util.Log.w("FireCashOCR", "processReceipt exception: ${e.message}", e)
                 // Fallback to default if OCR fails
             }
         }

@@ -452,3 +452,16 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
   - **Front card** (current wallet): draggable on top with `pointerInput` + `detectHorizontalDragGestures`. The `coerceIn` range expanded from `±300px` to `±cardWidth` so the card can slide fully off-screen. Threshold changed from fixed 120px to `25%` of card width (min 80px) for proportional feel. `animateTo(0f, tween(300))` for a smooth snap-back animation on release.
   - Outer `Box` uses `clipToBounds()` so the back card is hidden when off-screen, only appearing as the user drags.
 
+---
+
+## Day 14 — 2026-09-10 — Continuous card swipe with spring animation, removed gesture overlay
+
+**Goal:** Make the balance card swipe feel continuous and seamless instead of a switch-toggle. Fix buttons not working when the gesture overlay blocked taps.
+
+### Changes
+
+- **feat: continuous progress-driven card swipe** — replaced the `cardOffset` (pixel-range -w to +w) with a unified `cardProgress: Animatable<Float>` (0 = Bank, 1 = Cash). Both cards positioned by the same progress: Bank at `-progress * w`, Cash at `(1 - progress) * w`. This eliminates the `isBankActive` conditional that caused the back card to jump when switching wallets. Added `LaunchedEffect(selectedWallet)` to sync progress smoothly when the pill toggle is tapped.
+- **feat: spring animation instead of tween** — snap-back and wallet-switch animations now use `spring(dampingRatio = MediumBouncy, stiffness = StiffnessLow)` for a natural bouncy feel instead of `tween(300)` which felt mechanical.
+- **fix: gesture overlay was blocking card buttons** — removed the transparent `Box(pointerInput)` overlay on top of both cards. Moved `pointerInput` with `detectHorizontalDragGestures` to the parent clipping `Box` instead, so taps fall through to children's `clickable` modifiers.
+- **style: distinct Cash card gradient** — Cash card uses an emerald gradient (`#065F46` → `#10B981`) visually distinct from Bank's navy gradient.
+

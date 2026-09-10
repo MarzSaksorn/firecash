@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -210,8 +212,8 @@ private fun BalanceCardBody(
                     .clickable {
                         if (selectedWallet == "cash") onAddManualEntry()
                         else onOpenCamera()
-                    }
-                    .padding(vertical = 12.dp),
+            }
+            .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Row(
@@ -230,7 +232,7 @@ private fun BalanceCardBody(
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
                     )
-                }
+        }
             }
             // Analytics button
             Box(
@@ -258,7 +260,7 @@ private fun BalanceCardBody(
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
                     )
-                }
+        }
             }
         }
     }
@@ -322,7 +324,7 @@ fun AccountScreen(
                     "expense" -> effectiveIsMoneyIn(slip, knownNames) == false
                     "transfer" -> effectiveIsMoneyIn(slip, knownNames) == null
                     else -> true
-                }
+        }
             }
         } else walletSlips
         if (searchQuery.isBlank()) categoryFiltered
@@ -372,7 +374,7 @@ fun AccountScreen(
                         contentDescription = "Clear selection",
                         tint = FireCashPrimary
                     )
-                }
+        }
                 Text(
                     text = "${selectedKeys.size} selected",
                     style = MaterialTheme.typography.headlineSmall,
@@ -386,11 +388,11 @@ fun AccountScreen(
                             contentDescription = "Delete selected",
                             tint = FireCashError
                         )
-                    }
-                }
+            }
+        }
                 TextButton(onClick = { selectedKeys = walletSlips.map { it.savedAt }.toSet() }) {
                     Text("All", color = FireCashPrimary, fontSize = 13.sp)
-                }
+        }
             } else {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -412,7 +414,7 @@ fun AccountScreen(
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 26.sp
                     )
-                }
+        }
                 // Bank/Cash toggle pill — Figma style
                 Box(
                     modifier = Modifier
@@ -421,8 +423,8 @@ fun AccountScreen(
                         .background(FireCashSurfaceContainerLow)
                         .clickable {
                             selectedWallet = if (selectedWallet == "cash") null else "cash"
-                        }
-                        .padding(horizontal = 2.dp, vertical = 2.dp),
+            }
+                .padding(horizontal = 2.dp, vertical = 2.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Row(
@@ -447,8 +449,8 @@ fun AccountScreen(
                                 fontSize = 12.sp,
                                 fontWeight = if (selectedWallet != "cash") FontWeight.SemiBold else FontWeight.Normal
                             )
-                        }
-                        // Cash option
+            }
+                // Cash option
                         Box(
                             modifier = Modifier
                                 .height(28.dp)
@@ -466,40 +468,76 @@ fun AccountScreen(
                                 fontSize = 12.sp,
                                 fontWeight = if (selectedWallet == "cash") FontWeight.SemiBold else FontWeight.Normal
                             )
-                        }
-                    }
-                }
+            }
+            }
+        }
                 IconButton(onClick = onOpenSettings) {
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Account settings",
                         tint = FireCashPrimary
                     )
-                }
+        }
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Balance card — seamless dual-card swipe (other wallet prepared behind)
-        val cardOffset = remember { Animatable(0f) }
+        // Balance card — seamless continuous swipe (Bank ↔ Cash)
         val scope = rememberCoroutineScope()
         var cardWidthPx by remember { mutableStateOf(0) }
+        // 0f = Bank centered, 1f = Cash centered
+        val cardProgress = remember { Animatable(if (selectedWallet == "cash") 1f else 0f) }
+
+        // Sync progress when pill toggle changes selection externally
+        LaunchedEffect(selectedWallet) {
+            val target = if (selectedWallet == "cash") 1f else 0f
+            if (kotlin.math.abs(cardProgress.value - target) > 0.01f) {
+                cardProgress.animateTo(
+                    target,
+                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+                )
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clipToBounds()
                 .onSizeChanged { cardWidthPx = it.width }
+                .pointerInput(cardWidthPx) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            scope.launch {
+                                val w = cardWidthPx.toFloat().coerceAtLeast(1f)
+                                val target = if (cardProgress.value > 0.5f) 1f else 0f
+                                cardProgress.animateTo(
+                                    target,
+                                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
+                                )
+                                selectedWallet = if (target > 0.5f) "cash" else null
+            }
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            scope.launch {
+                                val w = cardWidthPx.toFloat().coerceAtLeast(1f)
+                                cardProgress.snapTo(
+                                    (cardProgress.value - dragAmount / w).coerceIn(0f, 1f)
+                                )
+            }
+            }
+            )
+        }
         ) {
-            val isBankActive = selectedWallet == null
-            // Back card (other wallet) — prepared behind, slides in from the opposite side
+            val w = cardWidthPx.toFloat().coerceAtLeast(1f)
+            val p = cardProgress.value
+
+            // Bank card
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .graphicsLayer {
-                        translationX = if (isBankActive) cardWidthPx + cardOffset.value
-                                       else -cardWidthPx + cardOffset.value
-                    }
+                    .graphicsLayer { translationX = -p * w }
                     .background(
                         brush = androidx.compose.ui.graphics.Brush.linearGradient(
                             colors = listOf(
@@ -516,50 +554,26 @@ fun AccountScreen(
                     .padding(24.dp)
             ) {
                 BalanceCardBody(
-                    balance = if (isBankActive) cashBalance else bankBalance,
-                    selectedWallet = if (isBankActive) "cash" else null,
+                    balance = bankBalance,
+                    selectedWallet = null,
                     onOpenCamera = onOpenCamera,
                     onOpenAnalytics = onOpenAnalytics,
                     onAddManualEntry = { showAddManualDialog = true }
                 )
             }
-            // Front card (current wallet) — draggable on top
+
+            // Cash card (declared on top Z-wise; at rest it sits off right edge)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                scope.launch {
-                                    val threshold = (cardWidthPx * 0.25f).coerceAtLeast(80f)
-                                    if (cardOffset.value > threshold) {
-                                        selectedWallet = null
-                                    } else if (cardOffset.value < -threshold) {
-                                        selectedWallet = "cash"
-                                    }
-                                    cardOffset.animateTo(0f, tween(300))
-                                }
-                            },
-                            onHorizontalDrag = { change, dragAmount ->
-                                change.consume()
-                                scope.launch {
-                                    cardOffset.snapTo(
-                                        (cardOffset.value + dragAmount).coerceIn(-cardWidthPx.toFloat(), cardWidthPx.toFloat())
-                                    )
-                                }
-                            }
-                        )
-                    }
-                    .graphicsLayer {
-                        translationX = cardOffset.value
-                    }
+                    .graphicsLayer { translationX = (1f - p) * w }
                     .background(
                         brush = androidx.compose.ui.graphics.Brush.linearGradient(
                             colors = listOf(
-                                Color(0xFF1A2744),
-                                Color(0xFF1E3058),
-                                Color(0xFF1A3D5C),
-                                Color(0xFF184A5E)
+                                Color(0xFF065F46),
+                                Color(0xFF047857),
+                                Color(0xFF059669),
+                                Color(0xFF10B981)
                             ),
                             start = androidx.compose.ui.geometry.Offset(0f, 0f),
                             end = androidx.compose.ui.geometry.Offset.Infinite
@@ -569,8 +583,8 @@ fun AccountScreen(
                     .padding(24.dp)
             ) {
                 BalanceCardBody(
-                    balance = balance,
-                    selectedWallet = selectedWallet,
+                    balance = cashBalance,
+                    selectedWallet = "cash",
                     onOpenCamera = onOpenCamera,
                     onOpenAnalytics = onOpenAnalytics,
                     onAddManualEntry = { showAddManualDialog = true }
@@ -632,7 +646,7 @@ fun AccountScreen(
                         color = FireCashOnSurfaceVariant,
                         fontSize = 12.sp
                     )
-                }
+        }
                 Text(
                     text = "THB %.2f".format(Locale.US, moneyIn),
                     color = FireCashSecondary,
@@ -654,7 +668,7 @@ fun AccountScreen(
                         tint = FireCashError,
                         modifier = Modifier.size(16.dp)
                     )
-                }
+        }
                 Text(
                     text = "THB %.2f".format(Locale.US, moneyOut),
                     color = FireCashError,
@@ -691,7 +705,7 @@ fun AccountScreen(
                         color = FireCashOnSurfaceVariant,
                         fontSize = 12.sp
                     )
-                }
+        }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
@@ -707,7 +721,7 @@ fun AccountScreen(
                         tint = FireCashPrimary,
                         modifier = Modifier.size(20.dp)
                     )
-                }
+        }
                 IconButton(
                     onClick = {
                         showAddManualDialog = true
@@ -723,7 +737,7 @@ fun AccountScreen(
                         tint = FireCashPrimary,
                         modifier = Modifier.size(22.dp)
                     )
-                }
+        }
                 // Sync: tap = new photos only, hold 10s = full resync (re-detect all + re-verify on server)
                 Box(
                     modifier = Modifier
@@ -737,8 +751,8 @@ fun AccountScreen(
                                     up != null -> onSyncNow()
                                     android.os.SystemClock.uptimeMillis() - startMs >= 10_000L -> onFullResync()
                                     else -> Unit // cancelled early (scroll) — ignore
-                                }
-                            }
+            }
+            }
                         },
                     contentAlignment = Alignment.Center
                 ) {
@@ -748,7 +762,7 @@ fun AccountScreen(
                         tint = FireCashPrimary,
                         modifier = Modifier.size(20.dp)
                     )
-                }
+        }
             }
         }
         // Filter chips
@@ -778,7 +792,7 @@ fun AccountScreen(
                         fontSize = 12.sp,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                     )
-                }
+        }
             }
         }
         if (isSearchActive) {
@@ -822,9 +836,9 @@ fun AccountScreen(
                     if (searchQuery.isNotBlank()) {
                         IconButton(onClick = { searchQuery = "" }) {
                             Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = FireCashOnSurfaceVariant, modifier = Modifier.size(16.dp))
-                        }
-                    }
-                }
+            }
+            }
+        }
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
@@ -867,10 +881,10 @@ fun AccountScreen(
                             true -> amt
                             false -> -amt
                             else -> 0.0
-                        }
-                    }
-                    items(dateSlips, key = { it.savedAt }) { slip ->
-                        val isSelected = slip.savedAt in selectedKeys
+            }
+            }
+            items(dateSlips, key = { it.savedAt }) { slip ->
+                val isSelected = slip.savedAt in selectedKeys
                         TransactionRow(
                             slip = slip,
                             knownNames = knownNames,
@@ -881,17 +895,17 @@ fun AccountScreen(
                                     selectedKeys = if (isSelected) selectedKeys - slip.savedAt else selectedKeys + slip.savedAt
                                 } else {
                                     onSlipClick(slip)
-                                }
+            }
                             },
                             onLongClick = {
                                 selectedKeys = if (isSelected) selectedKeys - slip.savedAt else selectedKeys + slip.savedAt
-                            }
-                        )
-                    }
-                    item(key = "header_$date") {
-                        DateHeader(date = date, count = dateSlips.size, total = dayTotal)
-                    }
-                }
+            }
+                )
+            }
+            item(key = "header_$date") {
+                DateHeader(date = date, count = dateSlips.size, total = dayTotal)
+            }
+        }
             }
         }
         }
@@ -914,7 +928,7 @@ fun AccountScreen(
                         color = Color.White,
                         style = MaterialTheme.typography.bodyLarge
                     )
-                }
+        }
             }
         }
 
@@ -970,8 +984,8 @@ fun AccountScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text("Money In", color = if (manualIsIn) FireCashSecondary else FireCashOnSurfaceVariant, fontWeight = if (manualIsIn) FontWeight.Bold else FontWeight.Normal)
-                            }
-                            Box(
+            }
+                    Box(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(48.dp)
@@ -981,9 +995,9 @@ fun AccountScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text("Money Out", color = if (!manualIsIn) FireCashError else FireCashOnSurfaceVariant, fontWeight = if (!manualIsIn) FontWeight.Bold else FontWeight.Normal)
-                            }
-                        }
-                        OutlinedTextField(
+            }
+            }
+                OutlinedTextField(
                             value = manualAmount,
                             onValueChange = { manualAmount = it.filter { c -> c.isDigit() || c == '.' } },
                             label = { Text("Amount (THB)") },
@@ -1018,7 +1032,7 @@ fun AccountScreen(
                             ),
                             shape = RoundedCornerShape(10.dp)
                         )
-                    }
+            }
                 },
                 confirmButton = {
                     Button(
@@ -1027,7 +1041,7 @@ fun AccountScreen(
                             if (amt != null && amt > 0) {
                                 onAddManual(amt, manualIsIn, manualNote.trim(), selectedWallet)
                                 showAddManualDialog = false
-                            }
+            }
                         },
                         enabled = (manualAmount.toDoubleOrNull() ?: 0.0) > 0
                     ) { Text("Add") }
@@ -1104,7 +1118,7 @@ private fun TransactionRow(
                         tint = Color.White,
                         modifier = Modifier.size(14.dp)
                     )
-                }
+        }
             }
             Spacer(modifier = Modifier.width(10.dp))
         }

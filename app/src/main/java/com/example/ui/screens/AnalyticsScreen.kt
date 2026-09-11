@@ -58,7 +58,7 @@ import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 
-private enum class AnalyticsFilter { WEEK, MONTH, YEAR }
+private enum class AnalyticsFilter { DAY, WEEK, MONTH, YEAR }
 
 private data class ChartPoint(
     val label: String,
@@ -123,6 +123,22 @@ private fun normalizeDate(raw: String?, today: String): String {
 
 // ── Data aggregation ──────────────────────────────────────────
 
+private fun computeDayData(expenses: List<Expense>, now: LocalDate): ChartData {
+    val dayFmt = DateTimeFormatter.ofPattern("d MMM", Locale.US)
+    val points = (0 until 15).map { offset ->
+        val day = now.minusDays(14L - offset)
+        val ds = day.toString()
+        val dayExp = expenses.filter { it.date == ds }
+        ChartPoint(
+            label = day.format(dayFmt),
+            income = dayExp.filter { it.category == "Income" }.sumOf { it.amount },
+            outcome = dayExp.filter { it.category != "Income" }.sumOf { it.amount }
+        )
+    }
+    val mx = points.maxOfOrNull { maxOf(it.income, it.outcome) } ?: 0.0
+    return ChartData(points, (mx * 1.25).coerceAtLeast(1.0))
+}
+
 private fun computeWeekData(expenses: List<Expense>, now: LocalDate): ChartData {
     val monday = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     val labels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
@@ -180,6 +196,12 @@ private fun filterExpensesForPeriod(
     now: LocalDate
 ): List<Expense> {
     return when (filter) {
+        AnalyticsFilter.DAY -> {
+            val start = now.minusDays(14)
+            expenses.filter { e ->
+                runCatching { LocalDate.parse(e.date) }.getOrNull()?.let { d -> d in start..now } ?: false
+            }
+        }
         AnalyticsFilter.WEEK -> {
             val monday = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
             val sunday = monday.plusDays(6)
@@ -231,6 +253,7 @@ fun AnalyticsScreen(
 
     val chartData = remember(expenses, selectedFilter, now) {
         when (selectedFilter) {
+            AnalyticsFilter.DAY -> computeDayData(expenses, now)
             AnalyticsFilter.WEEK -> computeWeekData(expenses, now)
             AnalyticsFilter.MONTH -> computeMonthData(expenses, now)
             AnalyticsFilter.YEAR -> computeYearData(expenses, now)
@@ -387,6 +410,7 @@ fun AnalyticsScreen(
                             .padding(2.dp)
                     ) {
                         listOf(
+                            AnalyticsFilter.DAY to "Day",
                             AnalyticsFilter.WEEK to "Week",
                             AnalyticsFilter.MONTH to "Month",
                             AnalyticsFilter.YEAR to "Year"
@@ -441,7 +465,7 @@ fun AnalyticsScreen(
                     val hasData = chartData.points.any { it.income > 0 || it.outcome > 0 }
                     if (hasData) {
                         when (selectedFilter) {
-                            AnalyticsFilter.WEEK, AnalyticsFilter.MONTH -> {
+                            AnalyticsFilter.DAY, AnalyticsFilter.WEEK, AnalyticsFilter.MONTH -> {
                                 LineChart(
                                     data = chartData,
                                     modifier = Modifier

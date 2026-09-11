@@ -517,3 +517,18 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
   - **Y-axis scale now shows THB amounts** instead of percentages: grid line labels display actual THB values matching the data range. Both line chart and bar chart use `computeNiceStep()` to calculate clean round grid steps (e.g. 0, 100, 200, 300... rather than arbitrary fractions of maxVal). The scale adjusts dynamically per filter period since `maxVal` is recomputed per week/month/year.
   - **Build verified:** `assembleDebug` + `adb install -r` succeeded.
 
+---
+
+## Day 16 (continued) — Add Day filter (15-day line chart) to analytics
+
+**Goal:** Add a granular "Day" filter showing the last 15 days as individual daily data points on a smooth line chart.
+
+### Changes
+- **`AnalyticsScreen.kt`:**
+  - Added `AnalyticsFilter.DAY` to the enum (tab order: Day, Week, Month, Year).
+  - `computeDayData()`: aggregates by individual day for the last 15 days (today−14 → today). Labels in `d MMM` format (e.g. "1 Sep").
+  - `filterExpensesForPeriod()` updated with `DAY` case filtering to the 15-day window.
+  - Tab row, chart data selection, and line-chart case all wired to handle the new filter.
+  - Renders the same mild-smooth line chart as Week/Month.
+- **Build verified:** `assembleDebug` + `adb install -r` succeeded.
+

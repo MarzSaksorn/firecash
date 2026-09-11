@@ -1,8 +1,6 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -500,13 +498,13 @@ fun AccountScreen(
             val target = if (selectedWallet == "cash") 1f else 0f
             if (kotlin.math.abs(cardProgress.value - target) > 0.01f) {
                 cardProgress.animateTo(
-                    target,
-                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
-                )
-            }
-        }
+                                    target,
+                                    tween(durationMillis = 250)
+                                )
+                            }
+                        }
 
-        Box(
+                        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clipToBounds()
@@ -518,10 +516,10 @@ fun AccountScreen(
                                 val w = cardWidthPx.toFloat().coerceAtLeast(1f)
                                 val target = if (cardProgress.value > 0.5f) 1f else 0f
                                 cardProgress.animateTo(
-                                    target,
-                                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
-                                )
-                                selectedWallet = if (target > 0.5f) "cash" else null
+                                                                    target,
+                                                                    tween(durationMillis = 250)
+                                                                )
+                                                                selectedWallet = if (target > 0.5f) "cash" else null
             }
                         },
                         onHorizontalDrag = { change, dragAmount ->

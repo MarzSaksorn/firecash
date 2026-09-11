@@ -487,3 +487,13 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 - **`MainApp.kt` — `scanFolder` cache override (DIAG, revert after verification):** temporarily disabled `if (fileKey in processedFiles) continue` and force-re-scans all cached files with a `RE-SCANNING cached file` log, so the fallback fix can be tested against the existing 38 photos without clearing app data. `TODO remove after verified` marker in code.
 - **Build verified:** `assembleDebug` + `adb install -r` + `adb logcat -c` succeeded; next step is on-device re-test of gallery pick + `Sync Folder Now` and inspection of `barcode scan: found X` logs to decide if the crop heuristic or the barcode path is the root cause.
 
+---
+
+## Day 16 — 2026-09-10 — Replace spring swipe animation with normal tween
+
+**Goal:** User requested the balance card swipe to feel like a normal swipe, not spring-bouncy.
+
+### Changes
+- **`AccountScreen.kt`** — replaced both `spring(dampingRatio = MediumBouncy, stiffness = StiffnessLow)` calls with `tween(durationMillis = 250)` in the `LaunchedEffect(selectedWallet)` sync and the `onDragEnd` snap-back. Removed unused imports `Spring` and `spring`.
+- **Build verified:** `assembleDebug` succeeds, APK installed.
+

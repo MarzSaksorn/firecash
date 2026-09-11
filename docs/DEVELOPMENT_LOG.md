@@ -497,3 +497,22 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
 - **`AccountScreen.kt`** — replaced both `spring(dampingRatio = MediumBouncy, stiffness = StiffnessLow)` calls with `tween(durationMillis = 250)` in the `LaunchedEffect(selectedWallet)` sync and the `onDragEnd` snap-back. Removed unused imports `Spring` and `spring`.
 - **Build verified:** `assembleDebug` succeeds, APK installed.
 
+---
+
+## Day 16 (continued) — Rewrite analytics with functional Week/Month/Year filters + smooth line charts
+
+**Goal:** Make Week/Month/Year filter tabs actually work. Week/Month show a line chart with mild smooth bezier curves. Year shows a grouped bar chart. "Smoothen out but not much."
+
+### Changes
+- **`AnalyticsScreen.kt` — full rewrite:**
+  - Added `AnalyticsFilter` enum (`WEEK`, `MONTH`, `YEAR`) and `selectedFilter` state.
+  - **Week filter:** aggregates by day (Mon–Sun) of the current calendar week. Renders a **line chart**.
+  - **Month filter:** aggregates by day-of-month (1–last day) of the current month. Renders a **line chart**.
+  - **Year filter:** aggregates by month (Jan–Dec) of the current year. Renders a **grouped bar chart** (income bar + outcome bar per month).
+  - **Line chart mild smoothing:** cubic bezier with control points offset 35% along X while keeping Y horizontal — the line leaves each point heading toward the next and curves gently without overshoot (`path.cubicTo(cur.x + dx*0.35f, cur.y, nxt.x - dx*0.35f, nxt.y, nxt.x, nxt.y)`). Dots drawn at each data point.
+  - **Stat cards now filter-aware:** `Total Spent`, `Avg/Day`, `vs Last` computed from the filtered period via `AnalyticsEngine.generateAnalytics(filteredExpenses)`.
+  - Legends and total rows update per filter.
+  - Removed old static `BarChart` with hardcoded labels. Removed `Canvas`/`Size`/`Fill`/`drawIntoCanvas` unused imports.
+  - `Compare` button only visible in Month view.
+- **Build verified:** `assembleDebug` + `adb install -r` succeeded.
+

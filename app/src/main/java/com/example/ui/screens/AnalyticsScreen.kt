@@ -26,10 +26,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -48,11 +50,26 @@ import com.example.ui.theme.FireCashSecondary
 import com.example.ui.theme.FireCashSurfaceContainerHigh
 import com.example.ui.theme.FireCashSurfaceContainerHighest
 import com.example.ui.theme.FireCashSurfaceContainerLow
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
+import java.time.temporal.TemporalAdjusters
 import java.util.Locale
+
+private enum class AnalyticsFilter { WEEK, MONTH, YEAR }
+
+private data class ChartPoint(
+    val label: String,
+    val income: Double,
+    val outcome: Double
+)
+
+private data class ChartData(
+    val points: List<ChartPoint>,
+    val maxValue: Double
+)
 
 private fun isSelfTransfer(slip: SavedSlip, knownNames: List<String> = emptyList()): Boolean {
     val s = slip.senderName?.trim()?.lowercase(Locale.ROOT)
@@ -71,7 +88,6 @@ private fun isKnownName(name: String?, knownNames: List<String>): Boolean {
 }
 
 private fun effectiveIsMoneyIn(slip: SavedSlip, knownNames: List<String>): Boolean? {
-    // Manual override takes precedence
     when (slip.manualCategory) {
         "income" -> return true
         "expense" -> return false
@@ -87,6 +103,105 @@ private fun effectiveIsMoneyIn(slip: SavedSlip, knownNames: List<String>): Boole
     }
 }
 
+private val SLIP_DATE_FORMATS = listOf(
+    "yyyy-MM-dd",
+    "dd/MM/yyyy",
+    "dd-MM-yyyy",
+    "yyyy/MM/dd",
+    "MM/dd/yyyy"
+)
+
+private fun normalizeDate(raw: String?, today: String): String {
+    val s = raw?.trim().orEmpty()
+    if (s.isBlank()) return today
+    for (f in SLIP_DATE_FORMATS) {
+        val d = runCatching { LocalDate.parse(s, DateTimeFormatter.ofPattern(f, Locale.US)) }.getOrNull()
+        if (d != null) return d.toString()
+    }
+    return today
+}
+
+// ── Data aggregation ──────────────────────────────────────────
+
+private fun computeWeekData(expenses: List<Expense>, now: LocalDate): ChartData {
+    val monday = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+    val labels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    val points = (0..6).map { i ->
+        val day = monday.plusDays(i.toLong())
+        val ds = day.toString()
+        val dayExp = expenses.filter { it.date == ds }
+        ChartPoint(
+            label = labels[i],
+            income = dayExp.filter { it.category == "Income" }.sumOf { it.amount },
+            outcome = dayExp.filter { it.category != "Income" }.sumOf { it.amount }
+        )
+    }
+    val mx = points.maxOfOrNull { maxOf(it.income, it.outcome) } ?: 0.0
+    return ChartData(points, (mx * 1.25).coerceAtLeast(1.0))
+}
+
+private fun computeMonthData(expenses: List<Expense>, now: LocalDate): ChartData {
+    val ym = YearMonth.from(now)
+    val lastDay = ym.lengthOfMonth()
+    val points = (1..lastDay).map { day ->
+        val ds = ym.atDay(day).toString()
+        val dayExp = expenses.filter { it.date == ds }
+        ChartPoint(
+            label = day.toString(),
+            income = dayExp.filter { it.category == "Income" }.sumOf { it.amount },
+            outcome = dayExp.filter { it.category != "Income" }.sumOf { it.amount }
+        )
+    }
+    val mx = points.maxOfOrNull { maxOf(it.income, it.outcome) } ?: 0.0
+    return ChartData(points, (mx * 1.25).coerceAtLeast(1.0))
+}
+
+private fun computeYearData(expenses: List<Expense>, now: LocalDate): ChartData {
+    val labels = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    val yearStr = now.year.toString()
+    val points = (1..12).map { m ->
+        val prefix = "$yearStr-${m.toString().padStart(2, '0')}"
+        val mExp = expenses.filter { it.date.startsWith(prefix) }
+        ChartPoint(
+            label = labels[m - 1],
+            income = mExp.filter { it.category == "Income" }.sumOf { it.amount },
+            outcome = mExp.filter { it.category != "Income" }.sumOf { it.amount }
+        )
+    }
+    val mx = points.maxOfOrNull { maxOf(it.income, it.outcome) } ?: 0.0
+    return ChartData(points, (mx * 1.25).coerceAtLeast(1.0))
+}
+
+// ── Filter helpers ─────────────────────────────────────────────
+
+private fun filterExpensesForPeriod(
+    expenses: List<Expense>,
+    filter: AnalyticsFilter,
+    now: LocalDate
+): List<Expense> {
+    return when (filter) {
+        AnalyticsFilter.WEEK -> {
+            val monday = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            val sunday = monday.plusDays(6)
+            expenses.filter { e ->
+                runCatching { LocalDate.parse(e.date) }.getOrNull()?.let { d -> d in monday..sunday } ?: false
+            }
+        }
+        AnalyticsFilter.MONTH -> {
+            val ym = YearMonth.from(now)
+            expenses.filter { e ->
+                runCatching { LocalDate.parse(e.date) }.getOrNull()?.let { d -> YearMonth.from(d) == ym } ?: false
+            }
+        }
+        AnalyticsFilter.YEAR -> {
+            val y = now.year
+            expenses.filter { e -> e.date.startsWith(y.toString()) }
+        }
+    }
+}
+
+// ── Main screen ────────────────────────────────────────────────
+
 @Composable
 fun AnalyticsScreen(
     slips: List<SavedSlip>,
@@ -95,8 +210,9 @@ fun AnalyticsScreen(
     onRefresh: () -> Unit
 ) {
     val now = LocalDate.now()
+    val todayStr = now.toString()
+
     val expenses = remember(slips, knownNames, now) {
-        val today = now.toString()
         slips.mapNotNull { slip ->
             if (isSelfTransfer(slip, knownNames)) return@mapNotNull null
             val amt = slip.amount ?: return@mapNotNull null
@@ -104,22 +220,34 @@ fun AnalyticsScreen(
             Expense(
                 merchant = slip.senderName ?: slip.receiverName ?: "Unknown",
                 amount = amt,
-                date = normalizeDate(slip.date, today),
+                date = normalizeDate(slip.date, todayStr),
                 time = slip.time ?: "",
                 category = if (effective) "Income" else "Other"
             )
         }
     }
-    val analytics = AnalyticsEngine.generateAnalytics(expenses)
+
+    var selectedFilter by remember { mutableStateOf(AnalyticsFilter.MONTH) }
+
+    val chartData = remember(expenses, selectedFilter, now) {
+        when (selectedFilter) {
+            AnalyticsFilter.WEEK -> computeWeekData(expenses, now)
+            AnalyticsFilter.MONTH -> computeMonthData(expenses, now)
+            AnalyticsFilter.YEAR -> computeYearData(expenses, now)
+        }
+    }
+
+    val filteredExpenses = remember(expenses, selectedFilter, now) {
+        filterExpensesForPeriod(expenses, selectedFilter, now)
+    }
+
+    val analytics = AnalyticsEngine.generateAnalytics(filteredExpenses)
     val totalSpent = analytics.totalSpent
     val changePct = analytics.changePercentage
     val avgPerDay = analytics.averagePerDay
     val insights = analytics.insights
 
     val monthKey = remember(now) { now.format(DateTimeFormatter.ofPattern("yyyy-MM", Locale.US)) }
-    val monthLabel = remember(now) {
-        "${now.month.getDisplayName(TextStyle.SHORT, Locale.US)} ${now.year}"
-    }
     val availableMonths = remember(expenses) {
         val fmt = DateTimeFormatter.ofPattern("yyyy-MM", Locale.US)
         expenses.map { it.date.take(7) }
@@ -142,28 +270,22 @@ fun AnalyticsScreen(
         mutableStateOf(setOf(availableMonths.firstOrNull()?.key ?: monthKey))
     }
     var showCompareDialog by remember { mutableStateOf(false) }
-    val pieMonths = remember(comparedKeys, availableMonths) {
-        availableMonths.filter { it.key in comparedKeys }.sortedByDescending { it.key }
-    }
 
-    val activeMonth = remember(availableMonths) {
-        availableMonths.firstOrNull()
-    }
+    val activeMonth = remember(availableMonths) { availableMonths.firstOrNull() }
     val incomeTotal = activeMonth?.income ?: 0.0
     val expenseTotal = activeMonth?.expense ?: 0.0
-    val maxBarValue = remember(incomeTotal, expenseTotal) {
-        (maxOf(incomeTotal, expenseTotal) * 1.3).coerceAtLeast(1.0)
-    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(FireCashBackground)
             .statusBarsPadding()
-            .padding(16.dp)
     ) {
+        // ── Header ────────────────────────────────────────
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
@@ -181,210 +303,246 @@ fun AnalyticsScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            StatCard(
-                title = "Total Spent",
-                value = "THB %.2f".format(Locale.US, totalSpent),
-                modifier = Modifier.weight(1f)
-            )
-            StatCard(
-                title = "Avg/Day",
-                value = "THB %.2f".format(Locale.US, avgPerDay),
-                modifier = Modifier.weight(1f)
-            )
-            StatCard(
-                title = "vs Last",
-                value = "%+.1f%%".format(Locale.US, changePct),
-                valueColor = if (changePct >= 0) FireCashError else FireCashSecondary,
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Transaction Overview Card
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(FireCashSurfaceContainerLow, RoundedCornerShape(16.dp))
-                .padding(16.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
         ) {
-            Column {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Transaction Overview",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+            // ── Stat cards ─────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatCard(
+                    title = "Total Spent",
+                    value = "THB %.2f".format(Locale.US, totalSpent),
+                    modifier = Modifier.weight(1f)
+                )
+                StatCard(
+                    title = "Avg/Day",
+                    value = "THB %.2f".format(Locale.US, avgPerDay),
+                    modifier = Modifier.weight(1f)
+                )
+                StatCard(
+                    title = "vs Last",
+                    value = "%+.1f%%".format(Locale.US, changePct),
+                    valueColor = if (changePct >= 0) FireCashError else FireCashSecondary,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ── Chart card ─────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(FireCashSurfaceContainerLow, RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column {
+                    // Header row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = activeMonth?.label?.substringBefore(' ') ?: "",
-                            color = FireCashOnSurfaceVariant,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
+                            text = "Transaction Overview",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        TextButton(
-                            onClick = { showCompareDialog = true },
-                            contentPadding = PaddingValues(horizontal = 8.dp)
-                        ) {
-                            Text("Compare", color = FireCashPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        if (selectedFilter == AnalyticsFilter.MONTH) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = activeMonth?.label?.substringBefore(' ') ?: "",
+                                    color = FireCashOnSurfaceVariant,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                TextButton(
+                                    onClick = { showCompareDialog = true },
+                                    contentPadding = PaddingValues(horizontal = 8.dp)
+                                ) {
+                                    Text(
+                                        "Compare",
+                                        color = FireCashPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
                         }
                     }
-                }
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                // Legend tabs
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(FireCashSurfaceContainerHigh.copy(alpha = 0.5f))
-                        .padding(2.dp)
-                ) {
-                    listOf("Week", "Month", "Year").forEach { tab ->
-                        val isActive = tab == "Month"
+                    // Filter tabs (Week | Month | Year)
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(FireCashSurfaceContainerHigh.copy(alpha = 0.5f))
+                            .padding(2.dp)
+                    ) {
+                        listOf(
+                            AnalyticsFilter.WEEK to "Week",
+                            AnalyticsFilter.MONTH to "Month",
+                            AnalyticsFilter.YEAR to "Year"
+                        ).forEach { (filter, label) ->
+                            val isActive = filter == selectedFilter
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isActive) FireCashSurfaceContainerHighest else Color.Transparent)
+                                    .clickable { selectedFilter = filter }
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = if (isActive) Color.White else FireCashOnSurfaceVariant,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Legend
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF2B66FF))
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Income", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF7DD3FC))
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Outcome", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Chart
+                    val hasData = chartData.points.any { it.income > 0 || it.outcome > 0 }
+                    if (hasData) {
+                        when (selectedFilter) {
+                            AnalyticsFilter.WEEK, AnalyticsFilter.MONTH -> {
+                                LineChart(
+                                    data = chartData,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(180.dp)
+                                )
+                            }
+                            AnalyticsFilter.YEAR -> {
+                                YearBarChart(
+                                    data = chartData,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(180.dp)
+                                )
+                            }
+                        }
+                    } else {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isActive) FireCashSurfaceContainerHighest else Color.Transparent)
-                                .clickable { /* Month is default */ }
-                                .padding(horizontal = 16.dp, vertical = 6.dp)
+                                .fillMaxWidth()
+                                .height(180.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = tab,
-                                color = if (isActive) Color.White else FireCashOnSurfaceVariant,
-                                fontSize = 12.sp,
-                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
+                                text = when {
+                                    availableMonths.isEmpty() -> "No dated transactions yet"
+                                    else -> "No transactions in this period"
+                                },
+                                color = FireCashOnSurfaceVariant,
+                                fontSize = 12.sp
                             )
                         }
                     }
-                }
-                Spacer(modifier = Modifier.height(12.dp))
 
-                // Legend indicators
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Legend rows (monthly income/outcome summary)
+                    if (hasData) {
+                        val totalInc = chartData.points.sumOf { it.income }
+                        val totalOut = chartData.points.sumOf { it.outcome }
+                        val total = totalInc + totalOut
+                        LegendRow(
+                            color = Color(0xFF2B66FF),
+                            label = "Income · ${selectedFilter.name.lowercase().replaceFirstChar { it.uppercase() }}",
+                            amount = totalInc,
+                            total = total
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LegendRow(
+                            color = Color(0xFF7DD3FC),
+                            label = "Outcome · ${selectedFilter.name.lowercase().replaceFirstChar { it.uppercase() }}",
+                            amount = totalOut,
+                            total = total
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ── AI Insights ────────────────────────────────
+            if (insights.isNotEmpty()) {
+                Text(
+                    text = "AI Insights",
+                    color = FireCashOnSurfaceVariant,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    insights.forEach { insight ->
+                        InsightRow(insight = insight)
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF2B66FF))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.AccountBalanceWallet,
+                            contentDescription = null,
+                            tint = FireCashOnSurfaceVariant,
+                            modifier = Modifier.size(48.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Income", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF7DD3FC))
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Outcome", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Bar chart
-                if (incomeTotal + expenseTotal > 0) {
-                    BarChart(
-                        income = incomeTotal,
-                        expense = expenseTotal,
-                        maxValue = maxBarValue,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp)
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = if (availableMonths.isEmpty()) "No dated transactions yet" else "No transactions in this month",
+                            text = "No data yet",
                             color = FireCashOnSurfaceVariant,
-                            fontSize = 12.sp
+                            style = MaterialTheme.typography.bodyLarge
                         )
                     }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Legend rows
-                if (incomeTotal + expenseTotal > 0) {
-                    LegendRow(
-                        color = Color(0xFF2B66FF),
-                        label = "Income · ${activeMonth?.label?.substringBefore(' ') ?: ""}",
-                        amount = incomeTotal,
-                        total = incomeTotal + expenseTotal
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LegendRow(
-                        color = Color(0xFF7DD3FC),
-                        label = "Outcome · ${activeMonth?.label?.substringBefore(' ') ?: ""}",
-                        amount = expenseTotal,
-                        total = incomeTotal + expenseTotal
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        if (insights.isNotEmpty()) {
-            Text(
-                text = "AI Insights",
-                color = FireCashOnSurfaceVariant,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(insights) { insight ->
-                    InsightRow(insight = insight)
-                }
-            }
-        } else {
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.AccountBalanceWallet,
-                        contentDescription = null,
-                        tint = FireCashOnSurfaceVariant,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "No data yet",
-                        color = FireCashOnSurfaceVariant,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
                 }
             }
         }
     }
 
+    // ── Compare dialog ────────────────────────────────────────
     if (showCompareDialog) {
         AlertDialog(
             onDismissRequest = { showCompareDialog = false },
@@ -412,32 +570,32 @@ fun AnalyticsScreen(
                             .heightIn(max = 360.dp)
                     ) {
                         availableMonths.forEach { mt ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = mt.key in comparedKeys,
-                                onCheckedChange = { checked ->
-                                    if (mt.isCurrent) return@Checkbox
-                                    comparedKeys = if (checked) comparedKeys + mt.key else comparedKeys - mt.key
-                                },
-                                enabled = !mt.isCurrent,
-                                colors = CheckboxDefaults.colors(checkedColor = FireCashPrimary)
-                            )
-                            Text(
-                                text = if (mt.isCurrent) "${mt.label} (current)" else mt.label,
-                                color = if (mt.isCurrent) FireCashOnSurfaceVariant else Color.White,
-                                fontSize = 13.sp
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = mt.key in comparedKeys,
+                                    onCheckedChange = { checked ->
+                                        if (mt.isCurrent) return@Checkbox
+                                        comparedKeys = if (checked) comparedKeys + mt.key else comparedKeys - mt.key
+                                    },
+                                    enabled = !mt.isCurrent,
+                                    colors = CheckboxDefaults.colors(checkedColor = FireCashPrimary)
+                                )
+                                Text(
+                                    text = if (mt.isCurrent) "${mt.label} (current)" else mt.label,
+                                    color = if (mt.isCurrent) FireCashOnSurfaceVariant else Color.White,
+                                    fontSize = 13.sp
+                                )
+                            }
                         }
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Up to 3 months can be compared at once",
-                        color = FireCashOnSurfaceVariant,
-                        fontSize = 11.sp
-                    )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Up to 3 months can be compared at once",
+                            color = FireCashOnSurfaceVariant,
+                            fontSize = 11.sp
+                        )
                     }
                 }
             },
@@ -450,23 +608,209 @@ fun AnalyticsScreen(
     }
 }
 
-private val SLIP_DATE_FORMATS = listOf(
-    "yyyy-MM-dd",
-    "dd/MM/yyyy",
-    "dd-MM-yyyy",
-    "yyyy/MM/dd",
-    "MM/dd/yyyy"
-)
+// ── Chart composables ──────────────────────────────────────────
 
-private fun normalizeDate(raw: String?, today: String): String {
-    val s = raw?.trim().orEmpty()
-    if (s.isBlank()) return today
-    for (f in SLIP_DATE_FORMATS) {
-        val d = runCatching { LocalDate.parse(s, DateTimeFormatter.ofPattern(f, Locale.US)) }.getOrNull()
-        if (d != null) return d.toString()
+private val incomeColor = Color(0xFF2B66FF)
+private val outcomeColor = Color(0xFF7DD3FC)
+private val gridColor = Color(0xFF2A2D35)
+
+/**
+ * Line chart with mild cubic-bezier smoothing ("smoothen out but not much").
+ * Control points are offset 35% along X from each point, keeping the Y horizontal,
+ * so lines curve gently without overshooting.
+ */
+@Composable
+private fun LineChart(
+    data: ChartData,
+    modifier: Modifier = Modifier
+) {
+    val points = data.points
+    val maxVal = data.maxValue
+    if (points.size < 2 || maxVal <= 0) return
+
+    Box(modifier = modifier) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val padL = 40.dp.toPx()
+            val padR = 8.dp.toPx()
+            val padT = 8.dp.toPx()
+            val padB = 28.dp.toPx()
+            val cw = size.width - padL - padR
+            val ch = size.height - padT - padB
+            if (cw <= 0 || ch <= 0) return@Canvas
+
+            val stepX = cw / (points.size - 1).coerceAtLeast(1)
+
+            // Grid lines
+            val gridFractions = listOf(0.0, 0.25, 0.5, 0.75, 1.0)
+            gridFractions.forEach { f ->
+                val y = padT + ch * (1f - f.toFloat())
+                drawLine(gridColor, Offset(padL, y), Offset(padL + cw, y), strokeWidth = 1f)
+            }
+
+            // Y-axis labels
+            val nativeCanvas = drawContext.canvas.nativeCanvas
+            val labelPaint = android.graphics.Paint().apply {
+                color = 0xFF6B7280.toInt()
+                textSize = 9.sp.toPx()
+                textAlign = android.graphics.Paint.Align.RIGHT
+            }
+            gridFractions.forEach { f ->
+                val y = padT + ch * (1f - f.toFloat())
+                val pctLabel = "${(f * 100).toInt()}%"
+                nativeCanvas.drawText(pctLabel, padL - 6.dp.toPx(), y + 3.dp.toPx(), labelPaint)
+            }
+
+            // Build line points
+            val incPoints = points.mapIndexed { i, p ->
+                Offset(
+                    padL + i * stepX,
+                    padT + ch * (1f - (p.income / maxVal).toFloat()).coerceIn(0f, 1f)
+                )
+            }
+            val outPoints = points.mapIndexed { i, p ->
+                Offset(
+                    padL + i * stepX,
+                    padT + ch * (1f - (p.outcome / maxVal).toFloat()).coerceIn(0f, 1f)
+                )
+            }
+
+            // Draw mild-smooth lines
+            drawSmoothLine(incPoints, incomeColor)
+            drawSmoothLine(outPoints, outcomeColor)
+
+            // X-axis labels — show subset to avoid crowding
+            val maxLabels = 8f
+            val labelStep = (points.size / maxLabels).toInt().coerceAtLeast(1)
+            val xLabelPaint = android.graphics.Paint().apply {
+                color = 0xFF6B7280.toInt()
+                textSize = 9.sp.toPx()
+                textAlign = android.graphics.Paint.Align.CENTER
+                isFakeBoldText = false
+            }
+            points.forEachIndexed { i, p ->
+                if (i % labelStep == 0 || i == points.size - 1) {
+                    val x = padL + i * stepX
+                    nativeCanvas.drawText(p.label, x, size.height - 4.dp.toPx(), xLabelPaint)
+                }
+            }
+        }
     }
-    return today
 }
+
+private fun DrawScope.drawSmoothLine(points: List<Offset>, color: Color) {
+    if (points.size < 2) return
+    val path = Path()
+    path.moveTo(points[0].x, points[0].y)
+
+    for (i in 0 until points.size - 1) {
+        val cur = points[i]
+        val nxt = points[i + 1]
+        val dx = nxt.x - cur.x
+        // Mild cubic bezier: leave horizontally toward next, arrive horizontally from prev
+        // 0.35f gives gentle smoothing without overshoot
+        path.cubicTo(
+            cur.x + dx * 0.35f, cur.y,
+            nxt.x - dx * 0.35f, nxt.y,
+            nxt.x, nxt.y
+        )
+    }
+
+    drawPath(
+        path,
+        color = color,
+        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+    )
+    // Dots at each data point
+    points.forEach { pt ->
+        drawCircle(color = color, radius = 3.dp.toPx(), center = pt)
+    }
+}
+
+/**
+ * Vertical grouped bar chart for Year view — each month has an income bar + outcome bar.
+ */
+@Composable
+private fun YearBarChart(
+    data: ChartData,
+    modifier: Modifier = Modifier
+) {
+    val points = data.points
+    val maxVal = data.maxValue
+    if (points.isEmpty() || maxVal <= 0) return
+
+    Box(modifier = modifier) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val padL = 32.dp.toPx()
+            val padR = 8.dp.toPx()
+            val padT = 8.dp.toPx()
+            val padB = 28.dp.toPx()
+            val cw = size.width - padL - padR
+            val ch = size.height - padT - padB
+            if (cw <= 0 || ch <= 0) return@Canvas
+
+            val barGroupWidth = cw / points.size
+            val barWidth = (barGroupWidth * 0.35f).coerceAtMost(16.dp.toPx())
+            val gap = (barGroupWidth - barWidth * 2) / 3f
+
+            // Grid lines
+            val gridFractions = listOf(0.0, 0.25, 0.5, 0.75, 1.0)
+            gridFractions.forEach { f ->
+                val y = padT + ch * (1f - f.toFloat())
+                drawLine(gridColor, Offset(padL, y), Offset(padL + cw, y), strokeWidth = 1f)
+            }
+
+            val nativeCanvas = drawContext.canvas.nativeCanvas
+            val labelPaint = android.graphics.Paint().apply {
+                color = 0xFF6B7280.toInt()
+                textSize = 9.sp.toPx()
+                textAlign = android.graphics.Paint.Align.RIGHT
+            }
+            gridFractions.forEach { f ->
+                val y = padT + ch * (1f - f.toFloat())
+                nativeCanvas.drawText(
+                    "${(f * 100).toInt()}%",
+                    padL - 6.dp.toPx(),
+                    y + 3.dp.toPx(),
+                    labelPaint
+                )
+            }
+
+            // Bars + X labels
+            val xLabelPaint = android.graphics.Paint().apply {
+                color = 0xFF6B7280.toInt()
+                textSize = 8.sp.toPx()
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+            points.forEachIndexed { i, p ->
+                val gx = padL + i * barGroupWidth
+                val incH = (ch * (p.income / maxVal).toFloat()).coerceAtMost(ch)
+                val outH = (ch * (p.outcome / maxVal).toFloat()).coerceAtMost(ch)
+
+                // Income bar (left)
+                drawRect(
+                    color = incomeColor,
+                    topLeft = Offset(gx + gap, padT + ch - incH),
+                    size = androidx.compose.ui.geometry.Size(barWidth, incH)
+                )
+                // Outcome bar (right)
+                drawRect(
+                    color = outcomeColor,
+                    topLeft = Offset(gx + gap * 2 + barWidth, padT + ch - outH),
+                    size = androidx.compose.ui.geometry.Size(barWidth, outH)
+                )
+                // X label
+                nativeCanvas.drawText(
+                    p.label,
+                    gx + barGroupWidth / 2f,
+                    size.height - 4.dp.toPx(),
+                    xLabelPaint
+                )
+            }
+        }
+    }
+}
+
+// ── Shared UI components ───────────────────────────────────────
 
 private data class MonthTotals(
     val key: String,
@@ -475,97 +819,6 @@ private data class MonthTotals(
     val expense: Double,
     val isCurrent: Boolean
 )
-
-@Composable
-private fun BarChart(
-    income: Double,
-    expense: Double,
-    maxValue: Double,
-    modifier: Modifier = Modifier
-) {
-    val barCount = 6
-    val labels = listOf("JAN", "MAR", "MAY", "JUL", "AUG", "DEC")
-    val gridLines = listOf(0.0, 0.25, 0.5, 0.75, 1.0)
-
-    Box(modifier = modifier) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val chartLeft = 0f
-            val chartRight = size.width
-            val chartTop = 0f
-            val chartBottom = size.height - 20.dp.toPx()
-            val chartHeight = chartBottom - chartTop
-
-            // Horizontal grid lines
-            gridLines.forEach { fraction ->
-                val y = chartBottom - (chartHeight * fraction).toFloat()
-                drawLine(
-                    color = Color(0xFF2A2D35),
-                    start = Offset(chartLeft, y),
-                    end = Offset(chartRight, y),
-                    strokeWidth = 1f
-                )
-            }
-
-            // Bar dimensions
-            val barWidth = (chartRight - chartLeft) / barCount * 0.5f
-            val gap = (chartRight - chartLeft) / barCount
-            val barStartX = chartLeft + gap * 0.25f
-
-            // X-axis labels + percentage labels via drawIntoCanvas
-            drawIntoCanvas { canvas ->
-                val nativeCanvas = canvas.nativeCanvas
-                gridLines.forEach { fraction ->
-                    val y = chartBottom - (chartHeight * fraction).toFloat()
-                    val pctLabel = "${(fraction * 100).toInt()}%"
-                    nativeCanvas.drawText(
-                        pctLabel,
-                        chartLeft + 4.dp.toPx(),
-                        y - 4.dp.toPx(),
-                        android.graphics.Paint().apply {
-                            color = 0xFF6B7280.toInt()
-                            textSize = 9.sp.toPx()
-                            textAlign = android.graphics.Paint.Align.LEFT
-                        }
-                    )
-                }
-
-                // X-axis labels
-                labels.forEachIndexed { index, label ->
-                    val x = barStartX + index * gap + barWidth
-                    nativeCanvas.drawText(
-                        label,
-                        x,
-                        size.height - 2.dp.toPx(),
-                        android.graphics.Paint().apply {
-                            color = if (label == "AUG") 0xFF2B66FF.toInt() else 0xFF6B7280.toInt()
-                            textSize = 9.sp.toPx()
-                            textAlign = android.graphics.Paint.Align.CENTER
-                            isFakeBoldText = label == "AUG"
-                        }
-                    )
-                }
-            }
-
-            // Income bars (blue #2B66FF)
-            val incomeHeight = (chartHeight * (income / maxValue)).toFloat().coerceAtMost(chartHeight)
-            drawRect(
-                color = Color(0xFF2B66FF),
-                topLeft = Offset(barStartX, chartBottom - incomeHeight),
-                size = Size(barWidth, incomeHeight),
-                style = Fill
-            )
-
-            // Expense bars (light blue #7DD3FC)
-            val expenseHeight = (chartHeight * (expense / maxValue)).toFloat().coerceAtMost(chartHeight)
-            drawRect(
-                color = Color(0xFF7DD3FC),
-                topLeft = Offset(barStartX + gap, chartBottom - expenseHeight),
-                size = Size(barWidth, expenseHeight),
-                style = Fill
-            )
-        }
-    }
-}
 
 @Composable
 private fun LegendRow(
@@ -676,4 +929,3 @@ private fun InsightRow(insight: SpendingInsight) {
         }
     }
 }
-

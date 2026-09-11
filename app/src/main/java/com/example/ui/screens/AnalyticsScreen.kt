@@ -8,8 +8,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -25,7 +27,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -33,6 +37,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -672,8 +677,28 @@ private fun LineChart(
     val maxVal = data.maxValue
     if (points.size < 2 || maxVal <= 0) return
 
-    Box(modifier = modifier) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
+    var selectedIndex by remember { mutableStateOf(-1) }
+    val chartW = remember { mutableStateOf(0f) }
+
+        Box(modifier = modifier) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onSizeChanged { chartW.value = it.width.toFloat() }
+                    .pointerInput(points.size) {
+                        detectTapGestures { offset ->
+                            val padL = 40.dp.toPx()
+                            val padR = 8.dp.toPx()
+                            val cw = chartW.value - padL - padR
+                            if (cw > 0f && points.size > 1) {
+                            val stepX = cw / (points.size - 1)
+                            val idx = ((offset.x - padL) / stepX + 0.5f).toInt()
+                                .coerceIn(0, points.size - 1)
+                            selectedIndex = if (selectedIndex == idx) -1 else idx
+                        }
+                    }
+                }
+        ) {
             val padL = 40.dp.toPx()
             val padR = 8.dp.toPx()
             val padT = 8.dp.toPx()
@@ -739,7 +764,79 @@ private fun LineChart(
                     nativeCanvas.drawText(p.label, x, size.height - 4.dp.toPx(), xLabelPaint)
                 }
             }
+
+            // Highlight selected point + draw tooltip
+            if (selectedIndex in points.indices) {
+                val sp = points[selectedIndex]
+                val sx = padL + selectedIndex * stepX
+                // Bigger dot on selected point
+                val incY = padT + ch * (1f - (sp.income / maxVal).toFloat()).coerceIn(0f, 1f)
+                val outY = padT + ch * (1f - (sp.outcome / maxVal).toFloat()).coerceIn(0f, 1f)
+                drawCircle(color = Color.White, radius = 5.dp.toPx(), center = Offset(sx, incY))
+                drawCircle(color = Color.White, radius = 5.dp.toPx(), center = Offset(sx, outY))
+                // Tooltip
+                drawPointTooltip(sp, sx, minOf(incY, outY), padL, padR, padT, size)
+            }
         }
+    }
+}
+
+private fun DrawScope.drawPointTooltip(
+    point: ChartPoint,
+    pointX: Float,
+    pointY: Float,
+    padL: Float,
+    padR: Float,
+    padT: Float,
+    canvasSize: Size
+) {
+    val lines = buildList {
+        add(point.label)
+        val incStr = "↑ THB %.2f".format(Locale.US, point.income)
+        add(incStr)
+        val outStr = "↓ THB %.2f".format(Locale.US, point.outcome)
+        add(outStr)
+        val net = point.income - point.outcome
+        val prefix = if (net >= 0) "+" else ""
+        add("Net %sTHB %.2f".format(prefix, Locale.US, net))
+    }
+
+    val titlePaint = android.graphics.Paint().apply {
+        color = 0xFFB3C5FF.toInt()
+        textSize = 12.sp.toPx()
+        isAntiAlias = true
+        isFakeBoldText = true
+    }
+    val textPaint = android.graphics.Paint().apply {
+        color = android.graphics.Color.WHITE
+        textSize = 11.sp.toPx()
+        isAntiAlias = true
+    }
+    val lineH = textPaint.fontSpacing
+    val titleW = lines.subList(0, 1).maxOf { titlePaint.measureText(it) }
+    val bodyW = lines.subList(1, lines.size).maxOf { textPaint.measureText(it) }
+    val maxW = maxOf(titleW, bodyW)
+    val padH = 12.dp.toPx()
+    val padV = 10.dp.toPx()
+    val tw = maxW + padH * 2
+    val th = lines.size * lineH + padV * 2
+
+    // Position above the point
+    var tx = (pointX - tw / 2f).coerceIn(padL, canvasSize.width - padR - tw)
+    var ty = pointY - th - 6.dp.toPx()
+    if (ty < padT) ty = (pointY + 6.dp.toPx()).coerceAtMost(canvasSize.height - th - 4.dp.toPx())
+
+    // Background
+    drawRoundRect(Color(0xFF1C1E24), Offset(tx, ty), Size(tw, th), CornerRadius(8.dp.toPx()))
+    drawRoundRect(Color(0xFF2A2D35), Offset(tx, ty), Size(tw, th), CornerRadius(8.dp.toPx()),
+        style = Stroke(1.dp.toPx()))
+
+    // Text lines
+    lines.forEachIndexed { i, txt ->
+        val p = if (i == 0) titlePaint else textPaint
+        val x = tx + padH
+        val y = ty + padV + i * lineH + p.textSize
+        drawContext.canvas.nativeCanvas.drawText(txt, x, y, p)
     }
 }
 
@@ -784,8 +881,28 @@ private fun YearBarChart(
     val maxVal = data.maxValue
     if (points.isEmpty() || maxVal <= 0) return
 
-    Box(modifier = modifier) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
+    var selectedIndex by remember { mutableStateOf(-1) }
+    val chartW2 = remember { mutableStateOf(0f) }
+
+        Box(modifier = modifier) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onSizeChanged { chartW2.value = it.width.toFloat() }
+                    .pointerInput(points.size) {
+                        detectTapGestures { offset ->
+                            val padL = 32.dp.toPx()
+                            val padR = 8.dp.toPx()
+                            val cw = chartW2.value - padL - padR
+                            if (cw > 0f && points.isNotEmpty()) {
+                            val barGroupW = cw / points.size
+                            val idx = ((offset.x - padL) / barGroupW).toInt()
+                                .coerceIn(0, points.size - 1)
+                            selectedIndex = if (selectedIndex == idx) -1 else idx
+                        }
+                    }
+                }
+        ) {
             val padL = 32.dp.toPx()
             val padR = 8.dp.toPx()
             val padT = 8.dp.toPx()
@@ -835,13 +952,13 @@ private fun YearBarChart(
                 drawRect(
                     color = incomeColor,
                     topLeft = Offset(gx + gap, padT + ch - incH),
-                    size = androidx.compose.ui.geometry.Size(barWidth, incH)
+                    size = Size(barWidth, incH)
                 )
                 // Outcome bar (right)
                 drawRect(
                     color = outcomeColor,
                     topLeft = Offset(gx + gap * 2 + barWidth, padT + ch - outH),
-                    size = androidx.compose.ui.geometry.Size(barWidth, outH)
+                    size = Size(barWidth, outH)
                 )
                 // X label
                 nativeCanvas.drawText(
@@ -850,6 +967,17 @@ private fun YearBarChart(
                     size.height - 4.dp.toPx(),
                     xLabelPaint
                 )
+            }
+
+            // Highlight selected bar + draw tooltip
+            if (selectedIndex in points.indices) {
+                val sp = points[selectedIndex]
+                val sx = padL + selectedIndex * barGroupWidth + barGroupWidth / 2f
+                // Tooltip at top of bars
+                val incH = (ch * (sp.income / maxVal).toFloat()).coerceAtMost(ch)
+                val outH = (ch * (sp.outcome / maxVal).toFloat()).coerceAtMost(ch)
+                val tipY = padT + ch - maxOf(incH, outH)
+                drawPointTooltip(sp, sx, tipY, padL, padR, padT, size)
             }
         }
     }

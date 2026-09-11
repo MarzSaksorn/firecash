@@ -532,3 +532,21 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
   - Renders the same mild-smooth line chart as Week/Month.
 - **Build verified:** `assembleDebug` + `adb install -r` succeeded.
 
+---
+
+## Day 16 (continued) — Tap chart points to show detail tooltip popup
+
+**Goal:** When user taps a data point on a chart, show a popup with income, outcome, and net balance for that point.
+
+### Changes
+- **`AnalyticsScreen.kt`** — added tap detection to `LineChart` and `YearBarChart` via `pointerInput` + `detectTapGestures`.
+- Tapping a point stores its index; tapping the same point again dismisses the tooltip.
+- `drawPointTooltip()` renders a dark rounded rectangle near the tapped point with:
+  - Date/week/month label (accent colored title)
+  - ↑ THB income
+  - ↓ THB outcome
+  - Net ±THB balance
+- Tooltip auto-positions above the point (below if near top edge).
+- Added imports: `detectTapGestures`, `pointerInput`, `CornerRadius`, `onSizeChanged`.
+- **Build verified:** `assembleDebug` + `adb install -r` succeeded.
+

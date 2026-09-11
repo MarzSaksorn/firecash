@@ -610,6 +610,26 @@ fun AnalyticsScreen(
 
 // ── Chart composables ──────────────────────────────────────────
 
+/**
+ * Compute a visually pleasant round step for Y-axis grid labels.
+ * e.g. maxVal=512 → step=100, so labels: 0, 100, 200, 300, 400, 500, 600
+ */
+private fun computeNiceStep(maxVal: Double): Double {
+    val targetSteps = 5
+    if (maxVal <= 0) return 1.0
+    val rawStep = maxVal / targetSteps
+    val magnitude = Math.pow(10.0, Math.floor(Math.log10(rawStep)))
+    val residual = rawStep / magnitude
+    val niceStep = when {
+        residual < 1.5 -> magnitude
+        residual < 3.5 -> 2 * magnitude
+        residual < 7.5 -> 5 * magnitude
+        else -> 10 * magnitude
+    }
+    return niceStep
+}
+
+
 private val incomeColor = Color(0xFF2B66FF)
 private val outcomeColor = Color(0xFF7DD3FC)
 private val gridColor = Color(0xFF2A2D35)
@@ -640,24 +660,26 @@ private fun LineChart(
 
             val stepX = cw / (points.size - 1).coerceAtLeast(1)
 
-            // Grid lines
-            val gridFractions = listOf(0.0, 0.25, 0.5, 0.75, 1.0)
-            gridFractions.forEach { f ->
-                val y = padT + ch * (1f - f.toFloat())
-                drawLine(gridColor, Offset(padL, y), Offset(padL + cw, y), strokeWidth = 1f)
-            }
+            // Compute nice round grid step
+            val niceStep = computeNiceStep(maxVal)
+            val niceMax = Math.ceil(maxVal / niceStep) * niceStep
+            val gridCount = (niceMax / niceStep).toInt().coerceAtLeast(1)
 
-            // Y-axis labels
+            // Grid lines + Y-axis labels (THB scale)
             val nativeCanvas = drawContext.canvas.nativeCanvas
             val labelPaint = android.graphics.Paint().apply {
                 color = 0xFF6B7280.toInt()
                 textSize = 9.sp.toPx()
                 textAlign = android.graphics.Paint.Align.RIGHT
             }
-            gridFractions.forEach { f ->
-                val y = padT + ch * (1f - f.toFloat())
-                val pctLabel = "${(f * 100).toInt()}%"
-                nativeCanvas.drawText(pctLabel, padL - 6.dp.toPx(), y + 3.dp.toPx(), labelPaint)
+            for (i in 0..gridCount) {
+                val thb = i * niceStep
+                val fraction = (thb / niceMax).toFloat()
+                val y = padT + ch * (1f - fraction)
+                drawLine(gridColor, Offset(padL, y), Offset(padL + cw, y), strokeWidth = 1f)
+                val thbLabel = if (thb >= 1000) "THB %.0f".format(Locale.US, thb)
+                               else "THB %.2f".format(Locale.US, thb)
+                nativeCanvas.drawText(thbLabel, padL - 6.dp.toPx(), y + 3.dp.toPx(), labelPaint)
             }
 
             // Build line points
@@ -752,27 +774,26 @@ private fun YearBarChart(
             val barWidth = (barGroupWidth * 0.35f).coerceAtMost(16.dp.toPx())
             val gap = (barGroupWidth - barWidth * 2) / 3f
 
-            // Grid lines
-            val gridFractions = listOf(0.0, 0.25, 0.5, 0.75, 1.0)
-            gridFractions.forEach { f ->
-                val y = padT + ch * (1f - f.toFloat())
-                drawLine(gridColor, Offset(padL, y), Offset(padL + cw, y), strokeWidth = 1f)
-            }
+            // Compute nice round grid step
+            val niceStep = computeNiceStep(maxVal)
+            val niceMax = Math.ceil(maxVal / niceStep) * niceStep
+            val gridCount = (niceMax / niceStep).toInt().coerceAtLeast(1)
 
+            // Grid lines + Y-axis labels (THB scale)
             val nativeCanvas = drawContext.canvas.nativeCanvas
             val labelPaint = android.graphics.Paint().apply {
                 color = 0xFF6B7280.toInt()
                 textSize = 9.sp.toPx()
                 textAlign = android.graphics.Paint.Align.RIGHT
             }
-            gridFractions.forEach { f ->
-                val y = padT + ch * (1f - f.toFloat())
-                nativeCanvas.drawText(
-                    "${(f * 100).toInt()}%",
-                    padL - 6.dp.toPx(),
-                    y + 3.dp.toPx(),
-                    labelPaint
-                )
+            for (i in 0..gridCount) {
+                val thb = i * niceStep
+                val fraction = (thb / niceMax).toFloat()
+                val y = padT + ch * (1f - fraction)
+                drawLine(gridColor, Offset(padL, y), Offset(padL + cw, y), strokeWidth = 1f)
+                val thbLabel = if (thb >= 1000) "THB %.0f".format(Locale.US, thb)
+                               else "THB %.2f".format(Locale.US, thb)
+                nativeCanvas.drawText(thbLabel, padL - 6.dp.toPx(), y + 3.dp.toPx(), labelPaint)
             }
 
             // Bars + X labels

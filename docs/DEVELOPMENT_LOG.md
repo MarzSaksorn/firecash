@@ -514,5 +514,6 @@ The OCR pipeline is wired end-to-end (camera → file → ViewModel → OcrProce
   - Legends and total rows update per filter.
   - Removed old static `BarChart` with hardcoded labels. Removed `Canvas`/`Size`/`Fill`/`drawIntoCanvas` unused imports.
   - `Compare` button only visible in Month view.
-- **Build verified:** `assembleDebug` + `adb install -r` succeeded.
+  - **Y-axis scale now shows THB amounts** instead of percentages: grid line labels display actual THB values matching the data range. Both line chart and bar chart use `computeNiceStep()` to calculate clean round grid steps (e.g. 0, 100, 200, 300... rather than arbitrary fractions of maxVal). The scale adjusts dynamically per filter period since `maxVal` is recomputed per week/month/year.
+  - **Build verified:** `assembleDebug` + `adb install -r` succeeded.
 

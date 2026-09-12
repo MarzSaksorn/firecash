@@ -787,38 +787,10 @@ fun MainApp(modifier: Modifier = Modifier) {
     }
 
     Scaffold(
-        containerColor = FireCashBackground,
-        modifier = modifier.fillMaxSize(),
-        bottomBar = {
-            FireCashBottomBar(
-                currentTab = currentTab,
-                onTabSelected = { tab ->
-                    currentTab = tab
-                    when (tab) {
-                        NavTab.HOME, NavTab.CARDS -> {
-                            showSavedSlips = true
-                            showCapture = false
-                            showPayload = false
-                            showAnalytics = false
-                        }
-                        NavTab.SPENDING -> {
-                            showAnalytics = true
-                            showSavedSlips = false
-                            showCapture = false
-                            showPayload = false
-                        }
-                        NavTab.PROFILE -> {
-                            showSavedSlips = false
-                            showCapture = false
-                            showPayload = false
-                            showAnalytics = false
-                        }
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(bottom = paddingValues.calculateBottomPadding())) {
+            containerColor = FireCashBackground,
+            modifier = modifier.fillMaxSize()
+        ) { _ ->
+                    Box(modifier = Modifier.fillMaxSize()) {
         if (showPayload) {
             QrPayloadScreen(
                 payload = qrPayload,

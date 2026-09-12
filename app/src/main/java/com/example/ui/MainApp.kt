@@ -545,13 +545,8 @@ fun MainApp(modifier: Modifier = Modifier) {
             android.util.Log.d("FireCashOCR", "scanFolder: found ${files.size} image files, processedFiles=${processedFiles.size}")
 
             for (file in files) {
-                val fileKey = file.uri.toString()
-                android.util.Log.d("FireCashOCR", "scanFolder: checking file=${file.name} key=${fileKey.takeLast(40)} inProcessed=${fileKey in processedFiles}")
-                // DIAG: temporarily force re-scan even if cached, to test fallback fix on existing files
-                // TODO remove after verified — restores cache skip
-                // if (fileKey in processedFiles) continue
-                val isCached = fileKey in processedFiles
-                if (isCached) android.util.Log.d("FireCashOCR", "scanFolder: RE-SCANNING cached file ${file.name} (diag override)")
+                            val fileKey = file.uri.toString()
+                            if (fileKey in processedFiles) continue
 
             val tempFile = File(
                 context.cacheDir,

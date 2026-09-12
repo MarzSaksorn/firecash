@@ -125,7 +125,7 @@ object SlipDataParser {
             if (matcher.find()) {
                 val cleanAmount = matcher.group(1)?.replace(",", "") ?: ""
                 val value = cleanAmount.toDoubleOrNull()
-                if (value != null && value > 0.0) {
+                if (value != null && value >= 0.0) {
                     return Triple(value, String.format(Locale.US, "%.2f", value), currency)
                 }
             }
@@ -149,15 +149,32 @@ object SlipDataParser {
         }
         for (pattern in DATE_PATTERNS) {
             val matcher = pattern.matcher(text)
-            if (matcher.find()) {
-                val found = matcher.group(1) ?: return null
-                if (found.contains("-") && found.length == 10) return found
-                try {
-                    val parsed = SimpleDateFormat("d MMM yyyy", Locale.ENGLISH).parse(found)
-                    if (parsed != null) return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(parsed)
-                } catch (_: Exception) {
-                    return null
+            if (!matcher.find()) continue
+            val found = matcher.group(1) ?: continue
+
+            // Pattern 1: ISO yyyy-MM-dd (starts with 202x)
+            if (found.startsWith("202") && found.length == 10) return found
+
+            // Pattern 2: dd/MM/yyyy, dd-MM-yyyy, dd.MM.yyyy
+            if (found.any { it in "/.-" }) {
+                val parts = found.split(Regex("""[/\-.]"""))
+                if (parts.size == 3) {
+                    val year = parts[2].toIntOrNull()
+                    val month = parts[1].toIntOrNull()
+                    val day = parts[0].toIntOrNull()
+                    if (year != null && month != null && day != null && month in 1..12 && day in 1..31) {
+                        return String.format(Locale.US, "%04d-%02d-%02d", year, month, day)
+                    }
                 }
+                continue // badly formed — try next pattern
+            }
+
+            // Pattern 3: English month name (e.g. "24 Oct 2023", "31 Aug 2026")
+            try {
+                val parsed = SimpleDateFormat("d MMM yyyy", Locale.ENGLISH).parse(found)
+                if (parsed != null) return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(parsed)
+            } catch (_: Exception) {
+                return null
             }
         }
         return null

@@ -868,15 +868,11 @@ private fun DrawScope.drawSmoothLine(points: List<Offset>, color: Color) {
     }
 
     drawPath(
-        path,
-        color = color,
-        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-    )
-    // Dots at each data point
-    points.forEach { pt ->
-        drawCircle(color = color, radius = 3.dp.toPx(), center = pt)
+            path,
+            color = color,
+            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
     }
-}
 
 /**
  * Vertical grouped bar chart for Year view — each month has an income bar + outcome bar.

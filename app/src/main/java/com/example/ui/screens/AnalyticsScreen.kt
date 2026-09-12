@@ -146,23 +146,16 @@ private fun computeDayData(expenses: List<Expense>, now: LocalDate): ChartData {
 }
 
 private fun computeWeekData(expenses: List<Expense>, now: LocalDate): ChartData {
-    val ym = YearMonth.from(now)
-    val lastDay = ym.lengthOfMonth()
-    // Weekly boundaries starting at day 1, every 7 days
-    val boundaries = (1..lastDay step 7).toList()
-    val labels = boundaries.indices.map { "Week ${it + 1}" }
-    val points = boundaries.mapIndexed { i, startDay ->
-        val endDay = if (i < boundaries.lastIndex) boundaries[i + 1] - 1 else lastDay
-        val prefix = ym.toString() + "-"
-        val weekExp = expenses.filter { e ->
-            if (!e.date.startsWith(prefix)) return@filter false
-            val day = e.date.substringAfterLast("-").toIntOrNull() ?: return@filter false
-            day in startDay..endDay
-        }
+    val monday = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+    val labels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    val points = (0..6).map { i ->
+        val day = monday.plusDays(i.toLong())
+        val ds = day.toString()
+        val dayExp = expenses.filter { it.date == ds }
         ChartPoint(
             label = labels[i],
-            income = weekExp.filter { it.category == "Income" }.sumOf { it.amount },
-            outcome = weekExp.filter { it.category != "Income" }.sumOf { it.amount }
+            income = dayExp.filter { it.category == "Income" }.sumOf { it.amount },
+            outcome = dayExp.filter { it.category != "Income" }.sumOf { it.amount }
         )
     }
     val mx = points.maxOfOrNull { maxOf(it.income, it.outcome) } ?: 0.0
@@ -423,10 +416,9 @@ fun AnalyticsScreen(
                             .padding(2.dp)
                     ) {
                         listOf(
-                            AnalyticsFilter.DAY to "Day",
-                            AnalyticsFilter.WEEK to "Week",
-                            AnalyticsFilter.MONTH to "Month",
-                            AnalyticsFilter.YEAR to "Year"
+                                                    AnalyticsFilter.WEEK to "Week",
+                                                    AnalyticsFilter.MONTH to "Month",
+                                                    AnalyticsFilter.YEAR to "Year"
                         ).forEach { (filter, label) ->
                             val isActive = filter == selectedFilter
                             Box(

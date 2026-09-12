@@ -8,7 +8,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.layout.onSizeChanged
@@ -145,16 +146,23 @@ private fun computeDayData(expenses: List<Expense>, now: LocalDate): ChartData {
 }
 
 private fun computeWeekData(expenses: List<Expense>, now: LocalDate): ChartData {
-    val monday = now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-    val labels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-    val points = (0..6).map { i ->
-        val day = monday.plusDays(i.toLong())
-        val ds = day.toString()
-        val dayExp = expenses.filter { it.date == ds }
+    val ym = YearMonth.from(now)
+    val lastDay = ym.lengthOfMonth()
+    // Weekly boundaries starting at day 1, every 7 days
+    val boundaries = (1..lastDay step 7).toList()
+    val labels = boundaries.indices.map { "Week ${it + 1}" }
+    val points = boundaries.mapIndexed { i, startDay ->
+        val endDay = if (i < boundaries.lastIndex) boundaries[i + 1] - 1 else lastDay
+        val prefix = ym.toString() + "-"
+        val weekExp = expenses.filter { e ->
+            if (!e.date.startsWith(prefix)) return@filter false
+            val day = e.date.substringAfterLast("-").toIntOrNull() ?: return@filter false
+            day in startDay..endDay
+        }
         ChartPoint(
             label = labels[i],
-            income = dayExp.filter { it.category == "Income" }.sumOf { it.amount },
-            outcome = dayExp.filter { it.category != "Income" }.sumOf { it.amount }
+            income = weekExp.filter { it.category == "Income" }.sumOf { it.amount },
+            outcome = weekExp.filter { it.category != "Income" }.sumOf { it.amount }
         )
     }
     val mx = points.maxOfOrNull { maxOf(it.income, it.outcome) } ?: 0.0
@@ -344,17 +352,17 @@ fun AnalyticsScreen(
             ) {
                 StatCard(
                     title = "Total Spent",
-                    value = "THB %.2f".format(Locale.US, totalSpent),
+                    value = String.format(Locale.US, "THB %.2f", totalSpent),
                     modifier = Modifier.weight(1f)
                 )
                 StatCard(
                     title = "Avg/Day",
-                    value = "THB %.2f".format(Locale.US, avgPerDay),
+                    value = String.format(Locale.US, "THB %.2f", avgPerDay),
                     modifier = Modifier.weight(1f)
                 )
                 StatCard(
                     title = "vs Last",
-                    value = "%+.1f%%".format(Locale.US, changePct),
+                    value = String.format(Locale.US, "%+.1f%%", changePct),
                     valueColor = if (changePct >= 0) FireCashError else FireCashSecondary,
                     modifier = Modifier.weight(1f)
                 )
@@ -686,18 +694,27 @@ private fun LineChart(
                     .fillMaxSize()
                     .onSizeChanged { chartW.value = it.width.toFloat() }
                     .pointerInput(points.size) {
-                        detectTapGestures { offset ->
-                            val padL = 40.dp.toPx()
-                            val padR = 8.dp.toPx()
-                            val cw = chartW.value - padL - padR
-                            if (cw > 0f && points.size > 1) {
-                            val stepX = cw / (points.size - 1)
-                            val idx = ((offset.x - padL) / stepX + 0.5f).toInt()
-                                .coerceIn(0, points.size - 1)
-                            selectedIndex = if (selectedIndex == idx) -1 else idx
-                        }
-                    }
-                }
+                                            val padL = 40.dp.toPx()
+                                            val padR = 8.dp.toPx()
+                                            fun xToIndex(x: Float): Int {
+                                                val cw = chartW.value - padL - padR
+                                                if (cw <= 0f || points.size < 2) return -1
+                                                val stepX = cw / (points.size - 1)
+                                                return ((x - padL) / stepX + 0.5f).toInt().coerceIn(0, points.size - 1)
+                                            }
+                                            awaitEachGesture {
+                                                val down = awaitFirstDown(requireUnconsumed = false)
+                                                selectedIndex = xToIndex(down.position.x)
+                                                do {
+                                                    val event = awaitPointerEvent()
+                                                    val change = event.changes.firstOrNull() ?: break
+                                                    if (change.pressed) {
+                                                        selectedIndex = xToIndex(change.position.x)
+                                                        change.consume()
+                                                    } else { break }
+                                                } while (true)
+                                            }
+                                        }
         ) {
             val padL = 40.dp.toPx()
             val padR = 8.dp.toPx()
@@ -726,8 +743,8 @@ private fun LineChart(
                 val fraction = (thb / niceMax).toFloat()
                 val y = padT + ch * (1f - fraction)
                 drawLine(gridColor, Offset(padL, y), Offset(padL + cw, y), strokeWidth = 1f)
-                val thbLabel = if (thb >= 1000) "THB %.0f".format(Locale.US, thb)
-                               else "THB %.2f".format(Locale.US, thb)
+                val thbLabel = if (thb >= 1000) String.format(Locale.US, "THB %.0f", thb)
+                               else String.format(Locale.US, "THB %.2f", thb)
                 nativeCanvas.drawText(thbLabel, padL - 6.dp.toPx(), y + 3.dp.toPx(), labelPaint)
             }
 
@@ -792,13 +809,13 @@ private fun DrawScope.drawPointTooltip(
 ) {
     val lines = buildList {
         add(point.label)
-        val incStr = "↑ THB %.2f".format(Locale.US, point.income)
+        val incStr = String.format(Locale.US, "↑ THB %.2f", point.income)
         add(incStr)
-        val outStr = "↓ THB %.2f".format(Locale.US, point.outcome)
+        val outStr = String.format(Locale.US, "↓ THB %.2f", point.outcome)
         add(outStr)
         val net = point.income - point.outcome
         val prefix = if (net >= 0) "+" else ""
-        add("Net %sTHB %.2f".format(prefix, Locale.US, net))
+        add(String.format(Locale.US, "Net %sTHB %.2f", prefix, net))
     }
 
     val titlePaint = android.graphics.Paint().apply {
@@ -890,18 +907,27 @@ private fun YearBarChart(
                     .fillMaxSize()
                     .onSizeChanged { chartW2.value = it.width.toFloat() }
                     .pointerInput(points.size) {
-                        detectTapGestures { offset ->
-                            val padL = 32.dp.toPx()
-                            val padR = 8.dp.toPx()
-                            val cw = chartW2.value - padL - padR
-                            if (cw > 0f && points.isNotEmpty()) {
-                            val barGroupW = cw / points.size
-                            val idx = ((offset.x - padL) / barGroupW).toInt()
-                                .coerceIn(0, points.size - 1)
-                            selectedIndex = if (selectedIndex == idx) -1 else idx
-                        }
-                    }
-                }
+                                            val padL = 32.dp.toPx()
+                                            val padR = 8.dp.toPx()
+                                            fun xToIndex(x: Float): Int {
+                                                val cw = chartW2.value - padL - padR
+                                                if (cw <= 0f || points.isEmpty()) return -1
+                                                val barGroupW = cw / points.size
+                                                return ((x - padL) / barGroupW).toInt().coerceIn(0, points.size - 1)
+                                            }
+                                            awaitEachGesture {
+                                                val down = awaitFirstDown(requireUnconsumed = false)
+                                                selectedIndex = xToIndex(down.position.x)
+                                                do {
+                                                    val event = awaitPointerEvent()
+                                                    val change = event.changes.firstOrNull() ?: break
+                                                    if (change.pressed) {
+                                                        selectedIndex = xToIndex(change.position.x)
+                                                        change.consume()
+                                                    } else { break }
+                                                } while (true)
+                                            }
+                                        }
         ) {
             val padL = 32.dp.toPx()
             val padR = 8.dp.toPx()
@@ -932,8 +958,8 @@ private fun YearBarChart(
                 val fraction = (thb / niceMax).toFloat()
                 val y = padT + ch * (1f - fraction)
                 drawLine(gridColor, Offset(padL, y), Offset(padL + cw, y), strokeWidth = 1f)
-                val thbLabel = if (thb >= 1000) "THB %.0f".format(Locale.US, thb)
-                               else "THB %.2f".format(Locale.US, thb)
+                val thbLabel = if (thb >= 1000) String.format(Locale.US, "THB %.0f", thb)
+                               else String.format(Locale.US, "THB %.2f", thb)
                 nativeCanvas.drawText(thbLabel, padL - 6.dp.toPx(), y + 3.dp.toPx(), labelPaint)
             }
 
@@ -1015,14 +1041,14 @@ private fun LegendRow(
         Text(text = label, color = FireCashOnSurfaceVariant, fontSize = 13.sp)
         Spacer(modifier = Modifier.weight(1f))
         Text(
-            text = "THB %.2f".format(Locale.US, amount),
+            text = String.format(Locale.US, "THB %.2f", amount),
             color = Color.White,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold
         )
         Spacer(modifier = Modifier.width(10.dp))
         Text(
-            text = "%.1f%%".format(Locale.US, pct),
+            text = String.format(Locale.US, "%.1f%%", pct),
             color = FireCashOnSurfaceVariant,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,

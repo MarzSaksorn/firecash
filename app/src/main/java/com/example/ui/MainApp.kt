@@ -222,23 +222,6 @@ fun MainApp(modifier: Modifier = Modifier) {
         return regex.find(text)?.value?.replace(",", "")?.toDoubleOrNull()
     }
 
-    // Prefer a slip amount marked with a baht/THB/B symbol over the generic parser result,
-    // which can grab exchange-rate fragments like "(¥1= THB 4.9793541)".
-    fun extractSlipAmount(text: String): Double? {
-        val patterns = listOf(
-            Regex("""\bB\s*([\d,]+\.\d{2})\b"""),
-            Regex("""฿\s*([\d,]+(?:\.\d{2})?)"""),
-            Regex("""(?:THB|บาท)\s*([\d,]+(?:\.\d{2})?)""", RegexOption.IGNORE_CASE),
-            Regex("""([\d,]+(?:\.\d{2})?)\s*(?:THB|บาท)""", RegexOption.IGNORE_CASE)
-        )
-        for (p in patterns) {
-            p.find(text)?.let { m ->
-                m.groupValues[1].replace(",", "").toDoubleOrNull()?.let { if (it > 0.0) return it }
-            }
-        }
-        return null
-    }
-
     suspend fun addSlip(
         payload: String,
         isMoneyIn: Boolean = false,

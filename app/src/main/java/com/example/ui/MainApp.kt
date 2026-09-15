@@ -252,7 +252,18 @@ fun MainApp(modifier: Modifier = Modifier) {
             errorMessage = slipWarning
         )
                 slipMismatch = false
-                                slipDateMismatch = false
+                                var timeMismatch = false
+                                if (verified != null && verified.transDate != null && verified.transTime != null) {
+                                    try {
+                                        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US)
+                                        val paymentTime = sdf.parse("${verified.transDate} ${verified.transTime}")?.time ?: now
+                                        timeMismatch = (now - paymentTime) > 5 * 60 * 1000L
+                                        if (timeMismatch) {
+                                            slipWarning = "Payment is older than 5 minutes — possible reused slip!"
+                                        }
+                                    } catch (_: Exception) { }
+                                }
+                                slipDateMismatch = timeMismatch
                                 slipData = result
         // Auto-resolve isMoneyIn based on known names:
         // - if both sender & receiver are known -> transfer (neutral, stored as false, UI shows Transfer)
@@ -280,7 +291,7 @@ fun MainApp(modifier: Modifier = Modifier) {
             isMoneyIn = resolvedIsMoneyIn,
             photoPath = photoPath,
             amountMismatch = false,
-                        dateMismatch = false
+                        dateMismatch = timeMismatch
         )
 
         // Dedupe: re-scanning the same slip updates the existing entry instead of adding a log

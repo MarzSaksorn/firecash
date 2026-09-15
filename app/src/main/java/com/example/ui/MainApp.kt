@@ -251,22 +251,9 @@ fun MainApp(modifier: Modifier = Modifier) {
             verificationStatus = VerificationStatus.UNVERIFIED,
             errorMessage = slipWarning
         )
-                // Time-based scam check: if the bank says payment was made >5 minutes ago,
-                // flag it as a potential reused/doctored slip screenshot.
-                var timeMismatch = false
-                if (verified != null && verified.transDate != null && verified.transTime != null) {
-                    try {
-                        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US)
-                        val paymentTime = sdf.parse("${verified.transDate} ${verified.transTime}")?.time ?: now
-                        timeMismatch = (now - paymentTime) > 5 * 60 * 1000L
-                        if (timeMismatch) {
-                            slipWarning = "Payment is older than 5 minutes — possible reused slip!"
-                        }
-                    } catch (_: Exception) { }
-                }
                 slipMismatch = false
-                slipDateMismatch = timeMismatch
-                slipData = result
+                                slipDateMismatch = false
+                                slipData = result
         // Auto-resolve isMoneyIn based on known names:
         // - if both sender & receiver are known -> transfer (neutral, stored as false, UI shows Transfer)
         // - if receiver is known -> income
@@ -293,7 +280,7 @@ fun MainApp(modifier: Modifier = Modifier) {
             isMoneyIn = resolvedIsMoneyIn,
             photoPath = photoPath,
             amountMismatch = false,
-                        dateMismatch = timeMismatch
+                        dateMismatch = false
         )
 
         // Dedupe: re-scanning the same slip updates the existing entry instead of adding a log

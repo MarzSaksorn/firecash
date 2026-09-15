@@ -268,27 +268,22 @@ fun MainApp(modifier: Modifier = Modifier) {
             verificationStatus = VerificationStatus.UNVERIFIED,
             errorMessage = slipWarning
         )
-        // Fraud cross-check (shop mode): the amount printed on the slip photo must match the
-        // QR payload amount and/or the bank-verified amount. A mismatch means a doctored slip.
-        val textAmount = if (ocrText.isNullOrBlank()) null else extractSlipAmount(ocrText)
-        val qrAmount = SlipDataParser.extractQrAmount(payload)
-        val verifiedAmount = verified?.amount
-        val candidates = listOfNotNull(textAmount, qrAmount, verifiedAmount)
-        val mismatch = candidates.size >= 2 && candidates.max() - candidates.min() > 0.005
-        slipMismatch = mismatch
-        if (mismatch) {
-            slipWarning = "Amount mismatch — photo text shows $textAmount but QR/bank shows ${qrAmount ?: verifiedAmount}. Possible tampered slip!"
-        }
-        // Date cross-check: the date printed on the slip photo must match the bank-verified date
-        val textDate = if (ocrText.isNullOrBlank()) null else SlipDataParser.extractSlipDate(ocrText)
-        val bankDate = verified?.transDate
-        val dateMismatch = textDate != null && bankDate != null && textDate != bankDate
-        slipDateMismatch = dateMismatch
-        if (dateMismatch) {
-            slipWarning = if (mismatch) "$slipWarning | Date mismatch — photo shows $textDate but bank shows $bankDate."
-                else "Date mismatch — slip photo shows $textDate but bank shows $bankDate. Possible tampered slip!"
-        }
-        slipData = result
+                // Time-based scam check: if the bank says payment was made >5 minutes ago,
+                // flag it as a potential reused/doctored slip screenshot.
+                var timeMismatch = false
+                if (verified != null && verified.transDate != null && verified.transTime != null) {
+                    try {
+                        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US)
+                        val paymentTime = sdf.parse("${verified.transDate} ${verified.transTime}")?.time ?: now
+                        timeMismatch = (now - paymentTime) > 5 * 60 * 1000L
+                        if (timeMismatch) {
+                            slipWarning = "Payment is older than 5 minutes — possible reused slip!"
+                        }
+                    } catch (_: Exception) { }
+                }
+                slipMismatch = false
+                slipDateMismatch = timeMismatch
+                slipData = result
         // Auto-resolve isMoneyIn based on known names:
         // - if both sender & receiver are known -> transfer (neutral, stored as false, UI shows Transfer)
         // - if receiver is known -> income
@@ -314,8 +309,8 @@ fun MainApp(modifier: Modifier = Modifier) {
             slipData = result,
             isMoneyIn = resolvedIsMoneyIn,
             photoPath = photoPath,
-            amountMismatch = mismatch,
-            dateMismatch = dateMismatch
+            amountMismatch = false,
+                        dateMismatch = timeMismatch
         )
 
         // Dedupe: re-scanning the same slip updates the existing entry instead of adding a log
@@ -824,99 +819,42 @@ fun MainApp(modifier: Modifier = Modifier) {
         } else if (showCapture) {
             PhotoCaptureScreen(
                 onPhotoCaptured = { path ->
-                    scope.launch {
-                        // Flatten the slip (document detection + perspective warp) so the
-                        // QR + OCR read the flat document. The CROP becomes the stored slip
-                        // photo; the full camera frame is dropped once the slip is saved.
-                        isLoading = true
-                        val processor = OcrProcessor(context)
-                        val workPath = processor.flattenedCopy(path) ?: path
-                        val ocrText = processor.recognizeText(workPath, scanCenterOnly = false)
-                        var payload = processor.processReceipt(workPath, scanCenterOnly = false).rawText
-                        android.util.Log.d("FireCashOCR", "onPhotoCaptured: work=$workPath ocrLen=${ocrText.length} payloadLen=${payload.length}")
-                        if (payload.isBlank() && workPath != path) {
-                            val fbPayload = processor.processReceipt(path, scanCenterOnly = false).rawText
-                            android.util.Log.d("FireCashOCR", "onPhotoCaptured: fallback orig payloadLen=${fbPayload.length}")
-                            if (fbPayload.isNotBlank()) {
-                                runCatching { File(workPath).delete() }
-                                val fbOcr = processor.recognizeText(path, scanCenterOnly = false)
-                                payload = fbPayload
-                                qrPayload = payload
-                                qrPhotoPath = path
-                                android.util.Log.d("FireCashOCR", "onPhotoCaptured: fallback payload len=${payload.length}")
-                                addSlip(payload, photoPath = path, ocrText = fbOcr)
-                                showCapture = false
-                                showPayload = true
-                                isLoading = false
-                                return@launch
-                            }
-                        }
-                        if (payload.isNotBlank()) {
-                                                    qrPayload = payload
-                                                    qrPhotoPath = workPath
-                                                    android.util.Log.d("FireCashOCR", "onImageSelected: payload found len=${payload.length}, adding slip")
-                                                    addSlip(payload, photoPath = workPath, ocrText = ocrText)
-                            if (workPath != path) {
-                                runCatching { File(path).delete() }
-                                    .onFailure { android.util.Log.w("FireCashOCR", "could not delete full frame $path: ${it.message}") }
-                            }
-                            showCapture = false
-                            showPayload = true
-                        } else {
-                            android.util.Log.w("FireCashOCR", "onPhotoCaptured: NO payload ocrLen=${ocrText.length} ocr='${ocrText.take(100)}'")
-                        }
-                        isLoading = false
-                    }
-                },
+                                    scope.launch {
+                                        isLoading = true
+                                        val processor = OcrProcessor(context)
+                                        var payload = processor.processReceipt(path, scanCenterOnly = false).rawText
+                                        android.util.Log.d("FireCashOCR", "onPhotoCaptured: fullFrame payloadLen=${payload.length}")
+                                        if (payload.isNotBlank()) {
+                                            qrPayload = payload
+                                            qrPhotoPath = path
+                                            addSlip(payload, photoPath = path)
+                                            showCapture = false
+                                            showPayload = true
+                                        } else {
+                                            android.util.Log.w("FireCashOCR", "onPhotoCaptured: NO payload from full frame")
+                                        }
+                                        isLoading = false
+                                    }
+                                },
                 onFileSelected = { /* unused – picker handled inside PhotoCaptureScreen */ },
                 onImageSelected = { path ->
-                    scope.launch {
-                        // Flatten the slip like a camera shot: the CROP becomes the stored
-                        // photo; the picked full frame is dropped once the slip is saved.
-                        isLoading = true
-                        val processor = OcrProcessor(context)
-                        val workPath = processor.flattenedCopy(path) ?: path
-                        val ocrText = processor.recognizeText(workPath, scanCenterOnly = false)
-                        var payload = processor.processReceipt(workPath, scanCenterOnly = false).rawText
-                        android.util.Log.d("FireCashOCR", "onImageSelected: work=$workPath ocrLen=${ocrText.length} payloadLen=${payload.length} isOrig=${workPath==path}")
-                        // Fallback: if crop lost the QR (center-crop fallback can cut off bottom QR), retry on original
-                        if (payload.isBlank() && workPath != path) {
-                            val fbPayload = processor.processReceipt(path, scanCenterOnly = false).rawText
-                            android.util.Log.d("FireCashOCR", "onImageSelected: fallback orig scan payloadLen=${fbPayload.length}")
-                            if (fbPayload.isNotBlank()) {
-                                // QR was outside crop — use original as stored photo
-                                runCatching { File(workPath).delete() }
-                                val fbOcr = processor.recognizeText(path, scanCenterOnly = false)
-                                payload = fbPayload
-                                qrPayload = payload
-                                qrPhotoPath = path
-                                android.util.Log.d("FireCashOCR", "onImageSelected: fallback payload found len=${payload.length}, adding slip from original")
-                                addSlip(payload, photoPath = path, ocrText = fbOcr)
-                                showCapture = false
-                                showPayload = true
-                                isLoading = false
-                                return@launch
-                            }
-                        }
-                        if (payload.isNotBlank()) {
-                                                    qrPayload = payload
-                                                    qrPhotoPath = workPath
-                                                    android.util.Log.d("FireCashOCR", "onImageSelected: payload found len=${payload.length}, adding slip")
-                                                    addSlip(payload, photoPath = workPath, ocrText = ocrText)
-                            if (workPath != path) {
-                                runCatching { File(path).delete() }
-                                    .onFailure { android.util.Log.w("FireCashOCR", "could not delete picked frame $path: ${it.message}") }
-                            }
-                            showCapture = false
-                            showPayload = true
-                        } else {
-                            android.util.Log.w("FireCashOCR", "onImageSelected: NO payload (ocrLen=${ocrText.length} ocr='${ocrText.take(100)}'), keeping spinner off, crop kept at $workPath")
-                            // Keep crop for inspection — don't delete on failure during debug
-                            // if (workPath != path) runCatching { File(workPath).delete() }
-                        }
-                        isLoading = false
-                    }
-                },
+                                    scope.launch {
+                                        isLoading = true
+                                        val processor = OcrProcessor(context)
+                                        val payload = processor.processReceipt(path, scanCenterOnly = false).rawText
+                                        android.util.Log.d("FireCashOCR", "onImageSelected: payloadLen=${payload.length}")
+                                        if (payload.isNotBlank()) {
+                                            qrPayload = payload
+                                            qrPhotoPath = path
+                                            addSlip(payload, photoPath = path)
+                                            showCapture = false
+                                            showPayload = true
+                                        } else {
+                                            android.util.Log.w("FireCashOCR", "onImageSelected: NO payload from picked image")
+                                        }
+                                        isLoading = false
+                                    }
+                                },
                 isLoading = isLoading,
                 onNavigateToSettings = {
                     showCapture = false

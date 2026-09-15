@@ -4,10 +4,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 
-val FireCashDarkColorScheme = darkColorScheme(
+private val FireCashColorScheme = darkColorScheme(
     primary = FireCashPrimary,
     onPrimary = FireCashOnPrimary,
     primaryContainer = FireCashPrimaryContainer,
@@ -25,11 +26,43 @@ val FireCashDarkColorScheme = darkColorScheme(
     onBackground = FireCashOnBackground,
     surface = FireCashSurface,
     onSurface = FireCashOnSurface,
-    surfaceVariant = FireCashSurfaceContainerHighest,
+    surfaceVariant = FireCashSurfaceVariant,
     onSurfaceVariant = FireCashOnSurfaceVariant,
-    surfaceTint = FireCashPrimary,
-    inverseSurface = FireCashInverseSurface,
-    inverseOnSurface = FireCashInverseOnSurface,
+    error = FireCashError,
+    onError = FireCashOnError,
+    errorContainer = FireCashErrorContainer,
+    onErrorContainer = FireCashOnErrorContainer,
+    outline = FireCashOutline,
+    outlineVariant = FireCashOutlineVariant,
+    surfaceContainerLowest = FireCashSurfaceContainerLowest,
+    surfaceContainerLow = FireCashSurfaceContainerLow,
+    surfaceContainer = FireCashSurfaceContainer,
+    surfaceContainerHigh = FireCashSurfaceContainerHigh,
+    surfaceContainerHighest = FireCashSurfaceContainerHighest,
+    surfaceDim = FireCashSurfaceDim,
+    surfaceBright = FireCashSurfaceBright
+)
+
+private val FireCashLightScheme = lightColorScheme(
+    primary = FireCashPrimary,
+    onPrimary = FireCashOnPrimary,
+    primaryContainer = FireCashPrimaryContainer,
+    onPrimaryContainer = FireCashOnPrimaryContainer,
+    inversePrimary = FireCashInversePrimary,
+    secondary = FireCashSecondary,
+    onSecondary = FireCashOnSecondary,
+    secondaryContainer = FireCashSecondaryContainer,
+    onSecondaryContainer = FireCashOnSecondaryContainer,
+    tertiary = FireCashTertiary,
+    onTertiary = FireCashOnTertiary,
+    tertiaryContainer = FireCashTertiaryContainer,
+    onTertiaryContainer = FireCashOnTertiaryContainer,
+    background = FireCashBackground,
+    onBackground = FireCashOnBackground,
+    surface = FireCashSurface,
+    onSurface = FireCashOnSurface,
+    surfaceVariant = FireCashSurfaceVariant,
+    onSurfaceVariant = FireCashOnSurfaceVariant,
     error = FireCashError,
     onError = FireCashOnError,
     errorContainer = FireCashErrorContainer,
@@ -55,10 +88,11 @@ val FireCashShapes = Shapes(
 
 @Composable
 fun FireCashTheme(
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
     MaterialTheme(
-        colorScheme = FireCashDarkColorScheme,
+        colorScheme = if (darkTheme) FireCashColorScheme else FireCashLightScheme,
         typography = Typography,
         shapes = FireCashShapes,
         content = content

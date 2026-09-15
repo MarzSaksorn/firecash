@@ -72,7 +72,9 @@ fun MainApp(modifier: Modifier = Modifier) {
         LaunchedEffect(currentLang) { Translations.setLanguageCode(currentLang) }
     // Seed default notification whitelist presets on first launch (no-op once seeded / user-customized)
     com.example.service.NotificationPresets.seedIfNeeded(prefs)
-    var backgroundListening by remember { mutableStateOf(prefs.getBoolean("background_listening", false)) }
+        var backgroundListening by remember { mutableStateOf(prefs.getBoolean("background_listening", false)) }
+        var isDarkTheme by remember { mutableStateOf(prefs.getBoolean("dark_theme", true)) }
+        LaunchedEffect(isDarkTheme) { com.example.ui.theme.isDarkTheme = isDarkTheme }
 
     // Refresh statuses whenever the activity resumes (e.g. returning from system settings)
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
@@ -986,10 +988,15 @@ fun MainApp(modifier: Modifier = Modifier) {
                                         batteryOptIgnored = batteryOptIgnored,
                                         backgroundListening = backgroundListening,
                                         onLanguageChange = { code ->
-                                            currentLang = code
-                                            prefs.edit().putString("app_language", code).apply()
-                                        },
-                                        currentLang = currentLang,
+                                                                                currentLang = code
+                                                                                prefs.edit().putString("app_language", code).apply()
+                                                                            },
+                                                                            currentLang = currentLang,
+                                                                            onThemeChange = { dark ->
+                                                                                isDarkTheme = dark
+                                                                                prefs.edit().putBoolean("dark_theme", dark).apply()
+                                                                            },
+                                                                            isDarkTheme = isDarkTheme,
                     onToggleBackgroundListening = { enabled ->
                         backgroundListening = enabled
                         prefs.edit().putBoolean("background_listening", enabled).apply()

@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Label
@@ -116,8 +117,10 @@ fun SettingsScreen(
     knownNames: List<String> = emptyList(),
     unverifiedCount: Int = 0,
     onLanguageChange: (String) -> Unit = {},
-    currentLang: String = "en",
-    notificationIncomeEnabled: Boolean = false,
+        currentLang: String = "en",
+        onThemeChange: (Boolean) -> Unit = {},
+        isDarkTheme: Boolean = true,
+        notificationIncomeEnabled: Boolean = false,
     notificationExpenseEnabled: Boolean = false,
     notificationWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
     notificationExpenseWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
@@ -243,50 +246,93 @@ fun SettingsScreen(
                             modifier = Modifier.padding(start = 4.dp)
                         )
                         // Card: Language
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(FireCashSurfaceContainerLow)
-                                .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                                .padding(16.dp)
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Language,
-                                        contentDescription = null,
-                                        tint = Color(0xFFB3C5FF),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        text = Translations.t(StringKeys.LANGUAGE),
-                                        color = Color.White,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Spacer(modifier = Modifier.weight(1f))
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        listOf("en" to Translations.t(StringKeys.ENGLISH), "th" to Translations.t(StringKeys.THAI)).forEach { (code, label) ->
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(if (currentLang == code) FireCashPrimary else FireCashSurfaceContainerHigh)
-                                                    .clickable { onLanguageChange(code) }
-                                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                                            ) {
-                                                Text(
-                                                    text = label,
-                                                    color = if (currentLang == code) Color.White else FireCashOnSurfaceVariant,
-                                                    fontSize = 13.sp
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clip(RoundedCornerShape(16.dp))
+                                                        .background(FireCashSurfaceContainerLow)
+                                                        .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                                                        .padding(16.dp)
+                                                ) {
+                                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Language,
+                                                                contentDescription = null,
+                                                                tint = Color(0xFFB3C5FF),
+                                                                modifier = Modifier.size(20.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.width(10.dp))
+                                                            Text(
+                                                                text = if (currentLang == "th") "ภาษา" else "Language",
+                                                                color = Color.White,
+                                                                fontSize = 14.sp,
+                                                                fontWeight = FontWeight.SemiBold
+                                                            )
+                                                            Spacer(modifier = Modifier.weight(1f))
+                                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                                listOf("en" to "English", "th" to "ภาษาไทย").forEach { (code, label) ->
+                                                                    Box(
+                                                                        modifier = Modifier
+                                                                            .clip(RoundedCornerShape(8.dp))
+                                                                            .background(if (currentLang == code) FireCashPrimary else FireCashSurfaceContainerHigh)
+                                                                            .clickable { onLanguageChange(code) }
+                                                                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                                                    ) {
+                                                                        Text(
+                                                                            text = label,
+                                                                            color = if (currentLang == code) Color.White else FireCashOnSurfaceVariant,
+                                                                            fontSize = 13.sp
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                // Card: Theme
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clip(RoundedCornerShape(16.dp))
+                                                        .background(FireCashSurfaceContainerLow)
+                                                        .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                                                        .padding(16.dp)
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.DarkMode,
+                                                            contentDescription = null,
+                                                            tint = Color(0xFFB3C5FF),
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(10.dp))
+                                                        Text(
+                                                            text = if (currentLang == "th") "ธีม" else "Theme",
+                                                            color = Color.White,
+                                                            fontSize = 14.sp,
+                                                            fontWeight = FontWeight.SemiBold
+                                                        )
+                                                        Spacer(modifier = Modifier.weight(1f))
+                                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                            listOf(true to (if (currentLang == "th") "มืด" else "Dark"), false to (if (currentLang == "th") "สว่าง" else "Light")).forEach { (isDark, label) ->
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .clip(RoundedCornerShape(8.dp))
+                                                                        .background(if (isDarkTheme == isDark) FireCashPrimary else FireCashSurfaceContainerHigh)
+                                                                        .clickable { onThemeChange(isDark) }
+                                                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                                                ) {
+                                                                    Text(
+                                                                        text = label,
+                                                                        color = if (isDarkTheme == isDark) Color.White else FireCashOnSurfaceVariant,
+                                                                        fontSize = 13.sp
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
                         // Card: My Names (auto income / transfer detection)
             Box(
                 modifier = Modifier

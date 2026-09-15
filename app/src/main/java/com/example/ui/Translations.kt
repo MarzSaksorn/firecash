@@ -423,5 +423,11 @@ object Translations {
     fun fmt(key: String, vararg args: Any?): String = String.format(java.util.Locale.US, get(key), *args)
 
     /** Convenience: translate and format. */
-    fun t(key: String): String = get(key)
-}
+        fun t(key: String): String = get(key)
+
+        /** Test-only: get translation for a specific language without changing locale. */
+        fun getForTest(key: String, lang: String): String? = when (lang) {
+            "th" -> th[key]
+            else -> en[key]
+        }
+    }

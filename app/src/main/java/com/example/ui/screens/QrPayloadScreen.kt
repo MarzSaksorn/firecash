@@ -47,6 +47,8 @@ import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.example.data.easyslip.VerifySlipResponse
 import com.example.data.model.VerificationStatus
+import com.example.ui.StringKeys
+import com.example.ui.Translations
 import com.example.ui.theme.FireCashBackground
 import com.example.ui.theme.FireCashError
 import com.example.ui.theme.FireCashOnSurface
@@ -102,20 +104,20 @@ fun QrPayloadScreen(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = Translations.t(StringKeys.BACK),
                     tint = Color.White,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Back",
+                    text = Translations.t(StringKeys.BACK),
                     color = Color.White,
                     fontSize = 14.sp
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "QR Payload",
+                text = Translations.t(StringKeys.QR_PAYLOAD),
                 style = MaterialTheme.typography.headlineSmall,
                 color = Color.White
             )
@@ -135,8 +137,8 @@ fun QrPayloadScreen(
             ) {
                 Text(
                     text = when {
-                        payload.isBlank() -> "No payload"
-                        payloadCopied -> "Copied"
+                        payload.isBlank() -> Translations.t(StringKeys.NO_PAYLOAD)
+                        payloadCopied -> Translations.t(StringKeys.COPIED)
                         else -> payload
                     },
                     style = MaterialTheme.typography.bodyLarge,
@@ -162,7 +164,7 @@ fun QrPayloadScreen(
                         tint = FireCashError
                     )
                     Text(
-                        text = "Amount mismatch — the amount on this slip photo differs from the QR/bank amount. Possible tampered slip!",
+                        text = Translations.t(StringKeys.AMOUNT_MISMATCH),
                         color = FireCashError,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -186,7 +188,7 @@ fun QrPayloadScreen(
                         tint = FireCashError
                     )
                     Text(
-                        text = "Date mismatch — the date printed on this slip photo differs from the bank-verified date. Possible tampered slip!",
+                        text = Translations.t(StringKeys.DATE_MISMATCH),
                         color = FireCashError,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -233,15 +235,15 @@ fun QrPayloadScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    DetailRow("Amount", slipData.amount?.let { "THB %.2f".format(Locale.US, it) } ?: extractAmount(payload)?.let { "THB %.2f".format(Locale.US, it) } ?: "—")
-                    DetailRow("Transaction Ref", slipData.transRef ?: "—")
-                    DetailRow("Date", slipData.transDate ?: "—")
-                    DetailRow("Time", slipData.transTime ?: "—")
-                    DetailRow("Sender", slipData.senderName ?: "—")
-                    DetailRow("Sender Bank", slipData.sendingBankName ?: slipData.sendingBank ?: "—")
-                    DetailRow("Receiver", slipData.receiverName ?: "—")
-                    DetailRow("Receiver Bank", slipData.receivingBankName ?: slipData.receivingBank ?: "—")
-                    DetailRow("Amount Matched", if (slipData.isAmountMatched) "Yes" else "No")
+                    DetailRow(Translations.t(StringKeys.AMOUNT), slipData.amount?.let { "${Translations.t(StringKeys.THB)} %.2f".format(Locale.US, it) } ?: extractAmount(payload)?.let { "${Translations.t(StringKeys.THB)} %.2f".format(Locale.US, it) } ?: "—")
+                    DetailRow(Translations.t(StringKeys.TRANSACTION_REF), slipData.transRef ?: "—")
+                    DetailRow(Translations.t(StringKeys.DATE), slipData.transDate ?: "—")
+                    DetailRow(Translations.t(StringKeys.TIME), slipData.transTime ?: "—")
+                    DetailRow(Translations.t(StringKeys.SENDER), slipData.senderName ?: "—")
+                    DetailRow(Translations.t(StringKeys.SENDER_BANK), slipData.sendingBankName ?: slipData.sendingBank ?: "—")
+                    DetailRow(Translations.t(StringKeys.RECEIVER), slipData.receiverName ?: "—")
+                    DetailRow(Translations.t(StringKeys.RECEIVER_BANK), slipData.receivingBankName ?: slipData.receivingBank ?: "—")
+                    DetailRow(Translations.t(StringKeys.AMOUNT_MATCHED), if (slipData.isAmountMatched) Translations.t(StringKeys.YES) else Translations.t(StringKeys.NO))
                 }
             } else {
                 // Fallback for old slips where slipData was null — still show a card from raw payload
@@ -257,13 +259,13 @@ fun QrPayloadScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    DetailRow("Amount", extractAmount(payload)?.let { "THB %.2f".format(Locale.US, it) } ?: "—")
-                    DetailRow("Transaction Ref", "—")
-                    DetailRow("Date", "—")
-                    DetailRow("Time", "—")
-                    DetailRow("Sender", "—")
-                    DetailRow("Receiver", "—")
-                    DetailRow("Status", "Not verified — enable EasySlip and Sync unverified")
+                    DetailRow(Translations.t(StringKeys.AMOUNT), extractAmount(payload)?.let { "${Translations.t(StringKeys.THB)} %.2f".format(Locale.US, it) } ?: "—")
+                    DetailRow(Translations.t(StringKeys.TRANSACTION_REF), "—")
+                    DetailRow(Translations.t(StringKeys.DATE), "—")
+                    DetailRow(Translations.t(StringKeys.TIME), "—")
+                    DetailRow(Translations.t(StringKeys.SENDER), "—")
+                    DetailRow(Translations.t(StringKeys.RECEIVER), "—")
+                    DetailRow(Translations.t(StringKeys.STATUS), Translations.t(StringKeys.NOT_VERIFIED))
                 }
             }
 
@@ -305,14 +307,14 @@ private fun PhotoSection(photoPath: String) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "Slip Photo",
+            text = Translations.t(StringKeys.SLIP_PHOTO),
             color = FireCashOnSurface,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
         )
         AsyncImage(
             model = photoPath,
-            contentDescription = "Slip photo",
+            contentDescription = Translations.t(StringKeys.SLIP_PHOTO),
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxWidth()
@@ -345,7 +347,7 @@ private fun PhotoSection(photoPath: String) {
         ) {
             Icon(imageVector = Icons.Default.Image, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Open photo on device", color = Color.White, fontSize = 14.sp)
+            Text(Translations.t(StringKeys.OPEN_PHOTO), color = Color.White, fontSize = 14.sp)
         }
     }
 }
@@ -355,17 +357,17 @@ private fun StatusBanner(slipData: VerifySlipResponse) {
     val (icon, text, color) = when (slipData.verificationStatus) {
         VerificationStatus.DUPLICATE_DETECTED -> Triple(
             Icons.Default.ErrorOutline,
-            "Duplicate slip detected",
+            Translations.t(StringKeys.DUPLICATE_SLIP),
             Color(0xFFFFB74D)
         )
         VerificationStatus.VERIFIED -> Triple(
             Icons.Default.CheckCircle,
-            "Slip verified successfully",
+            Translations.t(StringKeys.SLIP_VERIFIED),
             FireCashSecondary
         )
         else -> Triple(
             Icons.Default.ErrorOutline,
-            slipData.errorMessage ?: "Verification failed",
+            slipData.errorMessage ?: Translations.t(StringKeys.VERIFICATION_FAILED),
             FireCashError
         )
     }
@@ -413,7 +415,7 @@ private fun DetailRow(label: String, value: String) {
             style = MaterialTheme.typography.bodyMedium
         )
         Text(
-            text = if (copied) "Copied" else value,
+            text = if (copied) Translations.t(StringKeys.COPIED) else value,
             color = if (copied) FireCashSecondary else FireCashOnSurface,
             style = MaterialTheme.typography.bodyMedium
         )
@@ -426,8 +428,8 @@ private fun WalletToggle(
     onToggle: ((String?) -> Unit)?
 ) {
     val options = listOf(
-        null to "Bank" to Icons.Default.AccountBalance,
-        "cash" to "Cash" to Icons.Default.AccountBalance
+        null to Translations.t(StringKeys.BANK) to Icons.Default.AccountBalance,
+        "cash" to Translations.t(StringKeys.CASH) to Icons.Default.AccountBalance
     )
     Column(
         modifier = Modifier
@@ -437,7 +439,7 @@ private fun WalletToggle(
             .padding(16.dp)
     ) {
         Text(
-            text = "Wallet",
+            text = Translations.t(StringKeys.WALLET),
             color = FireCashOnSurface,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold
@@ -490,9 +492,9 @@ private fun CategoryToggle(
     onToggle: ((String?) -> Unit)?
 ) {
     val options = listOf(
-        "income" to "Income" to Icons.Default.ArrowUpward,
-        "expense" to "Expense" to Icons.Default.ArrowDownward,
-        "transfer" to "Transfer" to Icons.Default.SwapHoriz
+        "income" to Translations.t(StringKeys.INCOME) to Icons.Default.ArrowUpward,
+        "expense" to Translations.t(StringKeys.EXPENSE) to Icons.Default.ArrowDownward,
+        "transfer" to Translations.t(StringKeys.TRANSFER) to Icons.Default.SwapHoriz
     )
     Column(
         modifier = Modifier
@@ -502,7 +504,7 @@ private fun CategoryToggle(
             .padding(16.dp)
     ) {
         Text(
-            text = "Classification",
+            text = Translations.t(StringKeys.CLASSIFICATION),
             color = FireCashOnSurface,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold
@@ -551,7 +553,7 @@ private fun CategoryToggle(
         if (currentCategory == null) {
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Auto-detected from known names",
+                text = Translations.t(StringKeys.AUTO_DETECTED),
                 color = FireCashOnSurfaceVariant,
                 fontSize = 11.sp
             )

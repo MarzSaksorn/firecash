@@ -39,6 +39,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.example.ui.theme.FireCashSecondary
+import com.example.ui.Translations
+import com.example.ui.StringKeys
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -155,7 +157,7 @@ fun PhotoCaptureScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.AccountBalanceWallet,
-                    contentDescription = "Account",
+                    contentDescription = Translations.t(StringKeys.ACCOUNT),
                     tint = Color.White
                 )
             }
@@ -165,7 +167,7 @@ fun PhotoCaptureScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
-                    contentDescription = "Settings",
+                    contentDescription = Translations.t(StringKeys.SETTINGS),
                     tint = Color.White
                 )
             }
@@ -183,7 +185,7 @@ fun PhotoCaptureScreen(
             ) {
                 CircularProgressIndicator(color = Color.White)
                 Text(
-                    text = "Scanning...",
+                    text = Translations.t(StringKeys.SCANNING),
                     color = Color.White,
                     style = MaterialTheme.typography.bodyLarge
                 )
@@ -213,7 +215,7 @@ fun PhotoCaptureScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.Image,
-                    contentDescription = "Select file",
+                    contentDescription = Translations.t(StringKeys.PICK_FROM_GALLERY),
                     tint = Color.White
                 )
             }
@@ -246,7 +248,7 @@ fun PhotoCaptureScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.PhotoCamera,
-                    contentDescription = "Capture photo",
+                    contentDescription = Translations.t(StringKeys.CAPTURE_PHOTO),
                     tint = Color.Black,
                     modifier = Modifier.size(36.dp)
                 )

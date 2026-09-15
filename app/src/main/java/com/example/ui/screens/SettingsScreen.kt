@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -84,6 +85,8 @@ import androidx.documentfile.provider.DocumentFile
 import com.example.data.model.KeywordRule
 import java.io.File
 import java.io.FileOutputStream
+import com.example.ui.StringKeys
+import com.example.ui.Translations
 import com.example.ui.components.FireCashTopBar
 import com.example.ui.theme.FireCashBackground
 import com.example.ui.theme.FireCashError
@@ -108,10 +111,12 @@ fun SettingsScreen(
     rules: List<KeywordRule>,
     easySlipEnabled: Boolean,
     apiKey: String,
-    verificationProvider: com.example.data.verification.VerificationProvider = com.example.data.verification.VerificationProvider.EASYSLIP,
+        verificationProvider: com.example.data.verification.VerificationProvider = com.example.data.verification.VerificationProvider.EASYSLIP,
     checkDuplicates: Boolean,
     knownNames: List<String> = emptyList(),
     unverifiedCount: Int = 0,
+    onLanguageChange: (String) -> Unit = {},
+    currentLang: String = "en",
     notificationIncomeEnabled: Boolean = false,
     notificationExpenseEnabled: Boolean = false,
     notificationWhitelist: List<com.example.service.WhitelistedApp> = emptyList(),
@@ -217,7 +222,7 @@ fun SettingsScreen(
             .background(FireCashBackground)
     ) {
         FireCashTopBar(
-            title = "FireCash",
+            title = Translations.t(StringKeys.APP_NAME),
             showBackButton = true,
             onBackClick = onBack,
             onProfileClick = {}
@@ -231,13 +236,58 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Safe Settings",
-                color = FireCashSecondary,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(start = 4.dp)
-            )
-            // Card: My Names (auto income / transfer detection)
+                            text = Translations.t(StringKeys.SAFE_SETTINGS),
+                            color = FireCashSecondary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                        // Card: Language
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(FireCashSurfaceContainerLow)
+                                .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                                .padding(16.dp)
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Language,
+                                        contentDescription = null,
+                                        tint = Color(0xFFB3C5FF),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        text = Translations.t(StringKeys.LANGUAGE),
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        listOf("en" to Translations.t(StringKeys.ENGLISH), "th" to Translations.t(StringKeys.THAI)).forEach { (code, label) ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(if (currentLang == code) FireCashPrimary else FireCashSurfaceContainerHigh)
+                                                    .clickable { onLanguageChange(code) }
+                                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    color = if (currentLang == code) Color.White else FireCashOnSurfaceVariant,
+                                                    fontSize = 13.sp
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // Card: My Names (auto income / transfer detection)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -267,13 +317,13 @@ fun SettingsScreen(
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "My Names",
+                                text = Translations.t(StringKeys.MY_NAMES),
                                 color = FireCashOnSurface,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "Receiver = your name → Income • Both = your names → Transfer (excluded from balance)",
+                                text = Translations.t(StringKeys.MY_NAMES_DESC),
                                 color = FireCashOnSurfaceVariant,
                                 fontSize = 12.sp,
                                 lineHeight = 16.sp
@@ -287,7 +337,7 @@ fun SettingsScreen(
                         OutlinedTextField(
                             value = newKnownName,
                             onValueChange = { newKnownName = it },
-                            placeholder = { Text("e.g. Somchai / สมชาย ใจดี", fontSize = 13.sp) },
+                            placeholder = { Text(Translations.t(StringKeys.NAME_PLACEHOLDER), fontSize = 13.sp) },
                             singleLine = true,
                             textStyle = TextStyle(color = FireCashOnSurface, fontSize = 13.sp),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -308,11 +358,11 @@ fun SettingsScreen(
                                 }
                             },
                             modifier = Modifier.testTag("add_known_name_button")
-                        ) { Text("Add") }
+                        ) { Text(Translations.t(StringKeys.ADD)) }
                     }
                     if (knownNames.isEmpty()) {
                         Text(
-                            text = "No names yet — add your Thai / English variants.",
+                            text = Translations.t(StringKeys.NO_NAMES_YET),
                             color = FireCashOnSurfaceVariant,
                             fontSize = 12.sp
                         )
@@ -341,7 +391,7 @@ fun SettingsScreen(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Close,
-                                            contentDescription = "Remove",
+                                            contentDescription = Translations.t(StringKeys.REMOVE),
                                             tint = FireCashOutline,
                                             modifier = Modifier.size(18.dp)
                                         )
@@ -377,12 +427,12 @@ fun SettingsScreen(
                             Icon(imageVector = Icons.Default.Folder, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(22.dp))
                         }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Tracked Folders", color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text(text = "Auto-scan for new slips", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                            Text(text = Translations.t(StringKeys.TRACKED_FOLDERS), color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text(text = Translations.t(StringKeys.AUTO_SCAN), color = FireCashOnSurfaceVariant, fontSize = 13.sp)
                         }
                     }
                     if (trackedFolders.isEmpty()) {
-                        Text(text = "No folders tracked yet. Add folders to auto-scan for new slips.", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                        Text(text = Translations.t(StringKeys.NO_FOLDERS_YET), color = FireCashOnSurfaceVariant, fontSize = 13.sp)
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             trackedFolders.forEach { uriStr ->
@@ -399,7 +449,7 @@ fun SettingsScreen(
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Text(text = name ?: uriStr, color = FireCashOnSurface, fontSize = 13.sp, modifier = Modifier.weight(1f))
                                     IconButton(onClick = { onRemoveFolder(uriStr) }) {
-                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Remove folder", tint = FireCashOnSurfaceVariant, modifier = Modifier.size(18.dp))
+                                        Icon(imageVector = Icons.Default.Close, contentDescription = Translations.t(StringKeys.REMOVE_FOLDER), tint = FireCashOnSurfaceVariant, modifier = Modifier.size(18.dp))
                                     }
                                 }
                             }
@@ -408,28 +458,28 @@ fun SettingsScreen(
                     OutlinedButton(onClick = { folderPickerLauncher.launch(null) }, enabled = !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
                         Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "Add Tracked Folder", color = FireCashPrimary)
+                        Text(text = Translations.t(StringKeys.ADD_TRACKED_FOLDER), color = FireCashPrimary)
                     }
                     OutlinedButton(onClick = onSyncNow, enabled = trackedFolders.isNotEmpty() && !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
                         Icon(imageVector = Icons.Default.Sync, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "Sync Tracked Folders Now", color = FireCashPrimary)
+                        Text(text = Translations.t(StringKeys.SYNC_TRACKED_FOLDERS_NOW), color = FireCashPrimary)
                     }
                     OutlinedButton(onClick = onForceSyncAll, enabled = trackedFolders.isNotEmpty() && !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
                         Icon(imageVector = Icons.Default.Sync, contentDescription = null, tint = FireCashSecondary, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "Force Sync All (re-scan every photo)", color = FireCashSecondary)
+                        Text(text = Translations.t(StringKeys.FORCE_SYNC_ALL_DESC), color = FireCashSecondary)
                     }
                     OutlinedButton(onClick = { photoPickerLauncher.launch(arrayOf("image/*")) }, enabled = !isLoading, modifier = Modifier.fillMaxWidth().height(48.dp)) {
                         Icon(imageVector = Icons.Default.Sync, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "Import Slip Photos from Device", color = FireCashPrimary)
+                        Text(text = Translations.t(StringKeys.IMPORT_SLIP_PHOTOS), color = FireCashPrimary)
                     }
-                    Text(text = "Slips in the tracked folder are scanned automatically for QR codes and added to your account.", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                    Text(text = Translations.t(StringKeys.FOLDER_SCAN_DESC), color = FireCashOnSurfaceVariant, fontSize = 13.sp)
                     if (isLoading) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = FireCashPrimary)
-                            Text(text = "Syncing slips...", color = FireCashOnSurfaceVariant, fontSize = 12.sp)
+                            Text(text = Translations.t(StringKeys.SYNCING_SLIPS), color = FireCashOnSurfaceVariant, fontSize = 12.sp)
                         }
                     }
                 }
@@ -470,7 +520,7 @@ fun SettingsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Text(
-                                    text = "Keyword Mapping",
+                                    text = Translations.t(StringKeys.KEYWORD_MAPPING),
                                     color = FireCashOnSurface,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -482,7 +532,7 @@ fun SettingsScreen(
                                         .padding(horizontal = 8.dp, vertical = 2.dp)
                                 ) {
                                     Text(
-                                        text = "Smart",
+                                        text = Translations.t(StringKeys.SMART_TAG),
                                         color = FireCashPrimary,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
@@ -490,7 +540,7 @@ fun SettingsScreen(
                                 }
                             }
                             Text(
-                                text = "Auto-assign categories based on extracted keywords.",
+                                text = Translations.t(StringKeys.KEYWORD_MAPPING_DESC),
                                 color = FireCashOnSurfaceVariant,
                                 fontSize = 13.sp
                             )
@@ -550,7 +600,7 @@ fun SettingsScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Close,
-                                        contentDescription = "Remove rule",
+                                        contentDescription = Translations.t(StringKeys.REMOVE_RULE),
                                         tint = FireCashOutline,
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -584,7 +634,7 @@ fun SettingsScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Text(
-                                    text = "Add Rule",
+                                    text = Translations.t(StringKeys.ADD_RULE),
                                     color = FireCashPrimary,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium
@@ -616,14 +666,14 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Dangerous",
+                    text = Translations.t(StringKeys.DANGEROUS),
                     color = FireCashError,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (dangerousExpanded) "tap to collapse" else "tap to expand",
+                    text = if (dangerousExpanded) Translations.t(StringKeys.TAP_COLLAPSE) else Translations.t(StringKeys.TAP_EXPAND),
                     color = FireCashOnSurfaceVariant,
                     fontSize = 12.sp
                 )
@@ -636,7 +686,7 @@ fun SettingsScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             // Slip Verification Configuration
             Text(
-                text = "Bank Slip Verification",
+                text = Translations.t(StringKeys.BANK_SLIP_VERIFICATION),
                 color = FireCashOnSurface,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -678,13 +728,13 @@ fun SettingsScreen(
 
                             Column {
                                 Text(
-                                    text = "Slip Verification",
+                                    text = Translations.t(StringKeys.SLIP_VERIFICATION_TITLE),
                                     color = FireCashOnSurface,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = "Verify PromptPay / EMVCo Tag 91 CRC",
+                                    text = Translations.t(StringKeys.VERIFY_PROMPTPAY),
                                     color = FireCashOnSurfaceVariant,
                                     fontSize = 13.sp
                                 )
@@ -728,7 +778,7 @@ fun SettingsScreen(
                                     apiKeyText = it
                                     onUpdateApiKey(it)
                                 },
-                                label = { Text("${verificationProvider.label} API Key") },
+                                label = { Text(Translations.fmt(StringKeys.API_KEY_LABEL, verificationProvider.label)) },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Default.Key,
@@ -759,7 +809,7 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Prevent Duplicate Slips",
+                                    text = Translations.t(StringKeys.PREVENT_DUPLICATE),
                                     color = FireCashOnSurface,
                                     fontSize = 14.sp
                                 )
@@ -779,11 +829,11 @@ fun SettingsScreen(
                                     modifier = Modifier.fillMaxWidth().testTag("sync_unverified_button"),
                                     colors = ButtonDefaults.buttonColors(containerColor = FireCashPrimary)
                                 ) {
-                                    Text("Sync $unverifiedCount unverified slip(s) now", color = FireCashOnPrimary)
+                                    Text(Translations.fmt(StringKeys.SYNC_UNVERIFIED_COUNT, unverifiedCount), color = FireCashOnPrimary)
                                 }
                                 if (apiKey.isBlank()) {
                                     Text(
-                                        text = "Add API key to enable sync",
+                                        text = Translations.t(StringKeys.ADD_API_KEY_SYNC),
                                         color = FireCashOnSurfaceVariant,
                                         fontSize = 11.sp
                                     )
@@ -830,13 +880,13 @@ fun SettingsScreen(
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Notification Income",
+                                    text = Translations.t(StringKeys.NOTIFICATION_INCOME),
                                     color = FireCashOnSurface,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = "Auto-capture income from bank notifications (first number → amount)",
+                                    text = Translations.t(StringKeys.NOTIFICATION_INCOME_DESC),
                                     color = FireCashOnSurfaceVariant,
                                     fontSize = 12.sp,
                                     lineHeight = 14.sp
@@ -860,7 +910,7 @@ fun SettingsScreen(
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = FireCashSecondary, modifier = Modifier.size(16.dp))
                                 Text(
-                                    text = "Notification access granted",
+                                    text = Translations.t(StringKeys.NOTIFICATION_ACCESS_GRANTED),
                                     color = FireCashSecondary,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -872,31 +922,31 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(containerColor = FireCashSurfaceContainerHigh)
                             ) {
-                                Text("Enable Notification Access", color = FireCashOnSurface)
+                                Text(Translations.t(StringKeys.ENABLE_NOTIFICATION_ACCESS), color = FireCashOnSurface)
                             }
                         }
                         Text(
-                            text = "Scoops the first number from notifications and saves as Income. Ensure FireCash is enabled in system Notification Access.",
+                            text = Translations.t(StringKeys.NOTIFICATION_INCOME_HELP),
                             color = FireCashOnSurfaceVariant,
                             fontSize = 11.sp
                         )
                         // Whitelist with prefix detection
                         Text(
-                            text = "Whitelist (only these apps will be read)",
+                            text = Translations.t(StringKeys.WHITELIST_TITLE),
                             color = FireCashOnSurface,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(top = 8.dp)
                         )
                         Text(
-                            text = "Prefix: only notifications containing this text will be read, amount is first number after it. e.g. โอนเงินให้คุณ ฿",
+                            text = Translations.t(StringKeys.WHITELIST_PREFIX_HELP),
                             color = FireCashOnSurfaceVariant,
                             fontSize = 11.sp
                         )
                         OutlinedTextField(
                             value = newWhitelistApp,
                             onValueChange = { newWhitelistApp = it },
-                            placeholder = { Text("App package e.g. com.kasikornbank.kplus", fontSize = 12.sp) },
+                            placeholder = { Text(Translations.t(StringKeys.APP_PACKAGE_PLACEHOLDER), fontSize = 12.sp) },
                             singleLine = true,
                             textStyle = TextStyle(color = FireCashOnSurface, fontSize = 12.sp, fontFamily = FontFamily.Monospace),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -911,7 +961,7 @@ fun SettingsScreen(
                         OutlinedTextField(
                             value = newWhitelistPrefix,
                             onValueChange = { newWhitelistPrefix = it },
-                            placeholder = { Text("Prefix e.g. โอนเงินให้คุณ ฿ (empty = any)", fontSize = 11.sp) },
+                            placeholder = { Text(Translations.t(StringKeys.PREFIX_PLACEHOLDER), fontSize = 11.sp) },
                             singleLine = true,
                             textStyle = TextStyle(color = FireCashOnSurface, fontSize = 12.sp),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -933,10 +983,10 @@ fun SettingsScreen(
                                 }
                             },
                             modifier = Modifier.fillMaxWidth().testTag("add_whitelist_button")
-                        ) { Text("Add to whitelist") }
+                        ) { Text(Translations.t(StringKeys.ADD_TO_WHITELIST)) }
                         if (displayIncomeWhitelist.isEmpty()) {
                             Text(
-                                text = "No whitelist — all apps will be read. Add package names to restrict.",
+                                text = Translations.t(StringKeys.NO_WHITELIST),
                                 color = FireCashOnSurfaceVariant,
                                 fontSize = 11.sp
                             )
@@ -968,7 +1018,7 @@ fun SettingsScreen(
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                                     Icon(
                                                         imageVector = Icons.Default.Lock,
-                                                        contentDescription = "Permanent preset",
+                                                        contentDescription = Translations.t(StringKeys.PERMANENT_PRESET),
                                                         tint = FireCashSecondary,
                                                         modifier = Modifier.size(14.dp)
                                                     )
@@ -991,7 +1041,7 @@ fun SettingsScreen(
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Default.Close,
-                                                        contentDescription = "Remove",
+                                                        contentDescription = Translations.t(StringKeys.REMOVE),
                                                         tint = FireCashOutline,
                                                         modifier = Modifier.size(18.dp)
                                                     )
@@ -1000,13 +1050,13 @@ fun SettingsScreen(
                                         }
                                         if (entry.prefix.isNotBlank()) {
                                             Text(
-                                                text = "Prefix: ${entry.prefix}",
+                                                text = Translations.fmt(StringKeys.PREFIX_LABEL, entry.prefix),
                                                 color = FireCashOnSurfaceVariant,
                                                 fontSize = 11.sp
                                             )
                                         } else {
                                             Text(
-                                                text = "Prefix: (any)",
+                                                text = Translations.t(StringKeys.PREFIX_LABEL_ANY),
                                                 color = FireCashOnSurfaceVariant,
                                                 fontSize = 11.sp
                                             )
@@ -1055,13 +1105,13 @@ fun SettingsScreen(
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Notification Expense",
+                                    text = Translations.t(StringKeys.NOTIFICATION_EXPENSE),
                                     color = FireCashOnSurface,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = "Auto-capture expense from notifications (first number after prefix → amount)",
+                                    text = Translations.t(StringKeys.NOTIFICATION_EXPENSE_DESC),
                                     color = FireCashOnSurfaceVariant,
                                     fontSize = 12.sp,
                                     lineHeight = 14.sp
@@ -1085,7 +1135,7 @@ fun SettingsScreen(
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = FireCashSecondary, modifier = Modifier.size(16.dp))
                                 Text(
-                                    text = "Notification access granted",
+                                    text = Translations.t(StringKeys.NOTIFICATION_ACCESS_GRANTED),
                                     color = FireCashSecondary,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -1097,30 +1147,30 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(containerColor = FireCashSurfaceContainerHigh)
                             ) {
-                                Text("Enable Notification Access", color = FireCashOnSurface)
+                                Text(Translations.t(StringKeys.ENABLE_NOTIFICATION_ACCESS), color = FireCashOnSurface)
                             }
                         }
                         Text(
-                            text = "Same service as Income — ensure FireCash is enabled in Notification Access.",
+                            text = Translations.t(StringKeys.NOTIFICATION_EXPENSE_HELP),
                             color = FireCashOnSurfaceVariant,
                             fontSize = 11.sp
                         )
                         Text(
-                            text = "Whitelist (only these apps will be read)",
+                            text = Translations.t(StringKeys.WHITELIST_TITLE),
                             color = FireCashOnSurface,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(top = 8.dp)
                         )
                         Text(
-                            text = "Prefix: only notifications containing this text will be read, amount is first number after it. e.g. โอนเงินสำเร็จ ฿",
+                            text = Translations.t(StringKeys.EXPENSE_PREFIX_HELP),
                             color = FireCashOnSurfaceVariant,
                             fontSize = 11.sp
                         )
                         OutlinedTextField(
                             value = newExpenseWhitelistApp,
                             onValueChange = { newExpenseWhitelistApp = it },
-                            placeholder = { Text("App package e.g. com.kasikornbank.kplus", fontSize = 12.sp) },
+                            placeholder = { Text(Translations.t(StringKeys.APP_PACKAGE_PLACEHOLDER), fontSize = 12.sp) },
                             singleLine = true,
                             textStyle = TextStyle(color = FireCashOnSurface, fontSize = 12.sp, fontFamily = FontFamily.Monospace),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -1135,7 +1185,7 @@ fun SettingsScreen(
                         OutlinedTextField(
                             value = newExpenseWhitelistPrefix,
                             onValueChange = { newExpenseWhitelistPrefix = it },
-                            placeholder = { Text("Prefix e.g. โอนเงินสำเร็จ ฿ (empty = any)", fontSize = 11.sp) },
+                            placeholder = { Text(Translations.t(StringKeys.EXPENSE_PREFIX_PLACEHOLDER), fontSize = 11.sp) },
                             singleLine = true,
                             textStyle = TextStyle(color = FireCashOnSurface, fontSize = 12.sp),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -1157,10 +1207,10 @@ fun SettingsScreen(
                                 }
                             },
                             modifier = Modifier.fillMaxWidth().testTag("add_expense_whitelist_button")
-                        ) { Text("Add to whitelist") }
+                        ) { Text(Translations.t(StringKeys.ADD_TO_WHITELIST)) }
                         if (displayExpenseWhitelist.isEmpty()) {
                             Text(
-                                text = "No whitelist — all apps will be read. Add package names to restrict.",
+                                text = Translations.t(StringKeys.NO_WHITELIST),
                                 color = FireCashOnSurfaceVariant,
                                 fontSize = 11.sp
                             )
@@ -1192,7 +1242,7 @@ fun SettingsScreen(
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                                     Icon(
                                                         imageVector = Icons.Default.Lock,
-                                                        contentDescription = "Permanent preset",
+                                                        contentDescription = Translations.t(StringKeys.PERMANENT_PRESET),
                                                         tint = FireCashSecondary,
                                                         modifier = Modifier.size(14.dp)
                                                     )
@@ -1215,7 +1265,7 @@ fun SettingsScreen(
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Default.Close,
-                                                        contentDescription = "Remove",
+                                                        contentDescription = Translations.t(StringKeys.REMOVE),
                                                         tint = FireCashOutline,
                                                         modifier = Modifier.size(18.dp)
                                                     )
@@ -1223,9 +1273,9 @@ fun SettingsScreen(
                                             }
                                         }
                                         if (entry.prefix.isNotBlank()) {
-                                            Text(text = "Prefix: ${entry.prefix}", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
+                                            Text(text = Translations.fmt(StringKeys.PREFIX_LABEL, entry.prefix), color = FireCashOnSurfaceVariant, fontSize = 11.sp)
                                         } else {
-                                            Text(text = "Prefix: (any)", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
+                                            Text(text = Translations.t(StringKeys.PREFIX_LABEL_ANY), color = FireCashOnSurfaceVariant, fontSize = 11.sp)
                                         }
                                     }
                                 }
@@ -1260,15 +1310,15 @@ fun SettingsScreen(
                             Icon(imageVector = Icons.Default.BatterySaver, contentDescription = null, tint = if (batteryOptIgnored) FireCashSecondary else FireCashPrimary, modifier = Modifier.size(22.dp))
                         }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Background & Battery", color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text(text = "Keep the app alive so notifications are caught", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                            Text(text = Translations.t(StringKeys.BACKGROUND_BATTERY), color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text(text = Translations.t(StringKeys.BACKGROUND_BATTERY_DESC), color = FireCashOnSurfaceVariant, fontSize = 13.sp)
                         }
                     }
                     Text(
                         text = if (batteryOptIgnored)
-                            "Battery optimization is disabled — notification income/expense will run in background."
+                            Translations.t(StringKeys.BATTERY_DISABLED_MSG)
                         else
-                            "Battery optimization is enabled. Disable it so the app can keep listening for notifications in the background.",
+                            Translations.t(StringKeys.BATTERY_ENABLED_MSG),
                         color = if (batteryOptIgnored) FireCashSecondary else FireCashOnSurfaceVariant,
                         fontSize = 12.sp
                     )
@@ -1278,8 +1328,8 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Keep listening in background", color = FireCashOnSurface, fontSize = 14.sp)
-                            Text(text = "Persistent status-bar notification like a music player, so bank notifications are caught even after you leave the app", color = FireCashOnSurfaceVariant, fontSize = 11.sp, lineHeight = 14.sp)
+                            Text(text = Translations.t(StringKeys.KEEP_LISTENING), color = FireCashOnSurface, fontSize = 14.sp)
+                            Text(text = Translations.t(StringKeys.KEEP_LISTENING_DESC), color = FireCashOnSurfaceVariant, fontSize = 11.sp, lineHeight = 14.sp)
                         }
                         Switch(
                             checked = backgroundListening,
@@ -1299,7 +1349,7 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth().testTag("disable_battery_optimization_button"),
                             colors = ButtonDefaults.buttonColors(containerColor = FireCashPrimary)
                         ) {
-                            Text("Disable Battery Optimization", color = FireCashOnPrimary)
+                            Text(Translations.t(StringKeys.DISABLE_BATTERY_OPT), color = FireCashOnPrimary)
                         }
                     }
                 }
@@ -1329,8 +1379,8 @@ fun SettingsScreen(
                             Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = FireCashError, modifier = Modifier.size(22.dp))
                         }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Data Transfer", color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            Text(text = "Export everything (slips, API key, options) as JSON — import on another phone", color = FireCashOnSurfaceVariant, fontSize = 13.sp)
+                            Text(text = Translations.t(StringKeys.DATA_TRANSFER), color = FireCashOnSurface, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text(text = Translations.t(StringKeys.DATA_TRANSFER_DESC), color = FireCashOnSurfaceVariant, fontSize = 13.sp)
                         }
                     }
                     Button(
@@ -1340,7 +1390,7 @@ fun SettingsScreen(
                     ) {
                         Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = FireCashOnPrimary, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Export Data (JSON)", color = FireCashOnPrimary)
+                        Text(Translations.t(StringKeys.EXPORT_JSON), color = FireCashOnPrimary)
                     }
                     OutlinedButton(
                         onClick = { importJsonLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
@@ -1348,9 +1398,9 @@ fun SettingsScreen(
                     ) {
                         Icon(imageVector = Icons.Default.Storage, contentDescription = null, tint = FireCashPrimary, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Import Data (JSON)", color = FireCashPrimary)
+                        Text(Translations.t(StringKeys.IMPORT_JSON), color = FireCashPrimary)
                     }
-                    Text(text = "Import replaces current data with the exported one (same format as Export).", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
+                    Text(text = Translations.t(StringKeys.IMPORT_REPLACE_DESC), color = FireCashOnSurfaceVariant, fontSize = 11.sp)
                 }
             }
                 }
@@ -1366,7 +1416,7 @@ fun SettingsScreen(
                 onDismissRequest = { showAddRuleDialog = false },
                 title = {
                     Text(
-                        text = "Add Keyword Mapping",
+                        text = Translations.t(StringKeys.ADD_KEYWORD_MAPPING),
                         color = FireCashOnSurface,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold
@@ -1377,15 +1427,15 @@ fun SettingsScreen(
                         OutlinedTextField(
                             value = newKeyword,
                             onValueChange = { newKeyword = it },
-                            label = { Text("Merchant / Keyword") },
-                            placeholder = { Text("e.g. Uber, Netflix, Starbucks, PromptPay") },
+                            label = { Text(Translations.t(StringKeys.MERCHANT_KEYWORD)) },
+                            placeholder = { Text(Translations.t(StringKeys.MERCHANT_EXAMPLE)) },
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = newCategory,
                             onValueChange = { newCategory = it },
-                            label = { Text("Map To Category") },
-                            placeholder = { Text("e.g. Travel, Software, Food & Dining") },
+                            label = { Text(Translations.t(StringKeys.MAP_TO_CATEGORY)) },
+                            placeholder = { Text(Translations.t(StringKeys.CATEGORY_EXAMPLE)) },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -1400,12 +1450,12 @@ fun SettingsScreen(
                             showAddRuleDialog = false
                         }
                     ) {
-                        Text("Add Rule")
+                        Text(Translations.t(StringKeys.ADD_RULE))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showAddRuleDialog = false }) {
-                        Text("Cancel")
+                        Text(Translations.t(StringKeys.CANCEL))
                     }
                 },
                 containerColor = FireCashSurfaceContainerHighest

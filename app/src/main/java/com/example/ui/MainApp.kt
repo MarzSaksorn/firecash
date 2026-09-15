@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -52,7 +53,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     var showSavedSlips by remember { mutableStateOf(true) }
     var showAnalytics by remember { mutableStateOf(false) }
     var analyticsWallet by remember { mutableStateOf<String?>(null) }
-    var qrPayload by remember { mutableStateOf("") }
+        var qrPayload by remember { mutableStateOf("") }
     var slipData by remember { mutableStateOf<VerifySlipResponse?>(null) }
     var slipWarning by remember { mutableStateOf("") }
     var slipMismatch by remember { mutableStateOf(false) }
@@ -64,9 +65,11 @@ fun MainApp(modifier: Modifier = Modifier) {
     var batteryOptIgnored by remember { mutableStateOf(false) }
     var notificationAccessGranted by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val verificationManager = remember { SlipVerificationManager() }
-    val prefs = remember { context.getSharedPreferences("firecash_settings", Context.MODE_PRIVATE) }
+        val scope = rememberCoroutineScope()
+        val verificationManager = remember { SlipVerificationManager() }
+        val prefs = remember { context.getSharedPreferences("firecash_settings", Context.MODE_PRIVATE) }
+        var currentLang by remember { mutableStateOf(prefs.getString("app_language", "en") ?: "en") }
+        LaunchedEffect(currentLang) { Translations.setLanguageCode(currentLang) }
     // Seed default notification whitelist presets on first launch (no-op once seeded / user-customized)
     com.example.service.NotificationPresets.seedIfNeeded(prefs)
     var backgroundListening by remember { mutableStateOf(prefs.getBoolean("background_listening", false)) }
@@ -972,16 +975,21 @@ fun MainApp(modifier: Modifier = Modifier) {
                     onExportData = { exportAllData() },
                     onImportData = { path -> importAllData(path) },
                     notificationIncomeEnabled = notificationIncomeEnabled,
-                    notificationExpenseEnabled = notificationExpenseEnabled,
-                    notificationWhitelist = notificationWhitelist,
-                    notificationExpenseWhitelist = notificationExpenseWhitelist,
-                    permanentIncomeApps = com.example.service.NotificationPresets.incomePresets,
-                    permanentExpenseApps = com.example.service.NotificationPresets.expensePresets,
-                    disabledIncomePresets = disabledIncomePresets,
-                    disabledExpensePresets = disabledExpensePresets,
-                    notificationAccessGranted = notificationAccessGranted,
-                    batteryOptIgnored = batteryOptIgnored,
-                    backgroundListening = backgroundListening,
+                                        notificationExpenseEnabled = notificationExpenseEnabled,
+                                        notificationWhitelist = notificationWhitelist,
+                                        notificationExpenseWhitelist = notificationExpenseWhitelist,
+                                        permanentIncomeApps = com.example.service.NotificationPresets.incomePresets,
+                                        permanentExpenseApps = com.example.service.NotificationPresets.expensePresets,
+                                        disabledIncomePresets = disabledIncomePresets,
+                                        disabledExpensePresets = disabledExpensePresets,
+                                        notificationAccessGranted = notificationAccessGranted,
+                                        batteryOptIgnored = batteryOptIgnored,
+                                        backgroundListening = backgroundListening,
+                                        onLanguageChange = { code ->
+                                            currentLang = code
+                                            prefs.edit().putString("app_language", code).apply()
+                                        },
+                                        currentLang = currentLang,
                     onToggleBackgroundListening = { enabled ->
                         backgroundListening = enabled
                         prefs.edit().putBoolean("background_listening", enabled).apply()

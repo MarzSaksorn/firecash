@@ -48,6 +48,8 @@ import com.example.data.analytics.InsightType
 import com.example.data.analytics.SpendingInsight
 import com.example.data.model.Expense
 import com.example.data.model.SavedSlip
+import com.example.ui.StringKeys
+import com.example.ui.Translations
 import com.example.ui.theme.FireCashBackground
 import com.example.ui.theme.FireCashError
 import com.example.ui.theme.FireCashOnSurfaceVariant
@@ -320,12 +322,12 @@ fun AnalyticsScreen(
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = Translations.t(StringKeys.BACK),
                     tint = FireCashPrimary
                 )
             }
             Text(
-                text = "Transactions",
+                text = Translations.t(StringKeys.TRANSACTIONS),
                 style = MaterialTheme.typography.headlineSmall,
                 color = Color.White,
                 modifier = Modifier.weight(1f)
@@ -344,17 +346,17 @@ fun AnalyticsScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 StatCard(
-                    title = "Total Spent",
+                    title = Translations.t(StringKeys.TOTAL_SPENT),
                     value = String.format(Locale.US, "THB %.2f", totalSpent),
                     modifier = Modifier.weight(1f)
                 )
                 StatCard(
-                    title = "Avg/Day",
+                    title = Translations.t(StringKeys.AVG_PER_DAY),
                     value = String.format(Locale.US, "THB %.2f", avgPerDay),
                     modifier = Modifier.weight(1f)
                 )
                 StatCard(
-                    title = "vs Last",
+                    title = Translations.t(StringKeys.VS_LAST),
                     value = String.format(Locale.US, "%+.1f%%", changePct),
                     valueColor = if (changePct >= 0) FireCashError else FireCashSecondary,
                     modifier = Modifier.weight(1f)
@@ -378,7 +380,7 @@ fun AnalyticsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Transaction Overview",
+                            text = Translations.t(StringKeys.TRANSACTION_OVERVIEW),
                             color = Color.White,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
@@ -396,30 +398,30 @@ fun AnalyticsScreen(
                                     onClick = { showCompareDialog = true },
                                     contentPadding = PaddingValues(horizontal = 8.dp)
                                 ) {
-                                    Text(
-                                        "Compare",
-                                        color = FireCashPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
+                                                                    Text(
+                                                                        Translations.t(StringKeys.COMPARE),
+                                                                        color = FireCashPrimary,
+                                                                        fontSize = 12.sp,
+                                                                        fontWeight = FontWeight.SemiBold
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // Filter tabs (Week | Month | Year)
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(FireCashSurfaceContainerHigh.copy(alpha = 0.5f))
-                            .padding(2.dp)
-                    ) {
-                        listOf(
-                                                    AnalyticsFilter.WEEK to "Week",
-                                                    AnalyticsFilter.MONTH to "Month",
-                                                    AnalyticsFilter.YEAR to "Year"
-                        ).forEach { (filter, label) ->
+                                                    // Filter tabs (Week | Month | Year)
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .clip(RoundedCornerShape(8.dp))
+                                                            .background(FireCashSurfaceContainerHigh.copy(alpha = 0.5f))
+                                                            .padding(2.dp)
+                                                    ) {
+                                                        listOf(
+                                                            AnalyticsFilter.WEEK to Translations.t(StringKeys.WEEK),
+                                                            AnalyticsFilter.MONTH to Translations.t(StringKeys.MONTH),
+                                                            AnalyticsFilter.YEAR to Translations.t(StringKeys.YEAR)
+                                                        ).forEach { (filter, label) ->
                             val isActive = filter == selectedFilter
                             Box(
                                 modifier = Modifier
@@ -450,7 +452,7 @@ fun AnalyticsScreen(
                                     .background(Color(0xFF2B66FF))
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Income", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
+                            Text(Translations.t(StringKeys.INCOME), color = FireCashOnSurfaceVariant, fontSize = 11.sp)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
@@ -460,7 +462,7 @@ fun AnalyticsScreen(
                                     .background(Color(0xFF7DD3FC))
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Outcome", color = FireCashOnSurfaceVariant, fontSize = 11.sp)
+                            Text(Translations.t(StringKeys.OUTCOME), color = FireCashOnSurfaceVariant, fontSize = 11.sp)
                         }
                     }
 
@@ -494,15 +496,15 @@ fun AnalyticsScreen(
                                 .height(180.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = when {
-                                    availableMonths.isEmpty() -> "No dated transactions yet"
-                                    else -> "No transactions in this period"
-                                },
-                                color = FireCashOnSurfaceVariant,
-                                fontSize = 12.sp
-                            )
-                        }
+                                                    Text(
+                                                        text = when {
+                                                            availableMonths.isEmpty() -> Translations.t(StringKeys.NO_DATED_TRANSACTIONS)
+                                                            else -> Translations.t(StringKeys.NO_TRANSACTIONS_IN_PERIOD)
+                                                        },
+                                                        color = FireCashOnSurfaceVariant,
+                                                        fontSize = 12.sp
+                                                    )
+                                                }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -514,14 +516,14 @@ fun AnalyticsScreen(
                         val total = totalInc + totalOut
                         LegendRow(
                             color = Color(0xFF2B66FF),
-                            label = "Income · ${selectedFilter.name.lowercase().replaceFirstChar { it.uppercase() }}",
+                            label = "${Translations.t(StringKeys.INCOME)} · ${selectedFilter.name.lowercase().replaceFirstChar { it.uppercase() }}",
                             amount = totalInc,
                             total = total
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         LegendRow(
                             color = Color(0xFF7DD3FC),
-                            label = "Outcome · ${selectedFilter.name.lowercase().replaceFirstChar { it.uppercase() }}",
+                            label = "${Translations.t(StringKeys.OUTCOME)} · ${selectedFilter.name.lowercase().replaceFirstChar { it.uppercase() }}",
                             amount = totalOut,
                             total = total
                         )
@@ -534,7 +536,7 @@ fun AnalyticsScreen(
             // ── AI Insights ────────────────────────────────
             if (insights.isNotEmpty()) {
                 Text(
-                    text = "AI Insights",
+                    text = Translations.t(StringKeys.AI_INSIGHTS),
                     color = FireCashOnSurfaceVariant,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
@@ -561,7 +563,7 @@ fun AnalyticsScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "No data yet",
+                            text = Translations.t(StringKeys.NO_DATA),
                             color = FireCashOnSurfaceVariant,
                             style = MaterialTheme.typography.bodyLarge
                         )
@@ -578,7 +580,7 @@ fun AnalyticsScreen(
             containerColor = FireCashSurfaceContainerLow,
             title = {
                 Text(
-                    text = "Compare Months",
+                    text = Translations.t(StringKeys.COMPARE_MONTHS),
                     color = Color.White,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
@@ -587,7 +589,7 @@ fun AnalyticsScreen(
             text = {
                 if (availableMonths.isEmpty()) {
                     Text(
-                        text = "No dated transactions yet",
+                        text = Translations.t(StringKeys.NO_DATED_TRANSACTIONS),
                         color = FireCashOnSurfaceVariant,
                         fontSize = 13.sp
                     )
@@ -613,7 +615,7 @@ fun AnalyticsScreen(
                                     colors = CheckboxDefaults.colors(checkedColor = FireCashPrimary)
                                 )
                                 Text(
-                                    text = if (mt.isCurrent) "${mt.label} (current)" else mt.label,
+                                    text = if (mt.isCurrent) "${mt.label} ${Translations.t(StringKeys.CURRENT_SUFFIX)}" else mt.label,
                                     color = if (mt.isCurrent) FireCashOnSurfaceVariant else Color.White,
                                     fontSize = 13.sp
                                 )
@@ -621,7 +623,7 @@ fun AnalyticsScreen(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Up to 3 months can be compared at once",
+                            text = Translations.t(StringKeys.UP_TO_3_MONTHS),
                             color = FireCashOnSurfaceVariant,
                             fontSize = 11.sp
                         )
@@ -630,7 +632,7 @@ fun AnalyticsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showCompareDialog = false }) {
-                    Text("Done", color = FireCashPrimary)
+                    Text(Translations.t(StringKeys.DONE), color = FireCashPrimary)
                 }
             }
         )

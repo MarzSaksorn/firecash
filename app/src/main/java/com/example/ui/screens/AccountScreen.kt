@@ -88,6 +88,8 @@ import com.example.ui.theme.FireCashSecondaryContainer
 import com.example.ui.theme.FireCashSurfaceContainerHigh
 import com.example.ui.theme.FireCashSurfaceContainerHighest
 import com.example.ui.theme.FireCashSurfaceContainerLow
+import com.example.ui.Translations
+import com.example.ui.StringKeys
 import java.util.Locale
 
 private fun isSelfTransfer(slip: SavedSlip, knownNames: List<String> = emptyList()): Boolean {
@@ -147,8 +149,8 @@ private fun BalanceCardBody(
         ) {
             Column {
                 Text(
-                    text = "Total Balance",
-                    color = Color(0xFFcbd5e1),
+                                        text = Translations.t(StringKeys.TOTAL_BALANCE),
+                                        color = Color(0xFFcbd5e1),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -226,7 +228,7 @@ private fun BalanceCardBody(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = "Scan Slip",
+                                            text = Translations.t(StringKeys.SCAN_SLIP),
                         color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
@@ -254,7 +256,7 @@ private fun BalanceCardBody(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = "Analytics",
+                                            text = Translations.t(StringKeys.ANALYTICS),
                         color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium
@@ -375,12 +377,12 @@ fun AccountScreen(
                 IconButton(onClick = { selectedKeys = emptySet() }) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Clear selection",
+                        contentDescription = null,
                         tint = FireCashPrimary
                     )
         }
                 Text(
-                    text = "${selectedKeys.size} selected",
+                    text = "${selectedKeys.size} ${Translations.t(StringKeys.SELECTED)}",
                     style = MaterialTheme.typography.headlineSmall,
                     color = Color.White,
                     modifier = Modifier.weight(1f)
@@ -389,13 +391,13 @@ fun AccountScreen(
                     IconButton(onClick = { showDeleteMultiDialog = true }) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete selected",
+                            contentDescription = Translations.t(StringKeys.DELETE),
                             tint = FireCashError
                         )
             }
         }
                 TextButton(onClick = { selectedKeys = walletSlips.map { it.savedAt }.toSet() }) {
-                    Text("All", color = FireCashPrimary, fontSize = 13.sp)
+                                    Text(Translations.t(StringKeys.ALL), color = FireCashPrimary, fontSize = 13.sp)
         }
             } else {
                 Row(
@@ -405,15 +407,15 @@ fun AccountScreen(
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.firecash_icon),
-                        contentDescription = "FireCash logo",
+                        contentDescription = "${Translations.t(StringKeys.APP_NAME)} logo",
                         modifier = Modifier
                             .size(56.dp)
                             .clip(CircleShape)
                             .background(FireCashSurfaceContainerLow)
                     )
                     Text(
-                        text = "FireCash",
-                        style = MaterialTheme.typography.headlineMedium,
+                                            text = Translations.t(StringKeys.APP_NAME),
+                                            style = MaterialTheme.typography.headlineMedium,
                         color = Color.White,
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 26.sp
@@ -448,8 +450,8 @@ fun AccountScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Bank",
-                                color = if (selectedWallet != "cash") Color.White else FireCashOnSurfaceVariant.copy(alpha = 0.6f),
+                                                            text = Translations.t(StringKeys.BANK),
+                                                            color = if (selectedWallet != "cash") Color.White else FireCashOnSurfaceVariant.copy(alpha = 0.6f),
                                 fontSize = 12.sp,
                                 fontWeight = if (selectedWallet != "cash") FontWeight.SemiBold else FontWeight.Normal
                             )
@@ -467,8 +469,8 @@ fun AccountScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Cash",
-                                color = if (selectedWallet == "cash") Color.White else FireCashOnSurfaceVariant.copy(alpha = 0.6f),
+                                                            text = Translations.t(StringKeys.CASH),
+                                                            color = if (selectedWallet == "cash") Color.White else FireCashOnSurfaceVariant.copy(alpha = 0.6f),
                                 fontSize = 12.sp,
                                 fontWeight = if (selectedWallet == "cash") FontWeight.SemiBold else FontWeight.Normal
                             )
@@ -478,7 +480,7 @@ fun AccountScreen(
                 IconButton(onClick = onOpenSettings) {
                     Icon(
                         imageVector = Icons.Default.Settings,
-                        contentDescription = "Account settings",
+                        contentDescription = Translations.t(StringKeys.SETTINGS),
                         tint = FireCashPrimary
                     )
         }
@@ -636,8 +638,8 @@ fun AccountScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Transactions",
-                    color = FireCashOnSurface,
+                    text = Translations.t(StringKeys.TRANSACTIONS),
+                                        color = FireCashOnSurface,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -650,7 +652,7 @@ fun AccountScreen(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (isUserSyncing) "Syncing…" else "Auto-sync…",
+                        text = if (isUserSyncing) Translations.t(StringKeys.SYNCING) else Translations.t(StringKeys.AUTO_SYNC),
                         color = FireCashOnSurfaceVariant,
                         fontSize = 12.sp
                     )
@@ -666,7 +668,7 @@ fun AccountScreen(
                 ) {
                     Icon(
                         imageVector = if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
-                        contentDescription = if (isSearchActive) "Close search" else "Search slips",
+                        contentDescription = if (isSearchActive) null else Translations.t(StringKeys.SEARCH),
                         tint = FireCashPrimary,
                         modifier = Modifier.size(20.dp)
                     )
@@ -682,7 +684,7 @@ fun AccountScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = "Add income/expense manually",
+                        contentDescription = Translations.t(StringKeys.ADD_MANUAL),
                         tint = FireCashPrimary,
                         modifier = Modifier.size(22.dp)
                     )
@@ -707,7 +709,7 @@ fun AccountScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Sync,
-                        contentDescription = "Sync (tap = new slips, hold 10s = full resync)",
+                        contentDescription = Translations.t(StringKeys.SYNC),
                         tint = FireCashPrimary,
                         modifier = Modifier.size(20.dp)
                     )
@@ -721,10 +723,10 @@ fun AccountScreen(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             val chips = listOf(
-                null to "All",
-                "income" to "Income",
-                "expense" to "Expense",
-                "transfer" to "Transfer"
+                            null to Translations.t(StringKeys.ALL),
+                            "income" to Translations.t(StringKeys.INCOME),
+                            "expense" to Translations.t(StringKeys.EXPENSE),
+                            "transfer" to Translations.t(StringKeys.TRANSFER)
             )
             chips.forEach { (key, label) ->
                 val selected = filterCategory == key
@@ -762,7 +764,7 @@ fun AccountScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
+                        contentDescription = Translations.t(StringKeys.SEARCH),
                         tint = FireCashOnSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
@@ -770,7 +772,7 @@ fun AccountScreen(
                     TextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = { Text("Search transactions, merchant...", fontSize = 14.sp, color = FireCashOnSurfaceVariant.copy(alpha = 0.7f)) },
+                        placeholder = { Text(Translations.t(StringKeys.SEARCH_TRANSACTIONS), fontSize = 14.sp, color = FireCashOnSurfaceVariant.copy(alpha = 0.7f)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                         textStyle = TextStyle(color = FireCashOnSurface, fontSize = 14.sp),
@@ -784,7 +786,7 @@ fun AccountScreen(
                     )
                     if (searchQuery.isNotBlank()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = FireCashOnSurfaceVariant, modifier = Modifier.size(16.dp))
+                            Icon(imageVector = Icons.Default.Close, contentDescription = Translations.t(StringKeys.CANCEL), tint = FireCashOnSurfaceVariant, modifier = Modifier.size(16.dp))
             }
             }
         }
@@ -806,12 +808,12 @@ fun AccountScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = if (slips.isEmpty()) "No transactions yet" else "No matching slips",
+                    text = if (slips.isEmpty()) Translations.t(StringKeys.NO_TRANSACTIONS) else Translations.t(StringKeys.NO_MATCHING_SLIPS),
                     color = FireCashOnSurfaceVariant,
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Text(
-                    text = if (slips.isEmpty()) "Scan a slip to record money in/out" else "Try another date, title, amount or exact QR payload",
+                    text = if (slips.isEmpty()) Translations.t(StringKeys.SCAN_SLIP_PROMPT) else Translations.t(StringKeys.SEARCH_HELP),
                     color = FireCashOnSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -873,8 +875,8 @@ fun AccountScreen(
                 ) {
                     CircularProgressIndicator(color = Color.White)
                     Text(
-                        text = "Syncing slips...",
-                        color = Color.White,
+                        text = Translations.t(StringKeys.SYNCING_SLIPS),
+                                                color = Color.White,
                         style = MaterialTheme.typography.bodyLarge
                     )
         }
@@ -903,10 +905,10 @@ fun AccountScreen(
                             showDeleteMultiDialog = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = FireCashError)
-                    ) { Text("Delete", color = Color.White) }
+                    ) { Text(Translations.t(StringKeys.DELETE), color = Color.White) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDeleteMultiDialog = false }) { Text("Cancel") }
+                    TextButton(onClick = { showDeleteMultiDialog = false }) { Text(Translations.t(StringKeys.CANCEL)) }
                 },
                 containerColor = FireCashSurfaceContainerLow
             )
@@ -916,7 +918,7 @@ fun AccountScreen(
         if (showAddManualDialog) {
             AlertDialog(
                 onDismissRequest = { showAddManualDialog = false },
-                title = { Text("Add Transaction", color = Color.White, fontWeight = FontWeight.Bold) },
+                title = { Text(Translations.t(StringKeys.ADD_TRANSACTION), color = Color.White, fontWeight = FontWeight.Bold) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(
@@ -932,7 +934,7 @@ fun AccountScreen(
                                     .clickable { manualIsIn = true },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("Money In", color = if (manualIsIn) FireCashSecondary else FireCashOnSurfaceVariant, fontWeight = if (manualIsIn) FontWeight.Bold else FontWeight.Normal)
+                                Text(Translations.t(StringKeys.MONEY_IN), color = if (manualIsIn) FireCashSecondary else FireCashOnSurfaceVariant, fontWeight = if (manualIsIn) FontWeight.Bold else FontWeight.Normal)
             }
                     Box(
                                 modifier = Modifier
@@ -943,14 +945,14 @@ fun AccountScreen(
                                     .clickable { manualIsIn = false },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("Money Out", color = if (!manualIsIn) FireCashError else FireCashOnSurfaceVariant, fontWeight = if (!manualIsIn) FontWeight.Bold else FontWeight.Normal)
+                                Text(Translations.t(StringKeys.MONEY_OUT), color = if (!manualIsIn) FireCashError else FireCashOnSurfaceVariant, fontWeight = if (!manualIsIn) FontWeight.Bold else FontWeight.Normal)
             }
             }
                 OutlinedTextField(
                             value = manualAmount,
                             onValueChange = { manualAmount = it.filter { c -> c.isDigit() || c == '.' } },
-                            label = { Text("Amount (THB)") },
-                            placeholder = { Text("e.g. 1500.00") },
+                            label = { Text(Translations.t(StringKeys.AMOUNT_THB)) },
+                                                        placeholder = { Text(Translations.t(StringKeys.EG_AMOUNT)) },
                             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
@@ -967,8 +969,8 @@ fun AccountScreen(
                         OutlinedTextField(
                             value = manualNote,
                             onValueChange = { manualNote = it },
-                            label = { Text("Note (optional)") },
-                            placeholder = { Text("e.g. Groceries, Salary, Food") },
+                            label = { Text(Translations.t(StringKeys.NOTE_OPTIONAL)) },
+                                                        placeholder = { Text(Translations.t(StringKeys.EG_NOTE)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             textStyle = androidx.compose.ui.text.TextStyle(color = com.example.ui.theme.FireCashOnSurface, fontSize = 14.sp),
@@ -993,10 +995,10 @@ fun AccountScreen(
             }
                         },
                         enabled = (manualAmount.toDoubleOrNull() ?: 0.0) > 0
-                    ) { Text("Add") }
+                    ) { Text(Translations.t(StringKeys.ADD)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showAddManualDialog = false }) { Text("Cancel") }
+                    TextButton(onClick = { showAddManualDialog = false }) { Text(Translations.t(StringKeys.CANCEL)) }
                 },
                 containerColor = FireCashSurfaceContainerLow
             )
@@ -1028,15 +1030,15 @@ private fun TransactionRow(
         else -> FireCashError
     }
     val title = when {
-        isSelf -> "Transfer"
-        isIn -> slip.senderName ?: slip.receiverName ?: "Income"
-        else -> slip.receiverName ?: slip.senderName ?: "Expense"
-    }
+            isSelf -> Translations.t(StringKeys.TRANSFER)
+            isIn -> slip.senderName ?: slip.receiverName ?: Translations.t(StringKeys.INCOME)
+            else -> slip.receiverName ?: slip.senderName ?: Translations.t(StringKeys.EXPENSE)
+        }
     val category = when {
-        isSelf -> "Transfer"
-        isIn -> "Income"
-        else -> "Expense"
-    }
+            isSelf -> Translations.t(StringKeys.TRANSFER)
+            isIn -> Translations.t(StringKeys.INCOME)
+            else -> Translations.t(StringKeys.EXPENSE)
+        }
 
     Row(
         modifier = Modifier
@@ -1136,7 +1138,7 @@ private fun DateHeader(date: String, count: Int, total: Double) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = if (date == "Unknown") "Unknown Date" else date,
+            text = if (date == "Unknown") Translations.t(StringKeys.UNKNOWN_DATE) else date,
             color = FireCashPrimary,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold

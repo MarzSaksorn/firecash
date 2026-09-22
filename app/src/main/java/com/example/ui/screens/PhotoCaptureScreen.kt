@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.example.ui.theme.FireCashOnSurface
 import com.example.ui.theme.FireCashSecondary
 import com.example.ui.Translations
 import com.example.ui.StringKeys

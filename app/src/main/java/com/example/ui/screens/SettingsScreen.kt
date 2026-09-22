@@ -103,6 +103,7 @@ import com.example.ui.theme.FireCashSecondary
 import com.example.ui.theme.FireCashSurfaceContainer
 import com.example.ui.theme.FireCashSurfaceContainerHigh
 import com.example.ui.theme.FireCashSurfaceContainerHighest
+import com.example.ui.theme.FireCashOnSurface
 import com.example.ui.theme.FireCashSurfaceContainerLow
 import com.example.ui.theme.FireCashSurfaceDim
 import com.example.ui.theme.FireCashSurfaceVariant
@@ -290,50 +291,7 @@ fun SettingsScreen(
                                                         }
                                                     }
                                                 }
-                                                // Card: Theme
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clip(RoundedCornerShape(16.dp))
-                                                        .background(FireCashSurfaceContainerLow)
-                                                        .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                                                        .padding(16.dp)
-                                                ) {
-                                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.DarkMode,
-                                                            contentDescription = null,
-                                                            tint = Color(0xFFB3C5FF),
-                                                            modifier = Modifier.size(20.dp)
-                                                        )
-                                                        Spacer(modifier = Modifier.width(10.dp))
-                                                        Text(
-                                                            text = if (currentLang == "th") "ธีม" else "Theme",
-                                                            color = Color.White,
-                                                            fontSize = 14.sp,
-                                                            fontWeight = FontWeight.SemiBold
-                                                        )
-                                                        Spacer(modifier = Modifier.weight(1f))
-                                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                            listOf(true to (if (currentLang == "th") "มืด" else "Dark"), false to (if (currentLang == "th") "สว่าง" else "Light")).forEach { (isDark, label) ->
-                                                                Box(
-                                                                    modifier = Modifier
-                                                                        .clip(RoundedCornerShape(8.dp))
-                                                                        .background(if (isDarkTheme == isDark) FireCashPrimary else FireCashSurfaceContainerHigh)
-                                                                        .clickable { onThemeChange(isDark) }
-                                                                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                                                                ) {
-                                                                    Text(
-                                                                        text = label,
-                                                                        color = if (isDarkTheme == isDark) Color.White else FireCashOnSurfaceVariant,
-                                                                        fontSize = 13.sp
-                                                                    )
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                        // Card: My Names (auto income / transfer detection)
+                                                // Card: My Names (auto income / transfer detection)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1447,13 +1405,46 @@ fun SettingsScreen(
                         Text(Translations.t(StringKeys.IMPORT_JSON), color = FireCashPrimary)
                     }
                     Text(text = Translations.t(StringKeys.IMPORT_REPLACE_DESC), color = FireCashOnSurfaceVariant, fontSize = 11.sp)
-                }
-            }
-                }
-            }
-            }
+                                    }
+                                }
+                                    }
+                                }
+                                }
 
-            Spacer(modifier = Modifier.height(30.dp))
+                                // Card: Credits
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(FireCashSurfaceContainerLow)
+                                        .padding(16.dp)
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(
+                                            text = "คณะผู้จัดทำ",
+                                            color = FireCashOnSurface,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        listOf(
+                                            "นาย ศักย์ศรณ์ งานดี",
+                                            "นาย ธีรวัฒน์ เชียงภูกอ",
+                                            "นาย พิพัฒน์ แป้นชูผล",
+                                            "นาย ธนภูมิ คงทรัพย์",
+                                            "นางสาว อริสา ยาใจ",
+                                            "ครูที่ปรึกษาโครงงาน ว่าที่ร้อยตรี อมรลดา วาริสสอน"
+                                        ).forEach { name ->
+                                            Text(
+                                                text = name,
+                                                color = FireCashOnSurfaceVariant,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(30.dp))
         }
 
         // Add Rule Dialog

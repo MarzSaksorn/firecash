@@ -52,6 +52,7 @@ import com.example.ui.StringKeys
 import com.example.ui.Translations
 import com.example.ui.theme.FireCashBackground
 import com.example.ui.theme.FireCashError
+import com.example.ui.theme.FireCashOnSurface
 import com.example.ui.theme.FireCashOnSurfaceVariant
 import com.example.ui.theme.FireCashPrimary
 import com.example.ui.theme.FireCashSecondary

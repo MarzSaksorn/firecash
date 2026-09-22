@@ -14,14 +14,18 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.firecash.qxrtv"
-    minSdk = 24
-    targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+      applicationId = "com.aistudio.firecash.qxrtv"
+      minSdk = 24
+      targetSdk = 36
+      versionCode = 1
+      versionName = "1.0"
 
-    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-  }
+      testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+      // Only bundle native libs for the architectures the app actually needs.
+      // arm64-v8a covers ~95% of modern devices; drop older/unused ABIs.
+      ndk { abiFilters += listOf("arm64-v8a") }
+    }
 
   signingConfigs {
     create("release") {
@@ -40,13 +44,14 @@ android {
   }
 
   buildTypes {
-    release {
-      isCrunchPngs = false
-      isMinifyEnabled = false
-      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
-    }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+      release {
+        isMinifyEnabled = true
+        isShrinkResources = true
+        isCrunchPngs = true
+        proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        signingConfig = signingConfigs.getByName("release")
+      }
+      debug { signingConfig = signingConfigs.getByName("debugConfig") }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11

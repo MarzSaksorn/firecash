@@ -3,6 +3,7 @@ package com.example.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -22,6 +23,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.StringKeys
+import com.example.ui.Translations
 import com.example.ui.theme.FireCashPrimary
 import com.example.ui.theme.FireCashSurfaceContainer
 
@@ -31,6 +34,7 @@ fun FireCashTopBar(
     showBackButton: Boolean = true,
     onBackClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
+    showProfileButton: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -51,18 +55,13 @@ fun FireCashTopBar(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Go back",
+                    contentDescription = Translations.t(StringKeys.BACK),
                     tint = FireCashPrimary,
                     modifier = Modifier.size(24.dp)
                 )
             }
         } else {
-            IconButton(
-                onClick = {},
-                enabled = false
-            ) {
-                // Empty spacer matching back button size
-            }
+            Spacer(modifier = Modifier.size(48.dp))
         }
 
         Text(
@@ -74,18 +73,22 @@ fun FireCashTopBar(
             modifier = Modifier.testTag("app_title")
         )
 
-        IconButton(
-            onClick = onProfileClick,
-            modifier = Modifier
-                .clip(CircleShape)
-                .testTag("top_bar_profile_button")
-        ) {
-            Icon(
-                imageVector = Icons.Default.AccountCircle,
-                contentDescription = "User account",
-                tint = FireCashPrimary,
-                modifier = Modifier.size(28.dp)
-            )
+        if (showProfileButton) {
+            IconButton(
+                onClick = onProfileClick,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .testTag("top_bar_profile_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = Translations.t(StringKeys.SETTINGS),
+                    tint = FireCashPrimary,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        } else {
+            Spacer(modifier = Modifier.size(48.dp))
         }
     }
 }

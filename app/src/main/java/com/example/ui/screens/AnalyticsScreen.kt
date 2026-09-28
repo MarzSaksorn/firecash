@@ -328,11 +328,18 @@ fun AnalyticsScreen(
                 )
             }
             Text(
-                text = Translations.t(StringKeys.TRANSACTIONS),
+                text = Translations.t(StringKeys.ANALYTICS),
                 style = MaterialTheme.typography.headlineSmall,
-                color = Color.White,
+                color = FireCashOnSurface,
                 modifier = Modifier.weight(1f)
             )
+            IconButton(onClick = onRefresh) {
+                Icon(
+                    imageVector = Icons.Default.Repeat,
+                    contentDescription = Translations.t(StringKeys.SYNC),
+                    tint = FireCashPrimary
+                )
+            }
         }
 
         Column(
@@ -382,8 +389,8 @@ fun AnalyticsScreen(
                     ) {
                         Text(
                             text = Translations.t(StringKeys.TRANSACTION_OVERVIEW),
-                            color = Color.White,
-                            fontSize = 14.sp,
+                            color = FireCashOnSurface,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold
                         )
                         if (selectedFilter == AnalyticsFilter.MONTH) {
@@ -412,32 +419,24 @@ fun AnalyticsScreen(
                                                     Spacer(modifier = Modifier.height(12.dp))
 
                                                     // Filter tabs (Week | Month | Year)
-                                                    Row(
-                                                        modifier = Modifier
-                                                            .clip(RoundedCornerShape(8.dp))
-                                                            .background(FireCashSurfaceContainerHigh.copy(alpha = 0.5f))
-                                                            .padding(2.dp)
-                                                    ) {
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(FireCashSurfaceContainerHigh.copy(alpha = 0.5f))
+                                    .padding(2.dp)
+                            ) {
                                                         listOf(
                                                             AnalyticsFilter.WEEK to Translations.t(StringKeys.WEEK),
                                                             AnalyticsFilter.MONTH to Translations.t(StringKeys.MONTH),
                                                             AnalyticsFilter.YEAR to Translations.t(StringKeys.YEAR)
                                                         ).forEach { (filter, label) ->
                             val isActive = filter == selectedFilter
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isActive) FireCashSurfaceContainerHighest else Color.Transparent)
-                                    .clickable { selectedFilter = filter }
-                                    .padding(horizontal = 16.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = label,
-                                    color = if (isActive) Color.White else FireCashOnSurfaceVariant,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
+                            FilterChip(
+                                selected = isActive,
+                                onClick = { selectedFilter = filter },
+                                label = { Text(label) },
+                                modifier = Modifier.heightIn(min = 40.dp)
+                            )
                         }
                     }
 
@@ -490,6 +489,13 @@ fun AnalyticsScreen(
                                 )
                             }
                         }
+                        Text(
+                            text = "${Translations.t(StringKeys.INCOME)} ${String.format(Locale.US, "THB %.2f", chartData.points.sumOf { it.income })} · " +
+                                "${Translations.t(StringKeys.OUTCOME)} ${String.format(Locale.US, "THB %.2f", chartData.points.sumOf { it.outcome })}",
+                            color = FireCashOnSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 10.dp)
+                        )
                     } else {
                         Box(
                             modifier = Modifier
@@ -582,8 +588,8 @@ fun AnalyticsScreen(
             title = {
                 Text(
                     text = Translations.t(StringKeys.COMPARE_MONTHS),
-                    color = Color.White,
-                    fontSize = 16.sp,
+                    color = FireCashOnSurface,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
             },
@@ -617,8 +623,8 @@ fun AnalyticsScreen(
                                 )
                                 Text(
                                     text = if (mt.isCurrent) "${mt.label} ${Translations.t(StringKeys.CURRENT_SUFFIX)}" else mt.label,
-                                    color = if (mt.isCurrent) FireCashOnSurfaceVariant else Color.White,
-                                    fontSize = 13.sp
+                                    color = if (mt.isCurrent) FireCashOnSurfaceVariant else FireCashOnSurface,
+                                    style = MaterialTheme.typography.bodyMedium
                                 )
                             }
                         }
@@ -662,9 +668,9 @@ private fun computeNiceStep(maxVal: Double): Double {
 }
 
 
-private val incomeColor = Color(0xFF2B66FF)
-private val outcomeColor = Color(0xFF7DD3FC)
-private val gridColor = Color(0xFF2A2D35)
+private val incomeColor: Color get() = FireCashSecondary
+private val outcomeColor: Color get() = FireCashPrimary
+private val gridColor: Color get() = com.example.ui.theme.FireCashOutlineVariant.copy(alpha = 0.55f)
 
 /**
  * Line chart with mild cubic-bezier smoothing ("smoothen out but not much").
@@ -1033,8 +1039,8 @@ private fun LegendRow(
         Spacer(modifier = Modifier.weight(1f))
         Text(
             text = String.format(Locale.US, "THB %.2f", amount),
-            color = Color.White,
-            fontSize = 13.sp,
+            color = FireCashOnSurface,
+            style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold
         )
         Spacer(modifier = Modifier.width(10.dp))
@@ -1054,7 +1060,7 @@ private fun StatCard(
     title: String,
     value: String,
     modifier: Modifier = Modifier,
-    valueColor: Color = Color.White
+    valueColor: Color = FireCashOnSurface
 ) {
     Column(
         modifier = modifier
@@ -1065,13 +1071,13 @@ private fun StatCard(
         Text(
             text = title,
             color = FireCashOnSurfaceVariant,
-            fontSize = 11.sp
+            style = MaterialTheme.typography.labelSmall
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = value,
             color = valueColor,
-            fontSize = 13.sp,
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold
         )
     }
@@ -1106,14 +1112,14 @@ private fun InsightRow(insight: SpendingInsight) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = insight.title,
-                color = Color.White,
-                fontSize = 13.sp,
+                color = FireCashOnSurface,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
                 text = insight.description,
                 color = FireCashOnSurfaceVariant,
-                fontSize = 12.sp,
+                style = MaterialTheme.typography.bodySmall,
                 maxLines = 2
             )
         }

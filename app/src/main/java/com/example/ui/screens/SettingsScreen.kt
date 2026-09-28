@@ -11,11 +11,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -77,6 +80,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -226,7 +230,7 @@ fun SettingsScreen(
             .background(FireCashBackground)
     ) {
         FireCashTopBar(
-            title = Translations.t(StringKeys.APP_NAME),
+            title = Translations.t(StringKeys.SETTINGS),
             showBackButton = true,
             onBackClick = onBack,
             onProfileClick = {}
@@ -246,6 +250,57 @@ fun SettingsScreen(
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(start = 4.dp)
                         )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(FireCashSurfaceContainerLow)
+                                .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.3f), RoundedCornerShape(18.dp))
+                                .padding(16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .clip(CircleShape)
+                                        .background(FireCashSurfaceVariant),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.DarkMode,
+                                        contentDescription = null,
+                                        tint = FireCashPrimary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = Translations.t(StringKeys.DARK_MODE),
+                                        color = FireCashOnSurface,
+                                        style = androidx.compose.material3.MaterialTheme.typography.titleSmall
+                                    )
+                                    Text(
+                                        text = Translations.t(StringKeys.DARK_MODE_DESC),
+                                        color = FireCashOnSurfaceVariant,
+                                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                Switch(
+                                    checked = isDarkTheme,
+                                    onCheckedChange = onThemeChange,
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = FireCashOnPrimary,
+                                        checkedTrackColor = FireCashPrimary,
+                                        uncheckedThumbColor = FireCashOutline,
+                                        uncheckedTrackColor = FireCashSurfaceVariant
+                                    )
+                                )
+                            }
+                        }
                         // Card: Language
                                                 Box(
                                                     modifier = Modifier
@@ -266,23 +321,30 @@ fun SettingsScreen(
                                                             Spacer(modifier = Modifier.width(10.dp))
                                                             Text(
                                                                 text = if (currentLang == "th") "ภาษา" else "Language",
-                                                                color = Color.White,
+                                                                color = FireCashOnSurface,
                                                                 fontSize = 14.sp,
                                                                 fontWeight = FontWeight.SemiBold
                                                             )
                                                             Spacer(modifier = Modifier.weight(1f))
-                                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                            Row(
+                                                                modifier = Modifier.selectableGroup(),
+                                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                            ) {
                                                                 listOf("en" to "English", "th" to "ภาษาไทย").forEach { (code, label) ->
                                                                     Box(
                                                                         modifier = Modifier
                                                                             .clip(RoundedCornerShape(8.dp))
                                                                             .background(if (currentLang == code) FireCashPrimary else FireCashSurfaceContainerHigh)
-                                                                            .clickable { onLanguageChange(code) }
+                                                                            .selectable(
+                                                                                selected = currentLang == code,
+                                                                                role = Role.Tab,
+                                                                                onClick = { onLanguageChange(code) }
+                                                                            )
                                                                             .padding(horizontal = 12.dp, vertical = 6.dp)
                                                                     ) {
                                                                         Text(
                                                                             text = label,
-                                                                            color = if (currentLang == code) Color.White else FireCashOnSurfaceVariant,
+                                                                            color = if (currentLang == code) FireCashOnPrimary else FireCashOnSurfaceVariant,
                                                                             fontSize = 13.sp
                                                                         )
                                                                     }
@@ -600,7 +662,7 @@ fun SettingsScreen(
 
                                 IconButton(
                                     onClick = { onRemoveRule(rule) },
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Close,
@@ -622,7 +684,12 @@ fun SettingsScreen(
                                     color = FireCashOutline.copy(alpha = 0.5f),
                                     shape = RoundedCornerShape(10.dp)
                                 )
-                                .clickable { showAddRuleDialog = true }
+                                .clickable(
+                                    role = Role.Button,
+                                    onClickLabel = Translations.t(StringKeys.ADD_RULE),
+                                    onClick = { showAddRuleDialog = true }
+                                )
+                                .heightIn(min = 48.dp)
                                 .padding(vertical = 10.dp)
                                 .testTag("add_rule_button"),
                             contentAlignment = Alignment.Center
@@ -659,7 +726,12 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { dangerousExpanded = !dangerousExpanded }
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = if (dangerousExpanded) Translations.t(StringKeys.TAP_COLLAPSE)
+                        else Translations.t(StringKeys.TAP_EXPAND),
+                        onClick = { dangerousExpanded = !dangerousExpanded }
+                    )
                     .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

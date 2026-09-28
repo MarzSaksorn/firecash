@@ -16,9 +16,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -39,7 +41,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,8 +57,11 @@ import com.example.ui.theme.FireCashBackground
 import com.example.ui.theme.FireCashError
 import com.example.ui.theme.FireCashOnSurface
 import com.example.ui.theme.FireCashOnSurfaceVariant
+import com.example.ui.theme.FireCashOutlineVariant
 import com.example.ui.theme.FireCashPrimary
+import com.example.ui.theme.FireCashPrimaryContainer
 import com.example.ui.theme.FireCashSecondary
+import com.example.ui.theme.FireCashSecondaryContainer
 import com.example.ui.theme.FireCashSurfaceContainerLow
 import java.io.File
 import java.util.Locale
@@ -99,51 +106,107 @@ fun QrPayloadScreen(
                 onClick = onBack,
                 colors = ButtonDefaults.buttonColors(containerColor = FireCashSurfaceContainerLow),
                 shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, FireCashOutlineVariant.copy(alpha = 0.35f)),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = Translations.t(StringKeys.BACK),
-                    tint = Color.White,
+                    tint = FireCashOnSurface,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = Translations.t(StringKeys.BACK),
-                    color = Color.White,
-                    fontSize = 14.sp
+                    color = FireCashOnSurface,
+                    style = MaterialTheme.typography.labelLarge
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = Translations.t(StringKeys.QR_PAYLOAD),
+                text = Translations.t(StringKeys.SLIP_DETAILS),
                 style = MaterialTheme.typography.headlineSmall,
-                color = Color.White
+                color = FireCashOnSurface
             )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Lead with the amount and current verification context. Raw QR data stays below for diagnostics.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(FireCashSurfaceContainerLow, RoundedCornerShape(20.dp))
+                    .border(1.dp, FireCashPrimary.copy(alpha = 0.28f), RoundedCornerShape(20.dp))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = Translations.t(StringKeys.AMOUNT),
+                    color = FireCashOnSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium
+                )
+                Text(
+                    text = (slipData?.amount ?: extractAmount(payload))
+                        ?.let { "${Translations.t(StringKeys.THB)} %.2f".format(Locale.US, it) }
+                        ?: "—",
+                    color = FireCashOnSurface,
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = when (slipData?.verificationStatus) {
+                        VerificationStatus.VERIFIED -> Translations.t(StringKeys.SLIP_VERIFIED)
+                        VerificationStatus.DUPLICATE_DETECTED -> Translations.t(StringKeys.DUPLICATE_SLIP)
+                        VerificationStatus.UNVERIFIED, null -> Translations.t(StringKeys.NOT_VERIFIED)
+                        else -> Translations.t(StringKeys.VERIFICATION_FAILED)
+                    },
+                    color = when (slipData?.verificationStatus) {
+                        VerificationStatus.VERIFIED -> FireCashSecondary
+                        VerificationStatus.DUPLICATE_DETECTED -> Color(0xFFFFC46B)
+                        else -> FireCashOnSurfaceVariant
+                    },
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
             Spacer(modifier = Modifier.height(12.dp))
 
             // Raw payload display — tap to copy with green Copied feedback
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, if (payloadCopied) FireCashSecondary else Color.Gray, RoundedCornerShape(8.dp))
-                    .clickable(enabled = payload.isNotBlank()) {
+                    .heightIn(min = 56.dp)
+                    .background(FireCashSurfaceContainerLow, RoundedCornerShape(14.dp))
+                    .border(1.dp, if (payloadCopied) FireCashSecondary else FireCashOutlineVariant, RoundedCornerShape(14.dp))
+                    .clickable(
+                        enabled = payload.isNotBlank(),
+                        role = Role.Button,
+                        onClickLabel = Translations.fmt(StringKeys.COPY_FIELD, Translations.t(StringKeys.QR_PAYLOAD))
+                    ) {
                         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         cm.setPrimaryClip(ClipData.newPlainText("QR Payload", payload))
                         payloadCopied = true
                     }
-                    .padding(12.dp)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                contentAlignment = Alignment.CenterStart
             ) {
-                Text(
-                    text = when {
-                        payload.isBlank() -> Translations.t(StringKeys.NO_PAYLOAD)
-                        payloadCopied -> Translations.t(StringKeys.COPIED)
-                        else -> payload
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (payloadCopied) FireCashSecondary else Color.White
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = when {
+                            payload.isBlank() -> Translations.t(StringKeys.NO_PAYLOAD)
+                            else -> payload
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (payloadCopied) FireCashSecondary else FireCashOnSurface,
+                        maxLines = 2,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Icon(
+                        imageVector = if (payloadCopied) Icons.Default.CheckCircle else Icons.Default.ContentCopy,
+                        contentDescription = if (payloadCopied) Translations.t(StringKeys.COPIED) else Translations.t(StringKeys.QR_PAYLOAD),
+                        tint = if (payloadCopied) FireCashSecondary else FireCashPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -201,7 +264,7 @@ fun QrPayloadScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFFFFB74D).copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                        .background(FireCashPrimary.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -209,11 +272,11 @@ fun QrPayloadScreen(
                     Icon(
                         imageVector = Icons.Default.Warning,
                         contentDescription = null,
-                        tint = Color(0xFFFFB74D)
+                        tint = FireCashPrimary
                     )
                     Text(
                         text = warning,
-                        color = Color(0xFFFFB74D),
+                        color = FireCashPrimary,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -231,7 +294,7 @@ fun QrPayloadScreen(
                             FireCashSurfaceContainerLow,
                             RoundedCornerShape(16.dp)
                         )
-                        .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                        .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -255,7 +318,7 @@ fun QrPayloadScreen(
                             FireCashSurfaceContainerLow,
                             RoundedCornerShape(16.dp)
                         )
-                        .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                        .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -302,7 +365,7 @@ private fun PhotoSection(photoPath: String) {
         modifier = Modifier
             .fillMaxWidth()
             .background(FireCashSurfaceContainerLow, RoundedCornerShape(16.dp))
-            .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -358,7 +421,7 @@ private fun StatusBanner(slipData: VerifySlipResponse) {
         VerificationStatus.DUPLICATE_DETECTED -> Triple(
             Icons.Default.ErrorOutline,
             Translations.t(StringKeys.DUPLICATE_SLIP),
-            Color(0xFFFFB74D)
+            FireCashPrimary
         )
         VerificationStatus.VERIFIED -> Triple(
             Icons.Default.CheckCircle,
@@ -399,25 +462,47 @@ private fun DetailRow(label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = isCopyable) {
+            .heightIn(min = 48.dp)
+            .clickable(
+                enabled = isCopyable,
+                role = Role.Button,
+                onClickLabel = Translations.fmt(StringKeys.COPY_FIELD, label)
+            ) {
                 if (!isCopyable) return@clickable
                 val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 cm.setPrimaryClip(ClipData.newPlainText(label, value))
                 copied = true
             }
-            .padding(vertical = 2.dp),
+            .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
             color = FireCashOnSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f)
         )
-        Text(
-            text = if (copied) Translations.t(StringKeys.COPIED) else value,
-            color = if (copied) FireCashSecondary else FireCashOnSurface,
-            style = MaterialTheme.typography.bodyMedium
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = value,
+                color = FireCashOnSurface,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            if (copied) {
+                Text(
+                    text = Translations.t(StringKeys.COPIED),
+                    color = FireCashSecondary,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Icon(
+            imageVector = if (copied) Icons.Default.CheckCircle else Icons.Default.ContentCopy,
+            contentDescription = null,
+            tint = if (copied) FireCashSecondary else FireCashOnSurfaceVariant,
+            modifier = Modifier.size(18.dp)
         )
     }
 }
@@ -429,13 +514,13 @@ private fun WalletToggle(
 ) {
     val options = listOf(
         null to Translations.t(StringKeys.BANK) to Icons.Default.AccountBalance,
-        "cash" to Translations.t(StringKeys.CASH) to Icons.Default.AccountBalance
+        "cash" to Translations.t(StringKeys.CASH) to Icons.Default.AccountBalanceWallet
     )
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(FireCashSurfaceContainerLow, RoundedCornerShape(16.dp))
-            .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
         Text(
@@ -452,28 +537,29 @@ private fun WalletToggle(
             options.forEach { (keyLabel, icon) ->
                 val (key, label) = keyLabel
                 val selected = currentWallet == key
-                val bgColor = if (selected) when (key) {
-                    null -> Color(0xFF2563EB)
-                    else -> Color(0xFF10B981)
+                val bgColor = if (selected) {
+                    if (key == null) FireCashPrimaryContainer else FireCashSecondaryContainer
                 } else FireCashSurfaceContainerLow
+                val contentColor = if (selected) FireCashOnSurface else FireCashOnSurfaceVariant
                 Button(
                     onClick = { onToggle?.invoke(key) },
-                    colors = ButtonDefaults.buttonColors(containerColor = bgColor),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = bgColor,
+                        contentColor = contentColor
+                    ),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                 ) {
                     Icon(
                         imageVector = icon,
-                        contentDescription = label,
-                        tint = Color.White,
+                        contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = label,
-                        color = Color.White,
-                        fontSize = 12.sp
+                        style = MaterialTheme.typography.labelLarge
                     )
                 }
             }
@@ -500,7 +586,7 @@ private fun CategoryToggle(
         modifier = Modifier
             .fillMaxWidth()
             .background(FireCashSurfaceContainerLow, RoundedCornerShape(16.dp))
-            .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+            .border(1.dp, FireCashOutlineVariant.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
         Text(
@@ -522,30 +608,32 @@ private fun CategoryToggle(
                     else -> false
                 }
                 val bgColor = if (selected) when (key) {
-                    "income" -> Color(0xFF10B981)
-                    "expense" -> Color(0xFFEF4444)
-                    else -> Color(0xFF6366F1)
+                    "income" -> FireCashSecondaryContainer
+                    "expense" -> FireCashError.copy(alpha = 0.22f)
+                    else -> FireCashPrimaryContainer
                 } else FireCashSurfaceContainerLow
+                val contentColor = if (selected) FireCashOnSurface else FireCashOnSurfaceVariant
                 Button(
                     onClick = {
                         onToggle?.invoke(if (selected) null else key)
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = bgColor),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = bgColor,
+                        contentColor = contentColor
+                    ),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                 ) {
                     Icon(
                         imageVector = icon,
-                        contentDescription = label,
-                        tint = Color.White,
+                        contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = label,
-                        color = Color.White,
-                        fontSize = 12.sp
+                        style = MaterialTheme.typography.labelLarge
                     )
                 }
             }

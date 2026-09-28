@@ -78,6 +78,7 @@ object StringKeys {
     const val DAY = "day"
     const val WEEK = "week"
     const val MONTH = "month"
+    const val SELECT_MONTH = "select_month"
     const val YEAR = "year"
     const val INCOME = "income"
     const val OUTCOME = "outcome"

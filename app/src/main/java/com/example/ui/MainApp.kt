@@ -967,6 +967,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                 slips = if (analyticsWallet == "cash") savedSlips.filter { it.wallet == "cash" }
                     else savedSlips.filter { it.wallet != "cash" },
                 knownNames = knownNames,
+                currentLang = currentLang,
                 onBack = {
                     currentTab = NavTab.HOME
                     showAnalytics = false

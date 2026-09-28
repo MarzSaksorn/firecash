@@ -17,11 +17,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -238,10 +240,12 @@ fun AnalyticsScreen(
     slips: List<SavedSlip>,
     knownNames: List<String> = emptyList(),
     onBack: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    currentLang: String = "en"
 ) {
     val now = LocalDate.now()
     val todayStr = now.toString()
+    val displayLocale = if (currentLang == "th") Locale("th", "TH") else Locale.US
 
     val expenses = remember(slips, knownNames, now) {
         slips.mapNotNull { slip ->
@@ -260,17 +264,56 @@ fun AnalyticsScreen(
 
     var selectedFilter by remember { mutableStateOf(AnalyticsFilter.MONTH) }
 
-    val chartData = remember(expenses, selectedFilter, now) {
+    val monthKey = remember(now) { now.format(DateTimeFormatter.ofPattern("yyyy-MM", Locale.US)) }
+    val availableMonths = remember(expenses, monthKey, displayLocale) {
+        val fmt = DateTimeFormatter.ofPattern("yyyy-MM", Locale.US)
+        (expenses.map { it.date.take(7) } + monthKey)
+            .filter { it.length == 7 }
+            .distinct()
+            .sortedDescending()
+            .mapNotNull { key ->
+                val ym = runCatching { YearMonth.parse(key, fmt) }.getOrNull() ?: return@mapNotNull null
+                MonthTotals(
+                    key = key,
+                    label = "${ym.month.getDisplayName(TextStyle.SHORT, displayLocale)} ${ym.year}",
+                    income = expenses.filter { it.date.startsWith(key) && it.category == "Income" }.sumOf { e -> e.amount },
+                    expense = expenses.filter { it.date.startsWith(key) && it.category != "Income" }.sumOf { e -> e.amount },
+                    isCurrent = key == monthKey
+                )
+            }
+    }
+    var selectedMonthKey by remember(monthKey) { mutableStateOf(monthKey) }
+    var showMonthMenu by remember { mutableStateOf(false) }
+    LaunchedEffect(availableMonths, monthKey) {
+        if (availableMonths.none { it.key == selectedMonthKey }) {
+            selectedMonthKey = availableMonths.firstOrNull { it.key == monthKey }?.key
+                ?: availableMonths.firstOrNull()?.key
+                ?: monthKey
+        }
+    }
+    val activeMonth = availableMonths.firstOrNull { it.key == selectedMonthKey }
+        ?: availableMonths.firstOrNull { it.key == monthKey }
+        ?: availableMonths.firstOrNull()
+    val selectedMonthDate = runCatching {
+        YearMonth.parse(activeMonth?.key ?: monthKey).atDay(1)
+    }.getOrDefault(now)
+    val periodDate = if (selectedFilter == AnalyticsFilter.MONTH || selectedFilter == AnalyticsFilter.YEAR) {
+        selectedMonthDate
+    } else {
+        now
+    }
+
+    val chartData = remember(expenses, selectedFilter, periodDate) {
         when (selectedFilter) {
-            AnalyticsFilter.DAY -> computeDayData(expenses, now)
-            AnalyticsFilter.WEEK -> computeWeekData(expenses, now)
-            AnalyticsFilter.MONTH -> computeMonthData(expenses, now)
-            AnalyticsFilter.YEAR -> computeYearData(expenses, now)
+            AnalyticsFilter.DAY -> computeDayData(expenses, periodDate)
+            AnalyticsFilter.WEEK -> computeWeekData(expenses, periodDate)
+            AnalyticsFilter.MONTH -> computeMonthData(expenses, periodDate)
+            AnalyticsFilter.YEAR -> computeYearData(expenses, periodDate)
         }
     }
 
-    val filteredExpenses = remember(expenses, selectedFilter, now) {
-        filterExpensesForPeriod(expenses, selectedFilter, now)
+    val filteredExpenses = remember(expenses, selectedFilter, periodDate) {
+        filterExpensesForPeriod(expenses, selectedFilter, periodDate)
     }
 
     val analytics = AnalyticsEngine.generateAnalytics(filteredExpenses)
@@ -279,31 +322,11 @@ fun AnalyticsScreen(
     val avgPerDay = analytics.averagePerDay
     val insights = analytics.insights
 
-    val monthKey = remember(now) { now.format(DateTimeFormatter.ofPattern("yyyy-MM", Locale.US)) }
-    val availableMonths = remember(expenses) {
-        val fmt = DateTimeFormatter.ofPattern("yyyy-MM", Locale.US)
-        expenses.map { it.date.take(7) }
-            .filter { it.length == 7 }
-            .distinct()
-            .sortedDescending()
-            .take(3)
-            .mapNotNull { key ->
-                val ym = runCatching { YearMonth.parse(key, fmt) }.getOrNull() ?: return@mapNotNull null
-                MonthTotals(
-                    key = key,
-                    label = "${ym.month.getDisplayName(TextStyle.SHORT, Locale.US)} ${ym.year}",
-                    income = expenses.filter { it.date.startsWith(key) && it.category == "Income" }.sumOf { e -> e.amount },
-                    expense = expenses.filter { it.date.startsWith(key) && it.category != "Income" }.sumOf { e -> e.amount },
-                    isCurrent = key == monthKey
-                )
-            }
-    }
-    var comparedKeys by remember(monthKey, availableMonths) {
-        mutableStateOf(setOf(availableMonths.firstOrNull()?.key ?: monthKey))
+    var comparedKeys by remember(selectedMonthKey, availableMonths) {
+        mutableStateOf(setOf(selectedMonthKey))
     }
     var showCompareDialog by remember { mutableStateOf(false) }
 
-    val activeMonth = remember(availableMonths) { availableMonths.firstOrNull() }
     val incomeTotal = activeMonth?.income ?: 0.0
     val expenseTotal = activeMonth?.expense ?: 0.0
 
@@ -394,29 +417,62 @@ fun AnalyticsScreen(
                             fontWeight = FontWeight.Bold
                         )
                         if (selectedFilter == AnalyticsFilter.MONTH) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = activeMonth?.label?.substringBefore(' ') ?: "",
-                                    color = FireCashOnSurfaceVariant,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Box {
+                                    TextButton(
+                                        onClick = { showMonthMenu = true },
+                                        contentPadding = PaddingValues(horizontal = 8.dp),
+                                        modifier = Modifier.heightIn(min = 48.dp)
+                                    ) {
+                                        Text(
+                                            text = activeMonth?.label ?: Translations.t(StringKeys.SELECT_MONTH),
+                                            color = FireCashOnSurface,
+                                            style = MaterialTheme.typography.labelLarge
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Default.KeyboardArrowDown,
+                                            contentDescription = null,
+                                            tint = FireCashPrimary
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = showMonthMenu,
+                                        onDismissRequest = { showMonthMenu = false }
+                                    ) {
+                                        availableMonths.forEach { month ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        text = if (month.key == selectedMonthKey) "✓ ${month.label}" else month.label,
+                                                        style = MaterialTheme.typography.bodyLarge
+                                                    )
+                                                },
+                                                onClick = {
+                                                    selectedMonthKey = month.key
+                                                    showMonthMenu = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
                                 TextButton(
                                     onClick = { showCompareDialog = true },
-                                    contentPadding = PaddingValues(horizontal = 8.dp)
+                                    contentPadding = PaddingValues(horizontal = 8.dp),
+                                    modifier = Modifier.heightIn(min = 48.dp)
                                 ) {
-                                                                    Text(
-                                                                        Translations.t(StringKeys.COMPARE),
-                                                                        color = FireCashPrimary,
-                                                                        fontSize = 12.sp,
-                                                                        fontWeight = FontWeight.SemiBold
-                                                                    )
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        Translations.t(StringKeys.COMPARE),
+                                        color = FireCashPrimary,
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
 
                                                     // Filter tabs (Week | Month | Year)
                             Row(

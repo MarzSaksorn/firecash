@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -39,6 +40,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.example.ui.theme.FireCashOnSurface
+import com.example.ui.theme.FireCashOnSurfaceVariant
+import com.example.ui.theme.FireCashPrimary
 import com.example.ui.theme.FireCashSecondary
 import com.example.ui.Translations
 import com.example.ui.StringKeys
@@ -127,8 +130,51 @@ fun PhotoCaptureScreen(
     }
 
     Box(modifier = modifier.fillMaxSize().statusBarsPadding()) {
-        // Camera preview
-        AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+        // Camera preview and a clear QR target so operators know how to frame the slip.
+        if (permissionGranted) {
+            AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth(0.78f)
+                    .height(220.dp)
+                    .border(2.dp, FireCashPrimary.copy(alpha = 0.9f), RoundedCornerShape(24.dp))
+            )
+            Text(
+                text = Translations.t(StringKeys.ALIGN_QR),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(y = 132.dp)
+                    .background(Color.Black.copy(alpha = 0.62f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        } else {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PhotoCamera,
+                    contentDescription = null,
+                    tint = FireCashPrimary,
+                    modifier = Modifier.size(48.dp)
+                )
+                Text(
+                    text = Translations.t(StringKeys.CAMERA_PERMISSION_REQUIRED),
+                    color = FireCashOnSurface,
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
+                    Text(Translations.t(StringKeys.ALLOW_CAMERA))
+                }
+            }
+        }
 
         // QR payload display
         if (!payloadText.isNullOrBlank()) {
@@ -223,6 +269,7 @@ fun PhotoCaptureScreen(
 
             // Capture (shutter) button
             IconButton(
+                enabled = permissionGranted && imageCapture != null && !isLoading,
                 onClick = {
                     // Save into persistent app pictures dir so the slip keeps a lasting photo link
                     val photoDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_PICTURES)
@@ -245,7 +292,13 @@ fun PhotoCaptureScreen(
                 modifier = Modifier
                     .size(80.dp)
                     .clip(CircleShape)
-                    .background(Color.White)
+                    .background(
+                        if (permissionGranted && imageCapture != null && !isLoading) {
+                            Color.White
+                        } else {
+                            Color.White.copy(alpha = 0.45f)
+                        }
+                    )
             ) {
                 Icon(
                     imageVector = Icons.Default.PhotoCamera,

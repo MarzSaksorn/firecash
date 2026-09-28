@@ -46,6 +46,9 @@ object StringKeys {
     const val EG_NOTE = "eg_note"
     const val ADD = "add"
     const val SELECTED = "selected"
+    const val DELETE_SLIPS_TITLE = "delete_slips_title"
+    const val DELETE_SLIPS_PARTIAL = "delete_slips_partial"
+    const val DELETE_SLIPS_ONLY = "delete_slips_only"
 
     // Verification
     const val VERIFIED = "verified"
@@ -59,6 +62,11 @@ object StringKeys {
     // Camera / capture
     const val SCANNING = "scanning"
     const val QR_PAYLOAD = "qr_payload"
+    const val SLIP_DETAILS = "slip_details"
+    const val COPY_FIELD = "copy_field"
+    const val CAMERA_PERMISSION_REQUIRED = "camera_permission_required"
+    const val ALLOW_CAMERA = "allow_camera"
+    const val ALIGN_QR = "align_qr"
     const val PICK_FROM_GALLERY = "pick_from_gallery"
     const val CAPTURE_PHOTO = "capture_photo"
 
@@ -93,6 +101,8 @@ object StringKeys {
 
     // Settings
     const val LANGUAGE = "language"
+    const val DARK_MODE = "dark_mode"
+    const val DARK_MODE_DESC = "dark_mode_desc"
     const val ENGLISH = "english"
     const val THAI = "thai"
     const val VERIFICATION = "verification"

@@ -42,6 +42,7 @@ import com.example.ui.screens.QrPayloadScreen
 import com.example.ui.screens.AccountScreen
 import com.example.ui.screens.AnalyticsScreen
 import com.example.ui.theme.FireCashBackground
+import com.example.ui.theme.FireCashTheme
 import com.example.ui.components.FireCashBottomBar
 import com.example.ui.components.NavTab
 
@@ -74,7 +75,7 @@ fun MainApp(modifier: Modifier = Modifier) {
     com.example.service.NotificationPresets.seedIfNeeded(prefs)
         var backgroundListening by remember { mutableStateOf(prefs.getBoolean("background_listening", false)) }
         var isDarkTheme by remember { mutableStateOf(prefs.getBoolean("dark_theme", true)) }
-        LaunchedEffect(isDarkTheme) { com.example.ui.theme.isDarkTheme = isDarkTheme }
+    com.example.ui.theme.isDarkTheme = isDarkTheme
 
     // Refresh statuses whenever the activity resumes (e.g. returning from system settings)
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
@@ -162,21 +163,25 @@ fun MainApp(modifier: Modifier = Modifier) {
 
     // System back handling — mirrors in-app navigation, returns to previous state
     BackHandler(enabled = showPayload) {
+        currentTab = NavTab.HOME
         showPayload = false
         showSavedSlips = true
         showCapture = false
         showAnalytics = false
     }
     BackHandler(enabled = showAnalytics) {
+        currentTab = NavTab.HOME
         showAnalytics = false
         showSavedSlips = true
     }
     BackHandler(enabled = showCapture) {
+        currentTab = NavTab.HOME
         // Capture is now secondary (homepage is Account) → back returns to Account
         showCapture = false
         showSavedSlips = true
     }
     BackHandler(enabled = !showPayload && !showCapture && !showSavedSlips && !showAnalytics) {
+        currentTab = NavTab.HOME
         // Settings (unified) → back to Account (homepage)
         showSavedSlips = true
     }
@@ -202,12 +207,12 @@ fun MainApp(modifier: Modifier = Modifier) {
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
 
-    suspend fun verifyWithEasySlip(payload: String): VerifySlipResponse? {
+        suspend fun verifyWithEasySlip(payload: String): VerifySlipResponse? {
         if (!easySlipEnabled || apiKey.isBlank()) {
             slipWarning = if (easySlipEnabled) {
-                "No API key set — add your ${verificationProvider.label} API key in Settings to verify this slip."
+                Translations.fmt(StringKeys.NO_API_KEY, verificationProvider.label)
             } else {
-                "Slip verification is disabled — enable it in Settings and add your API key to verify slips."
+                Translations.t(StringKeys.VERIFICATION_DISABLED)
             }
             return null
         }
@@ -767,11 +772,48 @@ fun MainApp(modifier: Modifier = Modifier) {
         }
     }
 
-    Scaffold(
+    FireCashTheme(darkTheme = isDarkTheme) {
+        Scaffold(
             containerColor = FireCashBackground,
-            modifier = modifier.fillMaxSize()
-        ) { _ ->
-                    Box(modifier = Modifier.fillMaxSize()) {
+            modifier = modifier.fillMaxSize(),
+            bottomBar = {
+                if (!showPayload && !showCapture) {
+                    FireCashBottomBar(
+                        currentTab = currentTab,
+                        onTabSelected = { tab ->
+                            currentTab = tab
+                            when (tab) {
+                                NavTab.HOME -> {
+                                    showSavedSlips = true
+                                    showCapture = false
+                                    showAnalytics = false
+                                }
+                                NavTab.CARDS -> {
+                                    showSavedSlips = false
+                                    showCapture = true
+                                    showAnalytics = false
+                                }
+                                NavTab.SPENDING -> {
+                                    showSavedSlips = false
+                                    showCapture = false
+                                    showAnalytics = true
+                                }
+                                NavTab.PROFILE -> {
+                                    showSavedSlips = false
+                                    showCapture = false
+                                    showAnalytics = false
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
         if (showPayload) {
             QrPayloadScreen(
                 payload = qrPayload,
@@ -797,6 +839,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                     }
                 },
                 onBack = {
+                    currentTab = NavTab.HOME
                     showPayload = false
                     showSavedSlips = true
                     showCapture = false
@@ -843,11 +886,13 @@ fun MainApp(modifier: Modifier = Modifier) {
                                 },
                 isLoading = isLoading,
                 onNavigateToSettings = {
+                    currentTab = NavTab.PROFILE
                     showCapture = false
                     showSavedSlips = false
                     showAnalytics = false
                 },
                 onNavigateToAccount = {
+                    currentTab = NavTab.HOME
                     showCapture = false
                     showSavedSlips = true
                     showAnalytics = false
@@ -883,26 +928,30 @@ fun MainApp(modifier: Modifier = Modifier) {
                         receivingBank = null,
                         receivingBankName = null,
                         verificationStatus = slip.verificationStatus,
-                        errorMessage = "Not verified — enable EasySlip and Sync unverified in Settings",
+                        errorMessage = Translations.t(StringKeys.NOT_VERIFIED),
                         isAmountMatched = false
                     )
                     qrPhotoPath = slip.photoPath
                     slipWarning = ""
                     slipMismatch = slip.amountMismatch
+                    slipDateMismatch = slip.dateMismatch
                     showSavedSlips = false
                     showPayload = true
                 },
                 onOpenSettings = {
+                    currentTab = NavTab.PROFILE
                     showSavedSlips = false
                     showCapture = false
                     showAnalytics = false
                 },
                 onOpenAnalytics = { wallet ->
+                    currentTab = NavTab.SPENDING
                     analyticsWallet = wallet
                     showSavedSlips = false
                     showAnalytics = true
                 },
                 onOpenCamera = {
+                    currentTab = NavTab.CARDS
                     showSavedSlips = false
                     showCapture = true
                 },
@@ -919,6 +968,7 @@ fun MainApp(modifier: Modifier = Modifier) {
                     else savedSlips.filter { it.wallet != "cash" },
                 knownNames = knownNames,
                 onBack = {
+                    currentTab = NavTab.HOME
                     showAnalytics = false
                     showSavedSlips = true
                 },
@@ -1098,16 +1148,19 @@ fun MainApp(modifier: Modifier = Modifier) {
                     onAddRule = { _, _ -> },
                     onRemoveRule = {},
                     onBack = {
+                        currentTab = NavTab.HOME
                         showCapture = false
                         showSavedSlips = true
                         showAnalytics = false
                     },
                     onNavigateToCapture = {
+                        currentTab = NavTab.CARDS
                         showCapture = true
                         showSavedSlips = false
                         showAnalytics = false
                     }
                 )
+            }
             }
         }
     }

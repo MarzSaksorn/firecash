@@ -927,8 +927,8 @@ fun AccountScreen(
                                 label = { Text(Translations.t(StringKeys.MONEY_OUT)) },
                                 modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = FireCashErrorContainer,
-                                    selectedLabelColor = FireCashOnErrorContainer
+                                    selectedContainerColor = FireCashError.copy(alpha = 0.22f),
+                                    selectedLabelColor = FireCashOnSurface
                                 )
                             )
             }

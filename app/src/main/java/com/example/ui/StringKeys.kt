@@ -77,6 +77,7 @@ object StringKeys {
     const val VS_LAST = "vs_last"
     const val DAY = "day"
     const val WEEK = "week"
+    const val SELECT_WEEK = "select_week"
     const val MONTH = "month"
     const val SELECT_MONTH = "select_month"
     const val YEAR = "year"

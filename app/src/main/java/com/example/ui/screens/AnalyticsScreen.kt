@@ -282,13 +282,47 @@ fun AnalyticsScreen(
                 )
             }
     }
+    val weekKey = remember(now) {
+        now.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toString()
+    }
+    val availableWeeks = remember(expenses, weekKey, displayLocale) {
+        val shortDate = DateTimeFormatter.ofPattern("d MMM", displayLocale)
+        val fullDate = DateTimeFormatter.ofPattern("d MMM yyyy", displayLocale)
+        val starts = (expenses.mapNotNull { expense ->
+            runCatching { LocalDate.parse(expense.date) }.getOrNull()
+                ?.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        } + LocalDate.parse(weekKey))
+            .distinct()
+            .sortedDescending()
+        starts.map { start ->
+            val end = start.plusDays(6)
+            WeekTotals(
+                key = start.toString(),
+                label = if (start.year == end.year) {
+                    "${start.format(shortDate)} – ${end.format(shortDate)} ${end.year}"
+                } else {
+                    "${start.format(fullDate)} – ${end.format(fullDate)}"
+                },
+                start = start,
+                isCurrent = start.toString() == weekKey
+            )
+        }
+    }
     var selectedMonthKey by remember(monthKey) { mutableStateOf(monthKey) }
-    var showMonthMenu by remember { mutableStateOf(false) }
+    var selectedWeekKey by remember(weekKey) { mutableStateOf(weekKey) }
+    var showPeriodMenu by remember { mutableStateOf(false) }
     LaunchedEffect(availableMonths, monthKey) {
         if (availableMonths.none { it.key == selectedMonthKey }) {
             selectedMonthKey = availableMonths.firstOrNull { it.key == monthKey }?.key
                 ?: availableMonths.firstOrNull()?.key
                 ?: monthKey
+        }
+    }
+    LaunchedEffect(availableWeeks, weekKey) {
+        if (availableWeeks.none { it.key == selectedWeekKey }) {
+            selectedWeekKey = availableWeeks.firstOrNull { it.key == weekKey }?.key
+                ?: availableWeeks.firstOrNull()?.key
+                ?: weekKey
         }
     }
     val activeMonth = availableMonths.firstOrNull { it.key == selectedMonthKey }
@@ -297,10 +331,14 @@ fun AnalyticsScreen(
     val selectedMonthDate = runCatching {
         YearMonth.parse(activeMonth?.key ?: monthKey).atDay(1)
     }.getOrDefault(now)
-    val periodDate = if (selectedFilter == AnalyticsFilter.MONTH || selectedFilter == AnalyticsFilter.YEAR) {
-        selectedMonthDate
-    } else {
-        now
+    val activeWeek = availableWeeks.firstOrNull { it.key == selectedWeekKey }
+        ?: availableWeeks.firstOrNull { it.key == weekKey }
+        ?: availableWeeks.firstOrNull()
+    val selectedWeekDate = activeWeek?.start ?: now
+    val periodDate = when (selectedFilter) {
+        AnalyticsFilter.MONTH, AnalyticsFilter.YEAR -> selectedMonthDate
+        AnalyticsFilter.WEEK -> selectedWeekDate
+        AnalyticsFilter.DAY -> now
     }
 
     val chartData = remember(expenses, selectedFilter, periodDate) {
@@ -416,19 +454,35 @@ fun AnalyticsScreen(
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold
                         )
-                        if (selectedFilter == AnalyticsFilter.MONTH) {
+                        if (selectedFilter == AnalyticsFilter.MONTH || selectedFilter == AnalyticsFilter.WEEK) {
+                            val periodOptions = if (selectedFilter == AnalyticsFilter.MONTH) {
+                                availableMonths.map { it.key to it.label }
+                            } else {
+                                availableWeeks.map { it.key to it.label }
+                            }
+                            val selectedPeriodKey = if (selectedFilter == AnalyticsFilter.MONTH) {
+                                selectedMonthKey
+                            } else {
+                                selectedWeekKey
+                            }
+                            val activePeriodLabel = periodOptions.firstOrNull { it.first == selectedPeriodKey }?.second
+                                ?: if (selectedFilter == AnalyticsFilter.MONTH) {
+                                    Translations.t(StringKeys.SELECT_MONTH)
+                                } else {
+                                    Translations.t(StringKeys.SELECT_WEEK)
+                                }
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 Box {
                                     TextButton(
-                                        onClick = { showMonthMenu = true },
+                                        onClick = { showPeriodMenu = true },
                                         contentPadding = PaddingValues(horizontal = 8.dp),
                                         modifier = Modifier.heightIn(min = 48.dp)
                                     ) {
                                         Text(
-                                            text = activeMonth?.label ?: Translations.t(StringKeys.SELECT_MONTH),
+                                            text = activePeriodLabel,
                                             color = FireCashOnSurface,
                                             style = MaterialTheme.typography.labelLarge
                                         )
@@ -439,35 +493,41 @@ fun AnalyticsScreen(
                                         )
                                     }
                                     DropdownMenu(
-                                        expanded = showMonthMenu,
-                                        onDismissRequest = { showMonthMenu = false }
+                                        expanded = showPeriodMenu,
+                                        onDismissRequest = { showPeriodMenu = false }
                                     ) {
-                                        availableMonths.forEach { month ->
+                                        periodOptions.forEach { (key, label) ->
                                             DropdownMenuItem(
                                                 text = {
                                                     Text(
-                                                        text = if (month.key == selectedMonthKey) "✓ ${month.label}" else month.label,
+                                                        text = if (key == selectedPeriodKey) "✓ $label" else label,
                                                         style = MaterialTheme.typography.bodyLarge
                                                     )
                                                 },
                                                 onClick = {
-                                                    selectedMonthKey = month.key
-                                                    showMonthMenu = false
+                                                    if (selectedFilter == AnalyticsFilter.MONTH) {
+                                                        selectedMonthKey = key
+                                                    } else {
+                                                        selectedWeekKey = key
+                                                    }
+                                                    showPeriodMenu = false
                                                 }
                                             )
                                         }
                                     }
                                 }
-                                TextButton(
-                                    onClick = { showCompareDialog = true },
-                                    contentPadding = PaddingValues(horizontal = 8.dp),
-                                    modifier = Modifier.heightIn(min = 48.dp)
-                                ) {
-                                    Text(
-                                        Translations.t(StringKeys.COMPARE),
-                                        color = FireCashPrimary,
-                                        style = MaterialTheme.typography.labelLarge
-                                    )
+                                if (selectedFilter == AnalyticsFilter.MONTH) {
+                                    TextButton(
+                                        onClick = { showCompareDialog = true },
+                                        contentPadding = PaddingValues(horizontal = 8.dp),
+                                        modifier = Modifier.heightIn(min = 48.dp)
+                                    ) {
+                                        Text(
+                                            Translations.t(StringKeys.COMPARE),
+                                            color = FireCashPrimary,
+                                            style = MaterialTheme.typography.labelLarge
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1069,6 +1129,13 @@ private data class MonthTotals(
     val label: String,
     val income: Double,
     val expense: Double,
+    val isCurrent: Boolean
+)
+
+private data class WeekTotals(
+    val key: String,
+    val label: String,
+    val start: LocalDate,
     val isCurrent: Boolean
 )
 
